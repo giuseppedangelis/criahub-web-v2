@@ -9,6 +9,64 @@ export type Json =
 // Apenas os 3 roles principais para a versão web
 export type UserRole = 'admin' | 'criador' | 'assessor'
 
+export type AnimalSex = 'M' | 'F'
+
+export type AnimalCategory =
+  | 'potro'
+  | 'potra'
+  | 'garanhao'
+  | 'egua'
+  | 'castrado'
+
+export type AnimalStatus =
+  | 'ativo'
+  | 'vendido'
+  | 'morto'
+  | 'emprestado'
+  | 'em_servico'
+
+export type ReproductiveEventType =
+  | 'cobertura'
+  | 'inseminacao'
+  | 'coleta_ovulos'
+  | 'transferencia_embriao'
+
+export type GestationStatus =
+  | 'confirmada'
+  | 'em_andamento'
+  | 'nascimento'
+  | 'aborto'
+  | 'reabsorvida'
+
+export type TransactionType = 'receita' | 'despesa'
+
+export type TransactionCategory =
+  | 'venda_animal'
+  | 'servico_reproducao'
+  | 'premiacao'
+  | 'alimentacao'
+  | 'veterinario'
+  | 'medicamento'
+  | 'equipamento'
+  | 'funcionario'
+  | 'infraestrutura'
+  | 'outros'
+
+export type ServiceOrderStatus =
+  | 'pendente'
+  | 'em_andamento'
+  | 'concluido'
+  | 'cancelado'
+
+export type NotificationType =
+  | 'saude'
+  | 'reproducao'
+  | 'financeiro'
+  | 'geral'
+  | 'sistema'
+
+export type HarasMemberRole = 'owner' | 'manager' | 'employee'
+
 export interface Database {
   public: {
     Tables: {
@@ -23,8 +81,8 @@ export interface Database {
           phone: string | null
           location: string | null
           bio: string | null
-          created_at: string | null
-          updated_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id: string
@@ -46,267 +104,364 @@ export interface Database {
           phone?: string | null
           location?: string | null
           bio?: string | null
+          updated_at?: string
         }
       }
       haras: {
         Row: {
           id: string
-          nome: string
-          endereco: string | null
-          cidade: string | null
-          estado: string | null
-          telefone: string | null
+          name: string
+          owner_id: string
+          cnpj: string | null
+          address: string | null
+          city: string | null
+          state: string | null
+          phone: string | null
           email: string | null
           logo_url: string | null
-          plano: string | null
-          plano_status: string | null
-          plano_expira_em: string | null
-          created_at: string | null
-          updated_at: string | null
+          subscription_plan: string
+          subscription_status: string
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          nome: string
-          endereco?: string | null
-          cidade?: string | null
-          estado?: string | null
-          telefone?: string | null
+          name: string
+          owner_id: string
+          cnpj?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          phone?: string | null
           email?: string | null
           logo_url?: string | null
-          plano?: string | null
-          plano_status?: string | null
-          plano_expira_em?: string | null
+          subscription_plan?: string
+          subscription_status?: string
         }
         Update: {
-          nome?: string
-          endereco?: string | null
-          cidade?: string | null
-          estado?: string | null
-          telefone?: string | null
+          name?: string
+          owner_id?: string
+          cnpj?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          phone?: string | null
           email?: string | null
           logo_url?: string | null
-          plano?: string | null
-          plano_status?: string | null
-          plano_expira_em?: string | null
+          subscription_plan?: string
+          subscription_status?: string
+          updated_at?: string
+        }
+      }
+      haras_members: {
+        Row: {
+          id: string
+          haras_id: string
+          user_id: string
+          role: HarasMemberRole
+          permissions: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          haras_id: string
+          user_id: string
+          role: HarasMemberRole
+          permissions?: Json
+        }
+        Update: {
+          haras_id?: string
+          user_id?: string
+          role?: HarasMemberRole
+          permissions?: Json
         }
       }
       animals: {
         Row: {
           id: string
           haras_id: string
-          nome: string
-          registro: string | null
-          chip: string | null
-          marca: string | null
-          sexo: 'Macho' | 'Fêmea'
-          categoria: string
-          pelagem: string | null
-          data_nascimento: string | null
-          pai_id: string | null
-          mae_id: string | null
-          localizacao: string | null
-          piquete: string | null
-          status: string | null
-          para_venda: boolean | null
-          valor_venda: number | null
-          foto_url: string | null
-          observacoes: string | null
-          created_at: string | null
-          updated_at: string | null
+          name: string
+          registry_number: string | null
+          chip_number: string | null
+          brand: string | null
+          sex: AnimalSex
+          category: AnimalCategory
+          birth_date: string | null
+          coat_color: string | null
+          status: AnimalStatus
+          father_id: string | null
+          mother_id: string | null
+          origin_haras: string | null
+          location: string | null
+          observations: string | null
+          main_image_url: string | null
+          images: string[] | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           haras_id: string
-          nome: string
-          registro?: string | null
-          chip?: string | null
-          marca?: string | null
-          sexo: 'Macho' | 'Fêmea'
-          categoria: string
-          pelagem?: string | null
-          data_nascimento?: string | null
-          pai_id?: string | null
-          mae_id?: string | null
-          localizacao?: string | null
-          piquete?: string | null
-          status?: string | null
-          para_venda?: boolean | null
-          valor_venda?: number | null
-          foto_url?: string | null
-          observacoes?: string | null
+          name: string
+          registry_number?: string | null
+          chip_number?: string | null
+          brand?: string | null
+          sex: AnimalSex
+          category: AnimalCategory
+          birth_date?: string | null
+          coat_color?: string | null
+          status?: AnimalStatus
+          father_id?: string | null
+          mother_id?: string | null
+          origin_haras?: string | null
+          location?: string | null
+          observations?: string | null
+          main_image_url?: string | null
+          images?: string[] | null
         }
         Update: {
           haras_id?: string
-          nome?: string
-          registro?: string | null
-          chip?: string | null
-          marca?: string | null
-          sexo?: 'Macho' | 'Fêmea'
-          categoria?: string
-          pelagem?: string | null
-          data_nascimento?: string | null
-          pai_id?: string | null
-          mae_id?: string | null
-          localizacao?: string | null
-          piquete?: string | null
-          status?: string | null
-          para_venda?: boolean | null
-          valor_venda?: number | null
-          foto_url?: string | null
-          observacoes?: string | null
+          name?: string
+          registry_number?: string | null
+          chip_number?: string | null
+          brand?: string | null
+          sex?: AnimalSex
+          category?: AnimalCategory
+          birth_date?: string | null
+          coat_color?: string | null
+          status?: AnimalStatus
+          father_id?: string | null
+          mother_id?: string | null
+          origin_haras?: string | null
+          location?: string | null
+          observations?: string | null
+          main_image_url?: string | null
+          images?: string[] | null
+          updated_at?: string
+        }
+      }
+      reproductive_events: {
+        Row: {
+          id: string
+          haras_id: string
+          animal_id: string
+          event_type: ReproductiveEventType
+          event_date: string
+          stallion_id: string | null
+          mare_id: string | null
+          veterinarian: string | null
+          protocol: string | null
+          observations: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          haras_id: string
+          animal_id: string
+          event_type: ReproductiveEventType
+          event_date: string
+          stallion_id?: string | null
+          mare_id?: string | null
+          veterinarian?: string | null
+          protocol?: string | null
+          observations?: string | null
+        }
+        Update: {
+          haras_id?: string
+          animal_id?: string
+          event_type?: ReproductiveEventType
+          event_date?: string
+          stallion_id?: string | null
+          mare_id?: string | null
+          veterinarian?: string | null
+          protocol?: string | null
+          observations?: string | null
+          updated_at?: string
         }
       }
       gestations: {
         Row: {
           id: string
-          egua_id: string
-          garanhao_id: string | null
-          data_cobertura: string | null
-          data_confirmacao: string | null
-          data_prevista_parto: string | null
-          confirmada: boolean | null
-          status: string | null
-          potro_id: string | null
-          veterinario: string | null
-          observacoes: string | null
-          created_at: string | null
-          updated_at: string | null
+          haras_id: string
+          mare_id: string
+          stallion_id: string | null
+          reproductive_event_id: string | null
+          start_date: string
+          expected_birth_date: string | null
+          actual_birth_date: string | null
+          status: GestationStatus
+          foal_id: string | null
+          observations: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          egua_id: string
-          garanhao_id?: string | null
-          data_cobertura?: string | null
-          data_confirmacao?: string | null
-          data_prevista_parto?: string | null
-          confirmada?: boolean | null
-          status?: string | null
-          potro_id?: string | null
-          veterinario?: string | null
-          observacoes?: string | null
+          haras_id: string
+          mare_id: string
+          stallion_id?: string | null
+          reproductive_event_id?: string | null
+          start_date: string
+          expected_birth_date?: string | null
+          actual_birth_date?: string | null
+          status?: GestationStatus
+          foal_id?: string | null
+          observations?: string | null
         }
         Update: {
-          egua_id?: string
-          garanhao_id?: string | null
-          data_cobertura?: string | null
-          data_confirmacao?: string | null
-          data_prevista_parto?: string | null
-          confirmada?: boolean | null
-          status?: string | null
-          potro_id?: string | null
-          veterinario?: string | null
-          observacoes?: string | null
+          haras_id?: string
+          mare_id?: string
+          stallion_id?: string | null
+          reproductive_event_id?: string | null
+          start_date?: string
+          expected_birth_date?: string | null
+          actual_birth_date?: string | null
+          status?: GestationStatus
+          foal_id?: string | null
+          observations?: string | null
+          updated_at?: string
         }
       }
       transactions: {
         Row: {
           id: string
           haras_id: string
-          tipo: string
-          categoria: string
-          descricao: string | null
-          valor: number
-          data: string
-          forma_pagamento: string | null
-          status: string | null
+          type: TransactionType
+          category: TransactionCategory
+          amount: number
+          description: string
+          date: string
           animal_id: string | null
-          fornecedor: string | null
-          observacoes: string | null
-          created_by: string | null
-          created_at: string | null
+          reference_id: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           haras_id: string
-          tipo: string
-          categoria: string
-          descricao?: string | null
-          valor: number
-          data: string
-          forma_pagamento?: string | null
-          status?: string | null
+          type: TransactionType
+          category: TransactionCategory
+          amount: number
+          description: string
+          date: string
           animal_id?: string | null
-          fornecedor?: string | null
-          observacoes?: string | null
-          created_by?: string | null
+          reference_id?: string | null
+          created_by: string
         }
         Update: {
           haras_id?: string
-          tipo?: string
-          categoria?: string
-          descricao?: string | null
-          valor?: number
-          data?: string
-          forma_pagamento?: string | null
-          status?: string | null
+          type?: TransactionType
+          category?: TransactionCategory
+          amount?: number
+          description?: string
+          date?: string
           animal_id?: string | null
-          fornecedor?: string | null
-          observacoes?: string | null
+          reference_id?: string | null
+          updated_at?: string
+        }
+      }
+      service_orders: {
+        Row: {
+          id: string
+          haras_id: string
+          client_haras_id: string
+          animal_id: string
+          service_type: string
+          status: ServiceOrderStatus
+          price: number
+          start_date: string
+          end_date: string | null
+          observations: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          haras_id: string
+          client_haras_id: string
+          animal_id: string
+          service_type: string
+          status?: ServiceOrderStatus
+          price: number
+          start_date: string
+          end_date?: string | null
+          observations?: string | null
+        }
+        Update: {
+          haras_id?: string
+          client_haras_id?: string
+          animal_id?: string
+          service_type?: string
+          status?: ServiceOrderStatus
+          price?: number
+          start_date?: string
+          end_date?: string | null
+          observations?: string | null
+          updated_at?: string
         }
       }
       notifications: {
         Row: {
           id: string
           user_id: string
-          categoria: string
-          prioridade: string | null
-          titulo: string
-          mensagem: string | null
-          link: string | null
-          lida: boolean | null
-          created_at: string | null
+          type: NotificationType
+          title: string
+          message: string
+          read: boolean
+          data: Json | null
+          created_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          categoria: string
-          prioridade?: string | null
-          titulo: string
-          mensagem?: string | null
-          link?: string | null
-          lida?: boolean | null
+          type: NotificationType
+          title: string
+          message: string
+          read?: boolean
+          data?: Json | null
         }
         Update: {
           user_id?: string
-          categoria?: string
-          prioridade?: string | null
-          titulo?: string
-          mensagem?: string | null
-          link?: string | null
-          lida?: boolean | null
+          type?: NotificationType
+          title?: string
+          message?: string
+          read?: boolean
+          data?: Json | null
         }
       }
       events: {
         Row: {
           id: string
           haras_id: string
-          titulo: string
-          tipo: string
-          data_inicio: string
-          data_fim: string | null
-          descricao: string | null
+          title: string
+          type: string
+          start_date: string
+          end_date: string | null
+          description: string | null
           animal_id: string | null
           created_by: string | null
-          created_at: string | null
+          created_at: string
         }
         Insert: {
           id?: string
           haras_id: string
-          titulo: string
-          tipo: string
-          data_inicio: string
-          data_fim?: string | null
-          descricao?: string | null
+          title: string
+          type: string
+          start_date: string
+          end_date?: string | null
+          description?: string | null
           animal_id?: string | null
           created_by?: string | null
         }
         Update: {
           haras_id?: string
-          titulo?: string
-          tipo?: string
-          data_inicio?: string
-          data_fim?: string | null
-          descricao?: string | null
+          title?: string
+          type?: string
+          start_date?: string
+          end_date?: string | null
+          description?: string | null
           animal_id?: string | null
         }
       }
@@ -318,16 +473,29 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: UserRole
+      animal_sex: AnimalSex
+      animal_category: AnimalCategory
+      animal_status: AnimalStatus
+      reproductive_event_type: ReproductiveEventType
+      gestation_status: GestationStatus
+      transaction_type: TransactionType
+      transaction_category: TransactionCategory
+      service_order_status: ServiceOrderStatus
+      notification_type: NotificationType
+      haras_member_role: HarasMemberRole
     }
   }
 }
 
-// Helper types
+// Helper types para exportação direta das tabelas
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Haras = Database['public']['Tables']['haras']['Row']
+export type HarasMember = Database['public']['Tables']['haras_members']['Row']
 export type Animal = Database['public']['Tables']['animals']['Row']
+export type ReproductiveEvent = Database['public']['Tables']['reproductive_events']['Row']
 export type Gestation = Database['public']['Tables']['gestations']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
+export type ServiceOrder = Database['public']['Tables']['service_orders']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
 export type Event = Database['public']['Tables']['events']['Row']

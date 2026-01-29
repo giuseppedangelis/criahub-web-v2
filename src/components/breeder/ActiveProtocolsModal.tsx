@@ -368,11 +368,10 @@ export function ActiveProtocolsModal({ onClose }: ActiveProtocolsModalProps) {
               <button
                 key={protocol.id}
                 onClick={() => setSelectedProtocol(protocol.id)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                  selectedProtocol === protocol.id
+                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${selectedProtocol === protocol.id
                     ? 'border-primary dark:border-white bg-primary/5 dark:bg-white/5'
                     : 'border-gray-200 dark:border-[#2a3441] hover:border-gray-300 dark:hover:border-[#3a4451]'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -433,29 +432,27 @@ export function ActiveProtocolsModal({ onClose }: ActiveProtocolsModalProps) {
                 {selected.steps.map((step, idx) => {
                   const isNext = idx === selected.completedSteps;
                   const isPast = idx < selected.completedSteps;
-                  const isFuture = idx > selected.completedSteps;
+                  // const isFuture = idx > selected.completedSteps; // Not used
 
                   return (
                     <div key={step.id} className="relative">
                       {/* Linha de Conexão */}
                       {idx < selected.steps.length - 1 && (
                         <div
-                          className={`absolute left-5 top-12 w-0.5 h-full ${\
-                            isPast ? 'bg-gray-400 dark:bg-gray-600' : 'bg-gray-300 dark:bg-[#2a3441]'
-                          }`}
+                          className={`absolute left-5 top-12 w-0.5 h-full ${isPast ? 'bg-gray-400 dark:bg-gray-600' : 'bg-gray-300 dark:bg-[#2a3441]'
+                            }`}
                         />
                       )}
 
                       <div className="flex items-start gap-4 relative">
                         {/* Ícone de Status */}
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${\
-                            step.completed
+                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${step.completed
                               ? 'bg-gray-500 dark:bg-gray-600'
                               : isNext
-                              ? 'bg-primary dark:bg-white border-4 border-primary/20 dark:border-white/20'
-                              : 'bg-gray-300 dark:bg-[#2a3441]'
-                          }`}
+                                ? 'bg-primary dark:bg-white border-4 border-primary/20 dark:border-white/20'
+                                : 'bg-gray-300 dark:bg-[#2a3441]'
+                            }`}
                         >
                           {step.completed ? (
                             <CheckCircle2 className="w-5 h-5 text-white" />
@@ -469,13 +466,12 @@ export function ActiveProtocolsModal({ onClose }: ActiveProtocolsModalProps) {
                         {/* Conteúdo */}
                         <div className="flex-1 pb-4">
                           <div
-                            className={`p-4 rounded-lg border ${
-                              isNext
+                            className={`p-4 rounded-lg border ${isNext
                                 ? 'bg-amber-50 dark:bg-[#151a26] border-amber-200 dark:border-[#2a3441]'
                                 : step.completed
-                                ? 'bg-green-50 dark:bg-[#151a26] border-green-200 dark:border-[#2a3441]'
-                                : 'bg-gray-50 dark:bg-[#151a26] border-gray-200 dark:border-[#2a3441]'
-                            }`}
+                                  ? 'bg-green-50 dark:bg-[#151a26] border-green-200 dark:border-[#2a3441]'
+                                  : 'bg-gray-50 dark:bg-[#151a26] border-gray-200 dark:border-[#2a3441]'
+                              }`}
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2">
@@ -484,24 +480,22 @@ export function ActiveProtocolsModal({ onClose }: ActiveProtocolsModalProps) {
                                 </div>
                                 <div>
                                   <h5
-                                    className={`text-sm font-medium ${\
-                                      isNext
+                                    className={`text-sm font-medium ${isNext
                                         ? 'text-amber-900 dark:text-white'
                                         : step.completed
-                                        ? 'text-green-900 dark:text-white'
-                                        : 'text-foreground dark:text-white'
-                                    }`}
+                                          ? 'text-green-900 dark:text-white'
+                                          : 'text-foreground dark:text-white'
+                                      }`}
                                   >
                                     {step.name}
                                   </h5>
                                   <p
-                                    className={`text-xs ${\
-                                      isNext
+                                    className={`text-xs ${isNext
                                         ? 'text-amber-700 dark:text-[#99a1af]'
                                         : step.completed
-                                        ? 'text-green-700 dark:text-[#99a1af]'
-                                        : 'text-muted-foreground dark:text-[#99a1af]'
-                                    }`}
+                                          ? 'text-green-700 dark:text-[#99a1af]'
+                                          : 'text-muted-foreground dark:text-[#99a1af]'
+                                      }`}
                                   >
                                     {step.description}
                                   </p>
@@ -524,26 +518,24 @@ export function ActiveProtocolsModal({ onClose }: ActiveProtocolsModalProps) {
                             <div className="flex items-center gap-3 text-xs">
                               {step.scheduledDate && (
                                 <span
-                                  className={`flex items-center gap-1 ${
-                                    isNext
+                                  className={`flex items-center gap-1 ${isNext
                                       ? 'text-amber-700 dark:text-[#99a1af]'
                                       : step.completed
-                                      ? 'text-green-700 dark:text-[#99a1af]'
-                                      : 'text-muted-foreground dark:text-[#99a1af]'
-                                  }`}
+                                        ? 'text-green-700 dark:text-[#99a1af]'
+                                        : 'text-muted-foreground dark:text-[#99a1af]'
+                                    }`}
                                 >
                                   <Calendar className="w-3 h-3" />
                                   {formatDate(step.scheduledDate)}
                                 </span>
                               )}
                               <span
-                                className={`flex items-center gap-1 ${
-                                  isNext
+                                className={`flex items-center gap-1 ${isNext
                                     ? 'text-amber-700 dark:text-[#99a1af]'
                                     : step.completed
-                                    ? 'text-green-700 dark:text-[#99a1af]'
-                                    : 'text-muted-foreground dark:text-[#99a1af]'
-                                }`}
+                                      ? 'text-green-700 dark:text-[#99a1af]'
+                                      : 'text-muted-foreground dark:text-[#99a1af]'
+                                  }`}
                               >
                                 Dia {step.dayOffset}
                               </span>
