@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, Calendar, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
-import svgPaths from '../../imports/svg-5k9fcynw1e';
+
 
 interface AddAnimalFormProps {
   onBack: () => void;
@@ -27,7 +27,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.birthDate || !formData.sex) {
       toast.error('Preencha todos os campos obrigatórios!');
       return;
@@ -65,7 +65,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
           <span>/</span>
           <span className="text-foreground dark:text-white">Cadastrar Animal</span>
         </div>
-        
+
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-4 py-2 border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/5 transition-colors"
@@ -83,7 +83,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Informações Básicas */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Informações básicas</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Nome do Animal *</label>
@@ -163,7 +163,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Características Físicas */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Características Físicas</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Altura (cm)</label>
@@ -192,7 +192,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Genealogia */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Genealogia</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Pai</label>
@@ -221,7 +221,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Documentos */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Documentos</h2>
-          
+
           <div className="space-y-2">
             <label className="text-sm text-foreground dark:text-white">Selecionar Arquivo</label>
             <div className="relative">
@@ -240,7 +240,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
                 <span className="text-sm text-foreground dark:text-white">Selecionar Documentos</span>
               </label>
             </div>
-            
+
             {documents.length > 0 && (
               <div className="space-y-2 mt-4">
                 {documents.map((file, index) => (
@@ -263,7 +263,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Fotos */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Fotos</h2>
-          
+
           <div className="space-y-2">
             <label className="text-sm text-foreground dark:text-white">Imagens</label>
             <div className="relative">
@@ -283,7 +283,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
                 <span className="text-sm text-foreground dark:text-white">Selecionar Fotos</span>
               </label>
             </div>
-            
+
             {images.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                 {images.map((file, index) => (
@@ -310,7 +310,7 @@ export function AddAnimalForm({ onBack }: AddAnimalFormProps) {
         {/* Observações */}
         <div className="space-y-4">
           <h2 className="text-2xl text-foreground dark:text-white">Observações</h2>
-          
+
           <div className="space-y-2">
             <label className="text-sm text-foreground dark:text-white">Observações Gerais</label>
             <textarea

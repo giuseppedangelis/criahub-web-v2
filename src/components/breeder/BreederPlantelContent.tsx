@@ -1,6 +1,6 @@
 import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
 import { BreederAnimalDetails } from './BreederAnimalDetails';

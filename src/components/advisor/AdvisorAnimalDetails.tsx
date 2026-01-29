@@ -1,6 +1,6 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit, MapPin, Heart, Calendar, Users, Award, FileText, Activity, Clock, Syringe, Pill, Stethoscope, Baby, Info, Download } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
 

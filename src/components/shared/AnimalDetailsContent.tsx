@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, MapPin, Heart, Calendar, Award, Users, Baby, FileText, Stethoscope, Clock } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from '../breeder/GenealogyTree';
 
 interface Animal {

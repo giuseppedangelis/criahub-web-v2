@@ -1,6 +1,6 @@
 import { ArrowLeft, CheckCircle, X, AlertTriangle, Calendar, MapPin, User, Baby, Image as ImageIcon, FileText, Eye, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
 

@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, MapPin, Home } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {

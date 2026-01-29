@@ -2,7 +2,7 @@ import { Heart, Egg, Baby, Plus, Search, Calendar, Filter, Eye, Edit2, Download,
 import { useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { AdvisorOvulesContent } from './AdvisorOvulesContent';
 import { AdvisorEmbryosContent } from './AdvisorEmbryosContent';
 import { AdvisorPregnanciesContent } from './AdvisorPregnanciesContent';

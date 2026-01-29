@@ -1,6 +1,6 @@
 import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from './GenealogyTree';
 import { AwardsDetailModal } from './AwardsDetailModal';
 import { AnimalLocationSection } from './AnimalLocationSection';

@@ -2,7 +2,7 @@ import { Egg, Plus, Search, Eye, Edit2, Download, Grid3x3, List, ArrowLeft, Chev
 import { useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { AddOvuleModal, EditOvuleModal } from './modals/OvuleModals';
 
 type ViewMode = 'list' | 'card';

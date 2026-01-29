@@ -1,6 +1,6 @@
 import { Search, Filter, Eye, Upload, Download, Info } from 'lucide-react';
 import { useState } from 'react';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { AdvisorAnimalDetails } from './AdvisorAnimalDetails';
 import { AdvisorImportABCCMM } from './AdvisorImportABCCMM';

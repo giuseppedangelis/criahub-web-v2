@@ -12,7 +12,9 @@ import { AdminSettingsContent } from './admin/AdminSettingsContent';
 import { AdminHelpContent } from './admin/AdminHelpContent';
 import { NotificationsPanel } from './NotificationsPanel';
 import { toast } from 'sonner';
-import svgPaths from '../imports/svg-x3gg5gf77d';
+
+// SVG Chart Path
+const revenueChartPath = "M4.91813e-08 57.7594C17.774 57.7594 17.774 11.9184 35.5481 11.9184C53.3221 11.9184 53.3221 22.3368 71.0962 22.3368C88.8703 22.3368 88.8703 49.4247 106.644 49.4247C124.418 49.4247 124.418 18.1695 142.193 18.1695C159.967 18.1695 159.967 53.5921 177.74 53.5921C195.514 53.5921 195.514 32.7552 213.289 32.7552C231.063 32.7552 231.063 24.4205 248.837 24.4205C266.611 24.4205 266.611 64.0105 284.385 64.0105C302.159 64.0105 302.159 78.5962 319.933 78.5962C337.707 78.5962 337.707 1.5 355.481 1.5C373.255 1.5 373.255 43.1736 391.03 43.1736C408.803 43.1736 408.803 68.1778 426.577 68.1778C444.351 68.1778 444.351 14.0021 462.126 14.0021";
 
 export function AdminDashboard() {
   const { theme, toggleTheme } = useTheme();
@@ -465,7 +467,7 @@ function DashboardContent({ onNavigate }: { onNavigate: (tab: string) => void })
             {/* SVG Line Chart */}
             <svg className="w-full h-full" viewBox="0 0 463 91" fill="none" preserveAspectRatio="none">
               <path
-                d={svgPaths.p3c324108}
+                d={revenueChartPath}
                 stroke="#2472BC"
                 strokeWidth="3"
                 fill="none"
