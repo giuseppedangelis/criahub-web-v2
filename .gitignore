@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp migration folder
+/nextjs-temp/
+
+# antigravity skills
+/.agent/skills/
