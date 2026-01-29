@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
-import { User, Package, Plug, Shield, Wrench, Save, Check, X, AlertCircle, Upload, Eye, Key } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { User, Package, Plug, Shield, Wrench, Save, Check, X, AlertCircle, Upload, Eye, Key, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '../../contexts/UserContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { NativeSelect } from '../ui/native-select';
+import { createClient } from '@/lib/supabase/client';
 
 type SettingsTab = 'profile' | 'plans' | 'integrations' | 'security' | 'maintenance';
 
@@ -18,19 +19,169 @@ interface Plan {
 }
 
 export function AdminSettingsContent() {
-  const { user } = useUser();
+  const supabase = createClient();
+  const { user, profile, refreshProfile } = useUser();
   const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Estados do Perfil
+  // Estados do Perfil - inicializa vazio e carrega do contexto
   const [profileData, setProfileData] = useState({
-    name: 'Administrador CriaHub',
-    email: 'admin@criahub.com',
-    phone: '(11) 98765-4321',
-    role: 'Super Administrador',
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
     avatar: '',
+    bio: '',
+    // Endereço completo
+    cep: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
   });
+
+  // Estado para loading do CEP
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  // Carrega dados do perfil quando o profile do contexto muda
+  useEffect(() => {
+    if (profile) {
+      setProfileData({
+        name: profile.full_name || '',
+        email: profile.email || '',
+        phone: formatPhone(profile.phone || ''),
+        role: profile.role || 'admin',
+        avatar: profile.avatar_url || '',
+        bio: '',
+        cep: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: '',
+      });
+
+      // Buscar campos adicionais que podem não estar no contexto
+      loadAdditionalProfileData();
+    }
+  }, [profile]);
+
+  const loadAdditionalProfileData = async () => {
+    if (!user?.id) return;
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('bio, cep, street, number, complement, neighborhood, city, state')
+      .eq('id', user.id)
+      .single();
+
+    const profileExtra = data as {
+      bio: string | null;
+      cep: string | null;
+      street: string | null;
+      number: string | null;
+      complement: string | null;
+      neighborhood: string | null;
+      city: string | null;
+      state: string | null;
+    } | null;
+
+    if (profileExtra) {
+      setProfileData(prev => ({
+        ...prev,
+        bio: profileExtra.bio || '',
+        cep: formatCep(profileExtra.cep || ''),
+        street: profileExtra.street || '',
+        number: profileExtra.number || '',
+        complement: profileExtra.complement || '',
+        neighborhood: profileExtra.neighborhood || '',
+        city: profileExtra.city || '',
+        state: profileExtra.state || '',
+      }));
+    }
+  };
+
+  // Função para formatar telefone brasileiro
+  const formatPhone = (value: string): string => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+
+    // Limita a 11 dígitos
+    const limited = numbers.slice(0, 11);
+
+    // Aplica máscara
+    if (limited.length <= 2) {
+      return limited.length > 0 ? `(${limited}` : '';
+    } else if (limited.length <= 6) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    } else if (limited.length <= 10) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 6)}-${limited.slice(6)}`;
+    } else {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    }
+  };
+
+  // Handler para input de telefone com máscara
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setProfileData({ ...profileData, phone: formatted });
+  };
+
+  // Função para formatar CEP
+  const formatCep = (value: string): string => {
+    const numbers = value.replace(/\D/g, '').slice(0, 8);
+    if (numbers.length <= 5) {
+      return numbers;
+    }
+    return `${numbers.slice(0, 5)}-${numbers.slice(5)}`;
+  };
+
+  // Handler para input de CEP com máscara e busca automática
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCep(e.target.value);
+    setProfileData({ ...profileData, cep: formatted });
+
+    // Buscar endereço quando CEP tiver 8 dígitos
+    const cepNumbers = formatted.replace(/\D/g, '');
+    if (cepNumbers.length === 8) {
+      await fetchAddressFromCep(cepNumbers);
+    }
+  };
+
+  // Buscar endereço via ViaCEP
+  const fetchAddressFromCep = async (cep: string) => {
+    setIsLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setProfileData(prev => ({
+          ...prev,
+          street: data.logradouro || '',
+          neighborhood: data.bairro || '',
+          city: data.localidade || '',
+          state: data.uf || '',
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
+  // Lista de estados brasileiros
+  const BRAZILIAN_STATES = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+  ];
 
   // Estados dos Planos
   const [plans, setPlans] = useState<Plan[]>([
@@ -120,8 +271,48 @@ export function AdminSettingsContent() {
     }
   };
 
-  const handleSaveProfile = () => {
-    toast.success('Perfil atualizado com sucesso!');
+  const handleSaveProfile = async () => {
+    if (!user?.id) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updateData = {
+        full_name: profileData.name,
+        phone: profileData.phone,
+        bio: profileData.bio,
+        avatar_url: profileData.avatar,
+        cep: profileData.cep.replace(/\D/g, ''),
+        street: profileData.street,
+        number: profileData.number,
+        complement: profileData.complement,
+        neighborhood: profileData.neighborhood,
+        city: profileData.city,
+        state: profileData.state,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await (supabase as any)
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Atualizar contexto do usuário
+      await refreshProfile();
+
+      toast.success('Perfil atualizado com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao salvar perfil:', err);
+      toast.error(err.message || 'Erro ao salvar perfil.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEditPlan = (plan: Plan) => {
@@ -131,7 +322,7 @@ export function AdminSettingsContent() {
 
   const handleSavePlan = () => {
     if (!editingPlan) return;
-    
+
     setPlans(plans.map(p => p.id === editingPlan.id ? editingPlan : p));
     setShowEditPlanModal(false);
     toast.success(`Plano ${editingPlan.name} atualizado com sucesso!`);
@@ -189,7 +380,7 @@ export function AdminSettingsContent() {
 
   const handleDisconnectIntegration = (service: 'stripe' | 'asaas' | 'abccmm') => {
     const serviceName = service === 'stripe' ? 'Stripe' : service === 'asaas' ? 'Asaas' : 'ABCCMM';
-    
+
     setConfirmAction({
       title: `Desconectar ${serviceName}`,
       message: `Tem certeza que deseja desconectar o ${serviceName}? Esta ação pode afetar o funcionamento da plataforma.`,
@@ -281,11 +472,10 @@ export function AdminSettingsContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-b-2 border-primary dark:border-white bg-muted dark:bg-[#0d0d0d] text-primary dark:text-white'
-                    : 'text-muted-foreground dark:text-[#99a1af] hover:bg-muted dark:hover:bg-[#0d0d0d]'
-                }`}
+                className={`flex items-center gap-2 px-6 py-4 transition-colors ${activeTab === tab.id
+                  ? 'border-b-2 border-primary dark:border-white bg-muted dark:bg-[#0d0d0d] text-primary dark:text-white'
+                  : 'text-muted-foreground dark:text-[#99a1af] hover:bg-muted dark:hover:bg-[#0d0d0d]'
+                  }`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{tab.name}</span>
@@ -362,9 +552,10 @@ export function AdminSettingsContent() {
                   <input
                     type="email"
                     value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                    disabled
+                    className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-muted-foreground dark:text-[#99a1af] cursor-not-allowed"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">O e-mail não pode ser alterado</p>
                 </div>
                 <div>
                   <label className="block text-sm mb-2 text-foreground dark:text-white">
@@ -373,17 +564,147 @@ export function AdminSettingsContent() {
                   <input
                     type="tel"
                     value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    onChange={handlePhoneChange}
+                    placeholder="(11) 99999-9999"
                     className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                  />
+                </div>
+                {/* Endereço Completo */}
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm font-medium text-foreground dark:text-white">Endereço</span>
+                    <div className="flex-1 h-px bg-border dark:bg-[#3a3a3a]" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* CEP */}
+                    <div className="relative">
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        CEP
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={profileData.cep}
+                          onChange={handleCepChange}
+                          placeholder="00000-000"
+                          className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                        />
+                        {isLoadingCep && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rua */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Rua / Logradouro
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.street}
+                        onChange={(e) => setProfileData({ ...profileData, street: e.target.value })}
+                        placeholder="Nome da rua"
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
+                    </div>
+
+                    {/* Número */}
+                    <div>
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Número
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.number}
+                        onChange={(e) => setProfileData({ ...profileData, number: e.target.value })}
+                        placeholder="Nº"
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
+                    </div>
+
+                    {/* Complemento */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Complemento
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.complement}
+                        onChange={(e) => setProfileData({ ...profileData, complement: e.target.value })}
+                        placeholder="Apto, Sala, etc. (opcional)"
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
+                    </div>
+
+                    {/* Bairro */}
+                    <div>
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Bairro
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.neighborhood}
+                        onChange={(e) => setProfileData({ ...profileData, neighborhood: e.target.value })}
+                        placeholder="Bairro"
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
+                    </div>
+
+                    {/* Cidade */}
+                    <div>
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Cidade
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.city}
+                        onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                        placeholder="Cidade"
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
+                    </div>
+
+                    {/* Estado */}
+                    <div>
+                      <label className="block text-sm mb-2 text-foreground dark:text-white">
+                        Estado
+                      </label>
+                      <select
+                        value={profileData.state}
+                        onChange={(e) => setProfileData({ ...profileData, state: e.target.value })}
+                        className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      >
+                        <option value="">Selecione</option>
+                        {BRAZILIAN_STATES.map((state) => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm mb-2 text-foreground dark:text-white">
+                    Bio / Descrição
+                  </label>
+                  <textarea
+                    value={profileData.bio}
+                    onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                    placeholder="Conte um pouco sobre você..."
+                    rows={3}
+                    className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20 resize-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm mb-2 text-foreground dark:text-white">
-                    Cargo
+                    Cargo / Função
                   </label>
                   <input
                     type="text"
-                    value={profileData.role}
+                    value={profileData.role === 'admin' ? 'Administrador' : profileData.role === 'criador' ? 'Criador' : profileData.role === 'assessor' ? 'Assessor' : profileData.role}
                     disabled
                     className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-muted-foreground dark:text-[#99a1af] cursor-not-allowed"
                   />
@@ -391,10 +712,20 @@ export function AdminSettingsContent() {
               </div>
               <button
                 onClick={handleSaveProfile}
-                className="flex items-center gap-2 px-6 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSaving}
+                className="flex items-center gap-2 px-6 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                <Save className="w-5 h-5" />
-                Salvar Alterações
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Salvar Alterações
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -423,11 +754,10 @@ export function AdminSettingsContent() {
                       </button>
                       <button
                         onClick={() => handleTogglePlan(plan.id)}
-                        className={`px-4 py-2 rounded-xl transition-colors text-sm whitespace-nowrap ${
-                          plan.active
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        }`}
+                        className={`px-4 py-2 rounded-xl transition-colors text-sm whitespace-nowrap ${plan.active
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}
                       >
                         {plan.active ? 'Ativo' : 'Inativo'}
                       </button>
@@ -602,11 +932,10 @@ export function AdminSettingsContent() {
                   )}
                   <button
                     onClick={() => handleDisconnectIntegration('abccmm')}
-                    className={`px-4 py-2 rounded-xl transition-colors ${
-                      integrations.abccmm.connected
-                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40'
-                        : 'bg-primary dark:bg-white text-white dark:text-black hover:opacity-90'
-                    }`}
+                    className={`px-4 py-2 rounded-xl transition-colors ${integrations.abccmm.connected
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40'
+                      : 'bg-primary dark:bg-white text-white dark:text-black hover:opacity-90'
+                      }`}
                   >
                     {integrations.abccmm.connected ? 'Desconectar' : 'Conectar'}
                   </button>
@@ -784,7 +1113,7 @@ export function AdminSettingsContent() {
               <div className="space-y-4">
                 <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-4 space-y-4">
                   <h3 className="text-lg text-foreground dark:text-white">{editingPlan.name}</h3>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -854,9 +1183,9 @@ export function AdminSettingsContent() {
                     <span className="text-muted-foreground dark:text-gray-500">[{log.time}]</span>{' '}
                     <span className={
                       log.type === 'INFO' ? 'text-blue-600 dark:text-blue-400' :
-                      log.type === 'WARN' ? 'text-yellow-600 dark:text-yellow-400' :
-                      log.type === 'SUCCESS' ? 'text-green-600 dark:text-green-400' :
-                      'text-muted-foreground dark:text-gray-400'
+                        log.type === 'WARN' ? 'text-yellow-600 dark:text-yellow-400' :
+                          log.type === 'SUCCESS' ? 'text-green-600 dark:text-green-400' :
+                            'text-muted-foreground dark:text-gray-400'
                     }>
                       {log.type}:
                     </span>{' '}

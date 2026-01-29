@@ -1,8 +1,10 @@
 import { Search, Filter, Download, Send, Edit, MoreVertical, Eye, Plus, X, Check, Calendar } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { toast } from 'sonner';
+import { createClientAction } from '@/app/actions/admin';
+import { maskPhone, maskCurrency, parseCurrency } from '@/utils/masks';
 
 interface Subscription {
   id: string;
@@ -16,105 +18,208 @@ interface Subscription {
 
 export function AdminSubscriptionsContent() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showEditPlanModal, setShowEditPlanModal] = useState(false);
   const [showSendInvoiceModal, setShowSendInvoiceModal] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([
-    { id: '1', harasName: 'Haras do Sol', ownerName: 'Carlos Eduardo Silva', plan: 'Premium', dueDate: '2025-12-15', status: 'Ativa', value: 'R$ 499' },
-    { id: '2', harasName: 'Fazenda Vale Verde', ownerName: 'Maria Fernanda Costa', plan: 'Professional', dueDate: '2025-12-20', status: 'Ativa', value: 'R$ 299' },
-    { id: '3', harasName: 'Haras Boa Esperança', ownerName: 'João Pedro Santos', plan: 'Basic', dueDate: '2025-11-30', status: 'Pendente', value: 'R$ 149' },
-    { id: '4', harasName: 'Haras Aurora', ownerName: 'Ana Paula Oliveira', plan: 'Premium', dueDate: '2025-12-10', status: 'Ativa', value: 'R$ 499' },
-    { id: '5', harasName: 'Haras Vanguarda', ownerName: 'Roberto Almeida', plan: 'Professional', dueDate: '2025-11-25', status: 'Vencida', value: 'R$ 299' },
-    { id: '6', harasName: 'Haras Esperança', ownerName: 'Juliana Martins', plan: 'Basic', dueDate: '2025-12-05', status: 'Suspensa', value: 'R$ 149' },
-  ]);
+  const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
-  const filteredSubscriptions = subscriptions.filter(sub =>
-    sub.harasName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    sub.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    loadSubscriptions();
+  }, [searchQuery, statusFilter, planFilter, pagination.page]);
+
+  const loadSubscriptions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const adminService = await import('@/services/admin');
+      const result = await adminService.getAdminSubscriptions({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchQuery || undefined,
+        status: statusFilter || undefined,
+        plan: planFilter || undefined,
+      });
+
+      setSubscriptions(result.data);
+      setPagination(prev => ({
+        ...prev,
+        total: result.total,
+        totalPages: result.totalPages,
+      }));
+    } catch (err: any) {
+      console.error('Erro ao carregar assinaturas:', err);
+      setError(err.message || 'Erro ao carregar assinaturas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredSubscriptions = subscriptions; // Filtros já aplicados na API
 
   const toggleMenu = (id: string) => {
     setActiveMenuId(activeMenuId === id ? null : id);
   };
 
-  const handleEditPlan = (subscription: Subscription) => {
+  const handleEditPlan = async (subscription: any) => {
     setSelectedSubscription(subscription);
     setShowEditPlanModal(true);
     setActiveMenuId(null);
   };
 
-  const handleSendInvoice = (subscription: Subscription) => {
+  const handleSendInvoice = (subscription: any) => {
     setSelectedSubscription(subscription);
     setShowSendInvoiceModal(true);
     setActiveMenuId(null);
   };
 
-  const handleToggleStatus = (subscription: Subscription) => {
-    // Toggle entre Ativa e Suspensa funcional
-    setSubscriptions(prevSubs => 
-      prevSubs.map(sub => 
-        sub.id === subscription.id
-          ? { ...sub, status: sub.status === 'Ativa' ? 'Suspensa' : 'Ativa' }
-          : sub
-      )
-    );
+  const handleToggleStatus = async (subscription: any) => {
+    try {
+      const adminService = await import('@/services/admin');
+      const newStatus = subscription.status === 'Ativa' ? 'Suspensa' : 'Ativa';
+
+      await adminService.updateSubscriptionPlan(
+        subscription.haras_id,
+        subscription.plan,
+        newStatus
+      );
+
+      toast.success(`Status alterado para ${newStatus}`);
+      loadSubscriptions(); // Recarregar dados
+    } catch (error: any) {
+      console.error('Erro ao alterar status:', error);
+      toast.error(error.message || 'Erro ao alterar status');
+    }
     setActiveMenuId(null);
   };
 
-  const getStatusColor = (status: Subscription['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'Ativa':
+      case 'active':
         return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
       case 'Pendente':
+      case 'trial':
+      case 'pending':
         return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
       case 'Vencida':
+      case 'expired':
         return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
       case 'Suspensa':
+      case 'cancelled':
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
       default:
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
     }
   };
 
-  const getPlanColor = (plan: Subscription['plan']) => {
+  const getPlanColor = (plan: string) => {
     switch (plan) {
       case 'Premium':
+      case 'premium':
         return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
       case 'Professional':
+      case 'professional':
         return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       case 'Basic':
+      case 'basic':
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
       default:
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
     }
   };
+
+  if (loading && subscriptions.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando assinaturas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md p-6 bg-card rounded-lg shadow-lg border border-red-200 dark:border-red-900/50">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Erro ao Carregar</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button
+            onClick={loadSubscriptions}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header com Busca e Novo Cliente */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search Input */}
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
-          <input
-            type="text"
-            placeholder="Pesquisar por haras ou criador..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-          />
+      {/* Header com Busca e Filtros */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
+            <input
+              type="text"
+              placeholder="Pesquisar por haras ou criador..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 rounded-xl bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+            />
+          </div>
+
+          {/* Novo Cliente Button */}
+          <button
+            onClick={() => setShowNewClientModal(true)}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-all whitespace-nowrap"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Novo Cliente</span>
+          </button>
         </div>
 
-        {/* Novo Cliente Button */}
-        <button
-          onClick={() => setShowNewClientModal(true)}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-all whitespace-nowrap"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Novo Cliente</span>
-        </button>
+        {/* Filtros */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <NativeSelect
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Todos os Status</option>
+              <option value="Ativa">Ativa</option>
+              <option value="Pendente">Pendente</option>
+              <option value="Vencida">Vencida</option>
+              <option value="Suspensa">Suspensa</option>
+            </NativeSelect>
+          </div>
+          <div className="flex-1">
+            <NativeSelect
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+            >
+              <option value="">Todos os Planos</option>
+              <option value="Premium">Premium</option>
+              <option value="Professional">Professional</option>
+              <option value="Basic">Basic</option>
+            </NativeSelect>
+          </div>
+        </div>
       </div>
 
       {/* Tabela Desktop / Cards Mobile */}
@@ -127,7 +232,8 @@ export function AdminSubscriptionsContent() {
                 <th className="px-6 py-4 text-left text-foreground dark:text-white">Nome do Haras</th>
                 <th className="px-6 py-4 text-left text-foreground dark:text-white">Criador/Dono</th>
                 <th className="px-6 py-4 text-left text-foreground dark:text-white">Plano</th>
-                <th className="px-6 py-4 text-left text-foreground dark:text-white">Data de Vencimento</th>
+                <th className="px-6 py-4 text-left text-foreground dark:text-white">Próximo Vencimento</th>
+                <th className="px-6 py-4 text-left text-foreground dark:text-white">Animais</th>
                 <th className="px-6 py-4 text-left text-foreground dark:text-white">Status</th>
                 <th className="px-6 py-4 text-center text-foreground dark:text-white">Ações</th>
               </tr>
@@ -135,15 +241,18 @@ export function AdminSubscriptionsContent() {
             <tbody className="divide-y divide-border dark:divide-[rgba(255,255,255,0.1)]">
               {filteredSubscriptions.map((sub) => (
                 <tr key={sub.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
-                  <td className="px-6 py-4 text-foreground dark:text-white">{sub.harasName}</td>
-                  <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">{sub.ownerName}</td>
+                  <td className="px-6 py-4 text-foreground dark:text-white">{sub.haras_name}</td>
+                  <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">{sub.owner_name}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-sm ${getPlanColor(sub.plan)}`}>
                       {sub.plan}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">
-                    {new Date(sub.dueDate).toLocaleDateString('pt-BR')}
+                    {sub.next_payment_date ? new Date(sub.next_payment_date).toLocaleDateString('pt-BR') : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">
+                    {sub.animals_count}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-sm ${getStatusColor(sub.status)}`}>
@@ -162,8 +271,8 @@ export function AdminSubscriptionsContent() {
                       {/* Actions Menu */}
                       {activeMenuId === sub.id && (
                         <>
-                          <div 
-                            className="fixed inset-0 z-40" 
+                          <div
+                            className="fixed inset-0 z-40"
                             onClick={() => setActiveMenuId(null)}
                           />
                           <div className="absolute right-0 top-10 z-50 w-56 bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] py-2">
@@ -188,16 +297,14 @@ export function AdminSubscriptionsContent() {
                                 <span className="text-foreground dark:text-white">
                                   {sub.status === 'Ativa' ? 'Suspender' : 'Ativar'}
                                 </span>
-                                <div className={`w-10 h-6 rounded-full transition-colors ${
-                                  sub.status === 'Ativa' 
-                                    ? 'bg-green-500' 
-                                    : 'bg-gray-300 dark:bg-gray-600'
-                                }`}>
-                                  <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${
-                                    sub.status === 'Ativa' 
-                                      ? 'ml-5' 
-                                      : 'ml-1'
-                                  }`} />
+                                <div className={`w-10 h-6 rounded-full transition-colors ${sub.status === 'Ativa'
+                                  ? 'bg-green-500'
+                                  : 'bg-gray-300 dark:bg-gray-600'
+                                  }`}>
+                                  <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${sub.status === 'Ativa'
+                                    ? 'ml-5'
+                                    : 'ml-1'
+                                    }`} />
                                 </div>
                               </div>
                             </button>
@@ -232,8 +339,8 @@ export function AdminSubscriptionsContent() {
                   {/* Actions Menu Mobile */}
                   {activeMenuId === sub.id && (
                     <>
-                      <div 
-                        className="fixed inset-0 z-40" 
+                      <div
+                        className="fixed inset-0 z-40"
                         onClick={() => setActiveMenuId(null)}
                       />
                       <div className="absolute right-0 top-10 z-50 w-56 bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] py-2">
@@ -258,16 +365,14 @@ export function AdminSubscriptionsContent() {
                             <span className="text-foreground dark:text-white">
                               {sub.status === 'Ativa' ? 'Suspender' : 'Ativar'}
                             </span>
-                            <div className={`w-10 h-6 rounded-full transition-colors ${
-                              sub.status === 'Ativa' 
-                                ? 'bg-green-500' 
-                                : 'bg-gray-300 dark:bg-gray-600'
-                            }`}>
-                              <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${
-                                sub.status === 'Ativa' 
-                                  ? 'ml-5' 
-                                  : 'ml-1'
-                              }`} />
+                            <div className={`w-10 h-6 rounded-full transition-colors ${sub.status === 'Ativa'
+                              ? 'bg-green-500'
+                              : 'bg-gray-300 dark:bg-gray-600'
+                              }`}>
+                              <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-transform ${sub.status === 'Ativa'
+                                ? 'ml-5'
+                                : 'ml-1'
+                                }`} />
                             </div>
                           </div>
                         </button>
@@ -317,43 +422,95 @@ export function AdminSubscriptionsContent() {
 
       {/* Modal: Editar Plano */}
       {showEditPlanModal && selectedSubscription && (
-        <EditPlanModal 
+        <EditPlanModal
           subscription={selectedSubscription}
           onClose={() => {
             setShowEditPlanModal(false);
             setSelectedSubscription(null);
-          }} 
+          }}
         />
       )}
 
       {/* Modal: Enviar Fatura */}
       {showSendInvoiceModal && selectedSubscription && (
-        <SendInvoiceModal 
+        <SendInvoiceModal
           subscription={selectedSubscription}
           onClose={() => {
             setShowSendInvoiceModal(false);
             setSelectedSubscription(null);
-          }} 
+          }}
         />
       )}
     </div>
   );
 }
-
 // Modal: Novo Cliente
 function NewClientModal({ onClose }: { onClose: () => void }) {
   // Adiciona suporte à tecla ESC (acessibilidade WCAG 2.1)
   useEscapeKey(onClose);
-  
+
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    harasName: '',
+    ownerName: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'criador',
+    plan: 'Premium',
+    value: 'R$ 499,00',
+    startDate: new Date().toISOString().split('T')[0],
+    dueDay: 10,
+  });
+
   const [permissions, setPermissions] = useState({
     webAccess: true,
     mobileAccess: true,
     editABCCMM: true,
-    deleteRecords: true,
+    deleteRecords: false,
   });
+
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const togglePermission = (key: keyof typeof permissions) => {
     setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSubmit = async () => {
+    // Validação básica
+    if (!formData.harasName || !formData.ownerName || !formData.email || !formData.password) {
+      toast.error('Preencha os campos obrigatórios (*)');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await createClientAction({
+        ...formData,
+        value: parseCurrency(formData.value),
+        permissions
+      });
+
+      if (result.success) {
+        toast.success(result.warning || 'Cliente cadastrado com sucesso!');
+        onClose();
+        // Recarregar a página para mostrar o novo cliente
+        window.location.reload();
+      } else {
+        toast.error('Erro ao cadastrar: ' + result.error);
+        if (result.error?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+          toast.message('Configuração Necessária', {
+            description: 'Adicione SUPABASE_SERVICE_ROLE_KEY no arquivo .env.local'
+          });
+        }
+      }
+    } catch (err: any) {
+      toast.error('Erro inesperado: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -380,33 +537,39 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                    Nome do Haras
+                    Nome do Haras *
                   </label>
                   <input
                     type="text"
+                    value={formData.harasName}
+                    onChange={(e) => handleChange('harasName', e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                     placeholder="Ex: Haras Aurora"
                   />
                 </div>
                 <div>
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                    Nome do Criador/Dono do Haras
+                    Nome do Criador/Dono *
                   </label>
                   <input
                     type="text"
+                    value={formData.ownerName}
+                    onChange={(e) => handleChange('ownerName', e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                     placeholder="Ex: João Silva"
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                    E-mail de Contato (Login)
+                    E-mail de Contato (Login) *
                   </label>
                   <input
                     type="email"
+                    value={formData.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                     placeholder="email@haras.com.br"
                   />
@@ -417,9 +580,41 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                   </label>
                   <input
                     type="tel"
+                    value={formData.phone}
+                    onChange={(e) => handleChange('phone', maskPhone(e.target.value))}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                    placeholder="Digite o número de telefone"
+                    placeholder="(00) 00000-0000"
                   />
+                </div>
+              </div>
+
+              {/* Senha e Cargo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
+                    Senha de Acesso *
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
+                    Cargo / Função
+                  </label>
+                  <NativeSelect
+                    value={formData.role}
+                    onChange={(e) => handleChange('role', e.target.value)}
+                  >
+                    <option value="criador">Criador (Dono)</option>
+                    <option value="admin">Administrador</option>
+                    <option value="veterinario">Veterinário</option>
+                    <option value="gerente">Gerente</option>
+                  </NativeSelect>
                 </div>
               </div>
             </div>
@@ -432,11 +627,20 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
                     Plano de Assinatura
                   </label>
-                  <NativeSelect>
-                    <option value="">Selecione um plano</option>
-                    <option>Basic</option>
-                    <option>Professional</option>
-                    <option>Premium</option>
+                  <NativeSelect
+                    value={formData.plan}
+                    onChange={(e) => {
+                      const plan = e.target.value;
+                      let val = 'R$ 0,00';
+                      if (plan === 'Basic') val = 'R$ 149,00';
+                      if (plan === 'Professional') val = 'R$ 299,00';
+                      if (plan === 'Premium') val = 'R$ 499,00';
+                      setFormData(prev => ({ ...prev, plan, value: val }));
+                    }}
+                  >
+                    <option value="Basic">Basic</option>
+                    <option value="Professional">Professional</option>
+                    <option value="Premium">Premium</option>
                   </NativeSelect>
                 </div>
                 <div>
@@ -445,12 +649,14 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                   </label>
                   <input
                     type="text"
-                    className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                    placeholder="Ex: 299.00"
+                    value={formData.value}
+                    onChange={(e) => handleChange('value', maskCurrency(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                    placeholder="R$ 0,00"
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
@@ -458,6 +664,8 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                   </label>
                   <input
                     type="date"
+                    value={formData.startDate}
+                    onChange={(e) => handleChange('startDate', e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                   />
                 </div>
@@ -469,6 +677,8 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                     type="number"
                     min="1"
                     max="31"
+                    value={formData.dueDay}
+                    onChange={(e) => handleChange('dueDay', parseInt(e.target.value))}
                     className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                     placeholder="Ex: 15 (Dia 15 de cada mês)"
                   />
@@ -478,91 +688,31 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
 
             {/* Concessão de Permissões */}
             <div>
-              <h3 className="text-lg text-foreground dark:text-white mb-4">Concessão de Permissões</h3>
+              <h3 className="text-lg text-foreground dark:text-white mb-4">Permissões de Acesso</h3>
               <div className="space-y-4">
-                {/* Permissão Web */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-foreground dark:text-white">
-                    Permissão de Acesso Web (Painel Administrativo)
-                  </p>
-                  <button
-                    onClick={() => togglePermission('webAccess')}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex items-center ${
-                      permissions.webAccess 
-                        ? 'bg-green-500' 
+                {/* Permissões Loop */}
+                {Object.entries({
+                  webAccess: 'Acesso ao Painel Admin (Web)',
+                  mobileAccess: 'Acesso Mobile',
+                  editABCCMM: 'Editar Integração ABCCMM',
+                  deleteRecords: 'Permissão para Excluir Registros'
+                }).map(([key, label]) => (
+                  <div key={key} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
+                    <p className="text-sm text-foreground dark:text-white">{label}</p>
+                    <button
+                      onClick={() => togglePermission(key as keyof typeof permissions)}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex items-center ${permissions[key as keyof typeof permissions]
+                        ? 'bg-green-500'
                         : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      permissions.webAccess 
-                        ? 'translate-x-5' 
-                        : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                {/* Permissão Mobile */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-foreground dark:text-white">
-                    Permissão de Acesso Mobile (Visualização Rápida)
-                  </p>
-                  <button
-                    onClick={() => togglePermission('mobileAccess')}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex items-center ${
-                      permissions.mobileAccess 
-                        ? 'bg-green-500' 
-                        : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      permissions.mobileAccess 
-                        ? 'translate-x-5' 
-                        : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                {/* Editar ABCCMM */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-foreground dark:text-white">
-                    Editar Dados Importados da ABCCMM
-                  </p>
-                  <button
-                    onClick={() => togglePermission('editABCCMM')}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex items-center ${
-                      permissions.editABCCMM 
-                        ? 'bg-green-500' 
-                        : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      permissions.editABCCMM 
-                        ? 'translate-x-5' 
-                        : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                {/* Excluir Registros */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-foreground dark:text-white">
-                    Excluir Registros Oficiais de Nascimento
-                  </p>
-                  <button
-                    onClick={() => togglePermission('deleteRecords')}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex items-center ${
-                      permissions.deleteRecords 
-                        ? 'bg-green-500' 
-                        : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      permissions.deleteRecords 
-                        ? 'translate-x-5' 
-                        : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
+                        }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${permissions[key as keyof typeof permissions]
+                        ? 'translate-x-5'
+                        : 'translate-x-0.5'
+                        }`} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -571,18 +721,24 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-center justify-end gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
             <button
               onClick={onClose}
-              className="px-6 py-3 rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
+              disabled={loading}
+              className="px-6 py-3 rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
-              onClick={() => {
-                toast.success('Cliente cadastrado com sucesso!');
-                onClose();
-              }}
-              className="px-6 py-3 rounded-xl bg-primary dark:bg-white text-white dark:text-black hover:opacity-90 transition-all"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="px-6 py-3 rounded-xl bg-primary dark:bg-white text-white dark:text-black hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              Cadastrar Cliente
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <span>Processando...</span>
+                </>
+              ) : (
+                <span>Cadastrar Cliente</span>
+              )}
             </button>
           </div>
         </div>
@@ -591,11 +747,38 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+
+
+
 // Modal: Editar Plano
-function EditPlanModal({ subscription, onClose }: { subscription: Subscription; onClose: () => void }) {
+function EditPlanModal({ subscription, onClose }: { subscription: any; onClose: () => void }) {
   // Adiciona suporte à tecla ESC (acessibilidade WCAG 2.1)
   useEscapeKey(onClose);
-  
+  const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState(subscription.plan);
+  const [status, setStatus] = useState(subscription.status);
+
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      const adminService = await import('@/services/admin');
+
+      await adminService.updateSubscriptionPlan(
+        subscription.haras_id,
+        plan,
+        status
+      );
+
+      toast.success('Plano atualizado com sucesso!');
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao atualizar plano:', error);
+      toast.error(error.message || 'Erro ao atualizar plano');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
@@ -630,10 +813,10 @@ function EditPlanModal({ subscription, onClose }: { subscription: Subscription; 
               <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
                 Plano Atual
               </label>
-              <NativeSelect defaultValue={subscription.plan}>
-                <option>Basic</option>
-                <option>Professional</option>
-                <option>Premium</option>
+              <NativeSelect value={plan} onChange={(e) => setPlan(e.target.value)}>
+                <option value="Basic">Basic</option>
+                <option value="Professional">Professional</option>
+                <option value="Premium">Premium</option>
               </NativeSelect>
             </div>
 
@@ -643,7 +826,7 @@ function EditPlanModal({ subscription, onClose }: { subscription: Subscription; 
               </label>
               <input
                 type="date"
-                defaultValue={subscription.dueDate}
+                defaultValue={subscription.next_payment_date}
                 className="w-full px-4 py-3 rounded-xl bg-background dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
               />
             </div>
@@ -652,11 +835,11 @@ function EditPlanModal({ subscription, onClose }: { subscription: Subscription; 
               <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
                 Status
               </label>
-              <NativeSelect defaultValue={subscription.status}>
-                <option>Ativa</option>
-                <option>Pendente</option>
-                <option>Vencida</option>
-                <option>Suspensa</option>
+              <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="Ativa">Ativa</option>
+                <option value="Pendente">Pendente</option>
+                <option value="Vencida">Vencida</option>
+                <option value="Suspensa">Suspensa</option>
               </NativeSelect>
             </div>
           </div>
@@ -665,18 +848,17 @@ function EditPlanModal({ subscription, onClose }: { subscription: Subscription; 
           <div className="flex items-center justify-end gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
             <button
               onClick={onClose}
-              className="px-6 py-3 rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
+              disabled={loading}
+              className="px-6 py-3 rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
-              onClick={() => {
-                toast.success('Plano atualizado com sucesso!');
-                onClose();
-              }}
-              className="px-6 py-3 rounded-xl bg-primary dark:bg-white text-white dark:text-black hover:opacity-90 transition-all"
+              onClick={handleSave}
+              disabled={loading}
+              className="px-6 py-3 rounded-xl bg-primary dark:bg-white text-white dark:text-black hover:opacity-90 transition-all disabled:opacity-50"
             >
-              Salvar
+              {loading ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>
@@ -689,7 +871,7 @@ function EditPlanModal({ subscription, onClose }: { subscription: Subscription; 
 function SendInvoiceModal({ subscription, onClose }: { subscription: Subscription; onClose: () => void }) {
   // Adiciona suporte à tecla ESC (acessibilidade WCAG 2.1)
   useEscapeKey(onClose);
-  
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />

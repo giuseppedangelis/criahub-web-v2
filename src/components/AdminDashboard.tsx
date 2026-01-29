@@ -361,45 +361,171 @@ export function AdminDashboard() {
 }
 
 function DashboardContent({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Buscar estatísticas de assinaturas
+      const subscriptionStats = await (await import('@/services/admin')).getSubscriptionStats();
+
+      // Buscar métricas da plataforma
+      const platformMetrics = await (await import('@/services/admin')).getPlatformMetrics();
+
+      // Buscar histórico de receita
+      const revenueHistory = await (await import('@/services/admin')).getRevenueHistory();
+
+      setStats({
+        subscriptions: subscriptionStats,
+        platform: platformMetrics,
+        revenueHistory,
+      });
+    } catch (err: any) {
+      console.error('Erro ao carregar dados do dashboard:', err);
+      setError(err.message || 'Erro ao carregar dados');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateChartPath = (data: any[]) => {
+    if (!data || data.length === 0) return "";
+
+    // Extract values
+    const values = data.map(d => d.revenue);
+    const max = Math.max(...values, 1); // Avoid division by zero
+    const min = Math.min(...values);
+
+    // Dimensions matching viewBox "0 0 463 91"
+    const width = 463;
+    const height = 91;
+    const padding = 5;
+
+    const usableHeight = height - (padding * 2);
+
+    // Points generation
+    const points = values.map((val, index) => {
+      const x = (width / (values.length - 1)) * index;
+      // Invert Y because SVG 0 is top
+      // Normalize value between 0 and 1
+      const normalized = (val - min) / ((max - min) || 1);
+      // Map to height (higher value -> lower y)
+      const y = height - padding - (normalized * usableHeight);
+      return `${x},${y}`;
+    });
+
+    // Create curved line (Catmull-Rom or simple bezier)
+    // For simplicity, using simple line or basic curve simulation
+    // Let's use simple L for now to ensure robustness, or a basic cubic bezier smoothing helper?
+    // Given usage context, straight lines or simple smoothing is safer.
+    // Let's try to make it smooth.
+
+    if (points.length < 2) return "";
+
+    let path = `M ${points[0]}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, y0] = points[i].split(',').map(Number);
+      const [x1, y1] = points[i + 1].split(',').map(Number);
+
+      // Simple smoothing: use midpoints for control points
+      const cpx1 = x0 + (x1 - x0) / 2;
+      const cpy1 = y0;
+      const cpx2 = x0 + (x1 - x0) / 2;
+      const cpy2 = y1;
+
+      path += ` C ${cpx1},${cpy1} ${cpx2},${cpy2} ${x1},${y1}`;
+    }
+
+    return path;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando métricas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md p-6 bg-card rounded-lg shadow-lg border border-red-200 dark:border-red-900/50">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Erro ao Carregar Dados</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button
+            onClick={loadDashboardData}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const chartPath = generateChartPath(stats.revenueHistory);
+
   const metrics = [
     {
-      title: 'Receita Total',
-      value: '728',
-      change: '+12.5%',
+      title: 'Receita Mensal',
+      value: new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(stats.subscriptions.monthly_revenue),
+      change: '+12.5%', // TODO: Calculate real change
       trend: 'up' as const,
       color: 'emerald',
       icon: TrendingUp,
     },
     {
       title: 'Assinaturas Ativas',
-      value: '1,245',
-      change: '+5%',
+      value: stats.subscriptions.active_subscriptions.toLocaleString('pt-BR'),
+      change: `+${stats.subscriptions.new_customers_month}`,
       trend: 'up' as const,
       color: 'blue',
       icon: Users,
     },
     {
-      title: 'Taxa de Cancelamentos',
-      value: '1.8%',
+      title: 'Taxa de Renovação',
+      value: `${(stats.subscriptions.renewal_rate * 100).toFixed(1)}%`,
       change: '+0.3%',
-      trend: 'down' as const,
-      color: 'red',
-      icon: TrendingDown,
+      trend: 'up' as const,
+      color: 'green',
+      icon: TrendingUp,
     },
     {
-      title: 'Conversão de Planos',
-      value: '65%',
-      change: '+2.1%',
+      title: 'Total de Usuários',
+      value: stats.platform.total_users.toLocaleString('pt-BR'),
+      change: '+5%',
       trend: 'up' as const,
       color: 'violet',
-      icon: Repeat,
+      icon: Users,
     },
   ];
 
+  const totalSubs = stats.subscriptions.total_subscriptions || 1; // Avoid division by zero
   const conversionData = [
-    { label: 'Leads', percentage: 100, color: 'bg-red-500' },
-    { label: 'Trial', percentage: 73, color: 'bg-violet-500' },
-    { label: 'Pago', percentage: 53, color: 'bg-emerald-500' },
+    { label: 'Total de Haras', percentage: 100, color: 'bg-blue-500' },
+    { label: 'Ativos', percentage: (stats.subscriptions.active_subscriptions / totalSubs) * 100, color: 'bg-emerald-500' },
+    { label: 'Trial', percentage: (stats.subscriptions.trial_subscriptions / totalSubs) * 100, color: 'bg-violet-500' },
   ];
 
   return (
@@ -426,6 +552,10 @@ function DashboardContent({ onNavigate }: { onNavigate: (tab: string) => void })
             violet: {
               bg: 'bg-violet-500',
               text: 'text-violet-500',
+            },
+            green: {
+              bg: 'bg-green-500',
+              text: 'text-green-500',
             },
           };
 
@@ -467,7 +597,7 @@ function DashboardContent({ onNavigate }: { onNavigate: (tab: string) => void })
             {/* SVG Line Chart */}
             <svg className="w-full h-full" viewBox="0 0 463 91" fill="none" preserveAspectRatio="none">
               <path
-                d={revenueChartPath}
+                d={chartPath}
                 stroke="#2472BC"
                 strokeWidth="3"
                 fill="none"
@@ -477,10 +607,9 @@ function DashboardContent({ onNavigate }: { onNavigate: (tab: string) => void })
 
           {/* X-axis labels */}
           <div className="flex justify-between text-[10px] text-muted-foreground dark:text-[#b7c3d1]">
-            <span>S1</span>
-            <span>S2</span>
-            <span>S3</span>
-            <span>S4</span>
+            {stats.revenueHistory?.map((data: any, index: number) => (
+              <span key={index}>{data.month}</span>
+            ))}
           </div>
         </div>
 
