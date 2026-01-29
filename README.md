@@ -1,36 +1,168 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CriaHub - Sistema de Gestão para Haras
 
-## Getting Started
+Sistema completo de gestão para criadores de cavalos Mangalarga Marchador, desenvolvido com Next.js, React, TypeScript, Tailwind CSS, Shadcn/ui e Supabase.
 
-First, run the development server:
+## 🛠️ Stack Tecnológica
+
+- **Frontend**: Next.js 16+ (App Router), React 19, TypeScript
+- **Estilização**: Tailwind CSS 4, Shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **Forms**: React Hook Form + Zod
+- **Estado**: TanStack Query
+- **Gráficos**: Recharts
+- **Ícones**: Lucide React
+
+## 🚀 Começando
+
+### 1. Pré-requisitos
+
+- Node.js 18+
+- npm ou yarn
+- Conta no Supabase
+
+### 2. Configuração do Supabase
+
+1. Acesse seu projeto no [Supabase Dashboard](https://supabase.com/dashboard)
+2. Vá em **Project Settings** > **API**
+3. Copie a **URL** e a **anon key**
+
+### 3. Configuração do Projeto
+
+```bash
+# Clone o repositório (se necessário)
+cd criahub-web/nextjs-temp
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.local.example .env.local
+```
+
+Edite o arquivo `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_anon_key_aqui
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+### 4. Configuração do Banco de Dados
+
+Execute as migrations no SQL Editor do Supabase:
+
+1. Acesse **SQL Editor** no Supabase Dashboard
+2. Cole o conteúdo de `supabase/migrations/001_initial_schema.sql`
+3. Execute o script
+
+### 5. Criando Usuário de Teste
+
+No SQL Editor do Supabase, após criar as tabelas:
+
+```sql
+-- Criar usuário admin de teste
+-- Primeiro, crie o usuário via Auth (Dashboard > Authentication > Users > Add User)
+-- Email: admin@criahub.com | Senha: Admin@123
+
+-- Depois, atualize o role para admin:
+UPDATE profiles SET role = 'admin' WHERE id = 'USER_ID_AQUI';
+```
+
+### 6. Rodando o Projeto
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse: [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Estrutura do Projeto
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/
+│   ├── (auth)/           # Rotas de autenticação
+│   │   ├── login/
+│   │   └── forgot-password/
+│   ├── (dashboard)/      # Rotas protegidas
+│   │   ├── admin/        # Módulo Admin
+│   │   ├── criador/      # Módulo Criador
+│   │   └── assessor/     # Módulo Assessor
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── ui/               # Componentes Shadcn/ui
+│   ├── shared/           # Componentes compartilhados
+│   ├── admin/            # Componentes do Admin
+│   ├── breeder/          # Componentes do Criador
+│   └── advisor/          # Componentes do Assessor
+├── contexts/
+│   ├── auth-context.tsx
+│   └── theme-context.tsx
+├── hooks/
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts
+│   │   ├── server.ts
+│   │   └── middleware.ts
+│   └── utils.ts
+├── services/
+├── types/
+│   └── database.types.ts
+└── middleware.ts
+```
 
-## Learn More
+## 👥 Perfis de Usuário
 
-To learn more about Next.js, take a look at the following resources:
+| Perfil | Rota Base | Descrição |
+|--------|-----------|-----------|
+| Admin | `/admin` | Gerencia a plataforma e assinaturas |
+| Criador | `/criador` | Proprietário do haras, gestão completa |
+| Assessor | `/assessor` | Auditor administrativo, validação de dados |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔐 Autenticação
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+O sistema utiliza Supabase Auth com:
+- Login com email/senha
+- Recuperação de senha
+- Proteção de rotas via middleware
+- Controle de acesso baseado em roles
 
-## Deploy on Vercel
+## 📊 Módulos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Admin
+- Dashboard com KPIs da plataforma
+- Gerenciamento de assinaturas
+- Métricas de uso
+- Alertas críticos
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Criador
+- Dashboard com visão geral do plantel
+- Gestão de animais (CRUD completo)
+- Reprodução (coberturas, gestações, nascimentos)
+- Financeiro (receitas, despesas)
+- Agenda de eventos
+- Relatórios
+
+### Assessor
+- Dashboard com pendências
+- Importação de dados ABCCMM
+- Validação de registros
+- Ordens de serviço
+- Gestão de equipe
+- Documentos
+
+## 🔄 Próximos Passos
+
+1. [ ] Configurar Supabase com chave anon
+2. [ ] Executar migrations
+3. [ ] Criar usuário de teste
+4. [ ] Implementar páginas internas dos módulos
+5. [ ] Adicionar componentes de domain (AnimalCard, DataTable, etc.)
+6. [ ] Implementar integração com ABCCMM
+7. [ ] Configurar Storage para imagens
+8. [ ] Adicionar testes
+
+## 📝 Licença
+
+Projeto privado - CriaHub © 2026

@@ -1,0 +1,272 @@
+import { useState } from 'react';
+import { Shield, AlertTriangle, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { NativeSelect } from '../ui/native-select';
+
+interface AddCollaboratorFormProps {
+  onClose: () => void;
+}
+
+export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    role: '',
+  });
+
+  const [permissions, setPermissions] = useState({
+    plantel: {
+      view: false,
+      edit: false,
+      add: false,
+    },
+    reproduction: {
+      view: false,
+      manage: false,
+    },
+    agenda: {
+      view: false,
+      createEdit: false,
+    },
+    reports: {
+      view: false,
+      export: false,
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.fullName || !formData.email || !formData.role) {
+      toast.error('Preencha todos os campos obrigatórios!');
+      return;
+    }
+
+    toast.success('Colaborador adicionado com sucesso!');
+    onClose();
+  };
+
+  const togglePermission = (module: keyof typeof permissions, permission: string) => {
+    setPermissions({
+      ...permissions,
+      [module]: {
+        ...permissions[module],
+        [permission]: !permissions[module][permission as keyof typeof permissions[typeof module]],
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Formulário */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Cabeçalho com botão fechar */}
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h2 className="text-xl text-foreground dark:text-white mb-1">Adicionar Colaborador</h2>
+              <p className="text-sm text-muted-foreground dark:text-gray-500">Adicione um novo colaborador ao seu sistema</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-muted-foreground dark:text-gray-500 hover:text-foreground dark:hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Informações Básicas */}
+          <div className="space-y-3">
+            <h3 className="text-lg text-foreground dark:text-white">Informações Básicas</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm text-foreground dark:text-white">Nome Completo *</label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  placeholder="Digite o nome completo"
+                  className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-foreground dark:text-white">Email *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Digite o email"
+                  className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-foreground dark:text-white">Função/Cargo *</label>
+              <NativeSelect
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                className="w-full h-10 px-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+              >
+                <option value="">Selecione a função</option>
+                <option value="Gerente">Gerente</option>
+                <option value="Tratador">Tratador</option>
+                <option value="Veterinário">Veterinário</option>
+                <option value="Assistente">Assistente</option>
+                <option value="Estagiário">Estagiário</option>
+              </NativeSelect>
+            </div>
+          </div>
+
+          {/* Permissões Detalhadas */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-muted-foreground dark:text-[#6B7280]" />
+                <h3 className="text-lg text-foreground dark:text-white">Permissões Detalhadas</h3>
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <p className="text-xs text-muted-foreground dark:text-gray-500">Configure permissões específicas por módulo (disponível apenas no Premium)</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Plantel */}
+              <div className="space-y-2">
+                <h4 className="text-sm text-foreground dark:text-white">Plantel</h4>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.plantel.view}
+                      onChange={() => togglePermission('plantel', 'view')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Visualizar animais</span>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.plantel.edit}
+                      onChange={() => togglePermission('plantel', 'edit')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Editar informações dos animais</span>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.plantel.add}
+                      onChange={() => togglePermission('plantel', 'add')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Adicionar novos animais</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Reprodução */}
+              <div className="space-y-2">
+                <h4 className="text-sm text-foreground dark:text-white">Reprodução</h4>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.reproduction.view}
+                      onChange={() => togglePermission('reproduction', 'view')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Visualizar dados reprodutivos</span>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.reproduction.manage}
+                      onChange={() => togglePermission('reproduction', 'manage')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Gerenciar coberturas e gestações</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Agenda */}
+              <div className="space-y-2">
+                <h4 className="text-sm text-foreground dark:text-white">Agenda</h4>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.agenda.view}
+                      onChange={() => togglePermission('agenda', 'view')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Visualizar agenda</span>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.agenda.createEdit}
+                      onChange={() => togglePermission('agenda', 'createEdit')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Criar e editar eventos</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Relatórios */}
+              <div className="space-y-2">
+                <h4 className="text-sm text-foreground dark:text-white">Relatórios</h4>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.reports.view}
+                      onChange={() => togglePermission('reports', 'view')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Visualizar relatórios</span>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permissions.reports.export}
+                      onChange={() => togglePermission('reports', 'export')}
+                      className="mt-0.5 w-4 h-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground dark:text-white">Exportar relatórios</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botões */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-12 py-3 border border-border dark:border-[#b0b0b0] rounded-lg text-foreground dark:text-[#b0b0b0] hover:bg-muted dark:hover:bg-white/5 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-12 py-3 bg-primary dark:bg-white text-white dark:text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Salvar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
