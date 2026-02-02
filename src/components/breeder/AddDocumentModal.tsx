@@ -3,7 +3,8 @@ import { useState } from 'react';
 
 interface AddDocumentModalProps {
   onClose: () => void;
-  onSave: (data: DocumentData) => void;
+  onSave: (data: DocumentData) => Promise<void> | void;
+  isSaving?: boolean;
 }
 
 export interface DocumentData {
@@ -15,7 +16,7 @@ export interface DocumentData {
   file?: File;
 }
 
-export function AddDocumentModal({ onClose, onSave }: AddDocumentModalProps) {
+export function AddDocumentModal({ onClose, onSave, isSaving }: AddDocumentModalProps) {
   const [formData, setFormData] = useState<DocumentData>({
     name: '',
     type: 'Certificado',
@@ -23,19 +24,33 @@ export function AddDocumentModal({ onClose, onSave }: AddDocumentModalProps) {
     date: new Date().toISOString().split('T')[0],
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
       setFormData({ ...formData, file });
+      if (fileError) setFileError('');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-    onClose();
+
+    if (!selectedFile) {
+      setFileError('Selecione um arquivo para continuar.');
+      return;
+    }
+
+    if (isSaving) return;
+
+    try {
+      await onSave(formData);
+      onClose();
+    } catch {
+      // Erro tratado pelo chamador
+    }
   };
 
   return (
@@ -98,6 +113,9 @@ export function AddDocumentModal({ onClose, onSave }: AddDocumentModalProps) {
                 )}
               </label>
             </div>
+            {fileError && (
+              <p className="text-sm text-red-500 mt-2">{fileError}</p>
+            )}
           </div>
 
           {/* Nome do Documento */}
@@ -201,9 +219,10 @@ export function AddDocumentModal({ onClose, onSave }: AddDocumentModalProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+              disabled={isSaving}
+              className="flex-1 px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Adicionar Documento
+              {isSaving ? 'Salvando...' : 'Adicionar Documento'}
             </button>
           </div>
         </form>

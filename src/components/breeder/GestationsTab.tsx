@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Eye, Calendar, AlertCircle } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
 import { ConfirmPregnancyModal } from './ConfirmPregnancyModal';
+import type { Animal, Gestation } from '@/types';
+import { toast } from 'sonner';
 
 interface Gestacao {
-  id: number;
+  id: string;
   receptora: string;
   maeBiologica: string;
   garanhao: string;
@@ -18,85 +20,79 @@ interface Gestacao {
   observacoes?: string;
 }
 
-export function GestationsTab() {
+interface GestationsTabProps {
+  gestations: Gestation[];
+  mares?: Animal[];
+  stallions?: Animal[];
+  onConfirmGestation?: (input: {
+    mareId: string;
+    stallionId?: string;
+    confirmationDate: string;
+    method: string;
+    observations?: string;
+  }) => Promise<void> | void;
+  isSaving?: boolean;
+}
+
+export function GestationsTab({
+  gestations,
+  mares = [],
+  stallions = [],
+  onConfirmGestation,
+  isSaving,
+}: GestationsTabProps) {
   const [selectedAnimal, setSelectedAnimal] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedGestacao, setSelectedGestacao] = useState<Gestacao | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [selectedAnimalForConfirmation, setSelectedAnimalForConfirmation] = useState('Selecione um animal');
+  const [selectedMareId, setSelectedMareId] = useState('');
+  const [selectedStallionId, setSelectedStallionId] = useState('');
 
-  const gestacoes: Gestacao[] = [
-    {
-      id: 1,
-      receptora: 'Estrela da Manhã',
-      maeBiologica: 'Lua Cheia',
-      garanhao: 'Trovão Negro',
-      dataCobertura: '15/08/2024',
-      dataConfirmacao: '10/09/2024',
-      diasGestacao: 94,
-      dataPrevistaParto: '20/06/2025',
-      status: 'confirmada',
-      veterinario: 'Dr. João Silva',
-      isTransferencia: true,
-      observacoes: 'Transferência de embrião realizada com sucesso',
-    },
-    {
-      id: 2,
-      receptora: 'Bella Vista',
-      maeBiologica: 'Bella Vista',
-      garanhao: 'Imperador',
-      dataCobertura: '20/09/2024',
-      dataConfirmacao: '15/10/2024',
-      diasGestacao: 58,
-      dataPrevistaParto: '25/07/2025',
-      status: 'em-acompanhamento',
-      veterinario: 'Dr. Maria Santos',
-      isTransferencia: false,
-    },
-    {
-      id: 3,
-      receptora: 'Íris do Campo',
-      maeBiologica: 'Íris do Campo',
-      garanhao: 'Sol Nascente',
-      dataCobertura: '10/10/2024',
-      dataConfirmacao: '05/11/2024',
-      diasGestacao: 38,
-      dataPrevistaParto: '15/08/2025',
-      status: 'em-acompanhamento',
-      veterinario: 'Dr. Carlos Lima',
-      isTransferencia: false,
-    },
-    {
-      id: 4,
-      receptora: 'Pérola',
-      maeBiologica: 'Diamante Rosa',
-      garanhao: 'Trovão Negro',
-      dataCobertura: '05/07/2024',
-      dataConfirmacao: '01/08/2024',
-      diasGestacao: 134,
-      dataPrevistaParto: '15/04/2025',
-      status: 'parida',
-      veterinario: 'Dr. João Silva',
-      isTransferencia: true,
-      observacoes: 'Parto realizado em 12/12/2024. Potra saudável.',
-    },
-    {
-      id: 5,
-      receptora: 'Flor da Serra',
-      maeBiologica: 'Flor da Serra',
-      garanhao: 'Imperador',
-      dataCobertura: '15/06/2024',
-      dataConfirmacao: '10/07/2024',
-      diasGestacao: 75,
-      dataPrevistaParto: '20/04/2025',
-      status: 'abortada',
-      veterinario: 'Dr. Maria Santos',
-      isTransferencia: false,
-      observacoes: 'Aborto ocorrido em 28/08/2024 (75 dias)',
-    },
-  ];
+  const formatDate = (value?: string | null) => {
+    if (!value) return '-';
+    const [year, month, day] = value.split('T')[0].split('-');
+    if (!year || !month || !day) return value;
+    return `${day}/${month}/${year}`;
+  };
+
+  const mapStatusToUi = (status: Gestation['status']) => {
+    switch (status) {
+      case 'em_andamento':
+        return 'em-acompanhamento';
+      case 'nascimento':
+        return 'parida';
+      case 'aborto':
+      case 'reabsorvida':
+        return 'abortada';
+      default:
+        return 'confirmada';
+    }
+  };
+
+  const gestacoes: Gestacao[] = useMemo(() => {
+    return gestations.map((gestation) => {
+      const startDate = gestation.start_date || gestation.confirmation_date || '';
+      const start = startDate ? new Date(startDate) : null;
+      const diasGestacao = start ? Math.max(0, Math.ceil((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+
+      return {
+        id: gestation.id,
+        receptora: gestation.mare?.name || 'Não informado',
+        maeBiologica: gestation.donor_mare_id ? 'Mãe biológica' : gestation.mare?.name || 'Não informado',
+        garanhao: gestation.stallion?.name || 'Não informado',
+        dataCobertura: formatDate(gestation.start_date),
+        dataConfirmacao: formatDate(gestation.confirmation_date),
+        diasGestacao,
+        dataPrevistaParto: formatDate(gestation.expected_birth_date),
+        status: mapStatusToUi(gestation.status),
+        veterinario: gestation.veterinarian || '-',
+        isTransferencia: Boolean(gestation.donor_mare_id),
+        observacoes: gestation.observations || undefined,
+      };
+    });
+  }, [gestations]);
 
   const statusConfig = {
     'confirmada': { label: 'Confirmada', color: 'bg-emerald-500', textColor: 'text-white' },
@@ -126,13 +122,46 @@ export function GestationsTab() {
             {filteredGestacoes.length} {filteredGestacoes.length === 1 ? 'gestação' : 'gestações'} registrada(s)
           </p>
         </div>
-        <button
-          onClick={() => setShowConfirmModal(true)}
-          className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-white text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Confirmar Gestação
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <NativeSelect
+            value={selectedMareId}
+            onChange={(e) => setSelectedMareId(e.target.value)}
+            className="w-full sm:w-56 h-10 bg-muted dark:bg-[#3a3a3a] border-0 text-foreground dark:text-white rounded-lg"
+          >
+            <option value="">Selecione a égua</option>
+            {mares.map((mare) => (
+              <option key={mare.id} value={mare.id}>
+                {mare.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            value={selectedStallionId}
+            onChange={(e) => setSelectedStallionId(e.target.value)}
+            className="w-full sm:w-56 h-10 bg-muted dark:bg-[#3a3a3a] border-0 text-foreground dark:text-white rounded-lg"
+          >
+            <option value="">Garanhão (opcional)</option>
+            {stallions.map((stallion) => (
+              <option key={stallion.id} value={stallion.id}>
+                {stallion.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <button
+            onClick={() => {
+              if (!selectedMareId) {
+                toast.error('Selecione uma égua para confirmar a gestação.');
+                return;
+              }
+              setShowConfirmModal(true);
+            }}
+            disabled={isSaving}
+            className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-white text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            Confirmar Gestação
+          </button>
+        </div>
       </div>
 
       {/* Filtros específicos */}
@@ -145,11 +174,11 @@ export function GestationsTab() {
             className="w-full h-10 bg-muted dark:bg-[#3a3a3a] border-0 text-foreground dark:text-white rounded-lg"
           >
             <option value="">Todos os animais</option>
-            <option value="estrela">Estrela da Manhã</option>
-            <option value="bella">Bella Vista</option>
-            <option value="iris">Íris do Campo</option>
-            <option value="perola">Pérola</option>
-            <option value="flor">Flor da Serra</option>
+            {mares.map((mare) => (
+              <option key={mare.id} value={mare.name}>
+                {mare.name}
+              </option>
+            ))}
           </NativeSelect>
         </div>
 
@@ -213,11 +242,26 @@ export function GestationsTab() {
       {/* Modal Confirmar Gestação */}
       {showConfirmModal && (
         <ConfirmPregnancyModal 
-          animalName="Nova Gestação" 
+          animalName={mares.find((mare) => mare.id === selectedMareId)?.name || 'Nova Gestação'} 
           onClose={() => setShowConfirmModal(false)}
-          onConfirm={(data) => {
-            console.log('Gestação confirmada:', data);
-            setShowConfirmModal(false);
+          onConfirm={async (data) => {
+            if (!selectedMareId) {
+              toast.error('Selecione uma égua para confirmar a gestação.');
+              return;
+            }
+            try {
+              await onConfirmGestation?.({
+                mareId: selectedMareId,
+                stallionId: selectedStallionId || undefined,
+                confirmationDate: data.confirmationDate,
+                method: data.method,
+                observations: data.observations,
+              });
+              setShowConfirmModal(false);
+            } catch (error) {
+              console.error('Erro ao confirmar gestação:', error);
+              toast.error('Erro ao confirmar gestação. Tente novamente.');
+            }
           }}
         />
       )}

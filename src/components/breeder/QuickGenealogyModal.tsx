@@ -1,4 +1,6 @@
 import { X } from 'lucide-react';
+import { useAnimalGenealogy } from '@/hooks/useAnimals';
+import { buildGenealogyView } from '@/lib/genealogy';
 
 interface GenealogyAnimal {
   id: number;
@@ -17,61 +19,25 @@ interface QuickGenealogyModalProps {
 }
 
 export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGenealogyModalProps) {
-  // Mock data - Em produção, isso viria do banco de dados
-  const genealogyData = {
-    // Ouro (id: 101)
-    101: {
-      pai: { id: 201, name: 'Hércules', registry: 'ABCCMM 111111-11' },
-      mae: { id: 202, name: 'Safira', registry: 'ABCCMM 222222-22' },
-      avos: [
-        { id: 301, name: 'Titã', registry: 'ABCCMM 301301-01' },
-        { id: 302, name: 'Estrela da Manhã', registry: 'ABCCMM 302302-02' },
-        { id: 303, name: 'Diamante Negro', registry: 'ABCCMM 303303-03' },
-        { id: 304, name: 'Safira Real', registry: 'ABCCMM 304304-04' },
-      ]
-    },
-    // Aurora (id: 102)
-    102: {
-      pai: { id: 203, name: 'Trovão', registry: 'ABCCMM 333333-33' },
-      mae: { id: 204, name: 'Serena', registry: 'ABCCMM 444444-44' },
-      avos: [
-        { id: 305, name: 'Raio', registry: 'ABCCMM 305305-05' },
-        { id: 306, name: 'Tempestade', registry: 'ABCCMM 306306-06' },
-        { id: 307, name: 'Sol Poente', registry: 'ABCCMM 307307-07' },
-        { id: 308, name: 'Lua Cheia', registry: 'ABCCMM 308308-08' },
-      ]
-    },
-    // Estrela Mangalarga (id: 1)
-    1: {
-      pai: { id: 101, name: 'Ouro', registry: 'ABCCMM 123456-78' },
-      mae: { id: 102, name: 'Aurora', registry: 'ABCCMM 654321-89' },
-      avos: [
-        { id: 201, name: 'Hércules', registry: 'ABCCMM 111111-11' },
-        { id: 202, name: 'Safira', registry: 'ABCCMM 222222-22' },
-        { id: 203, name: 'Trovão', registry: 'ABCCMM 333333-33' },
-        { id: 204, name: 'Serena', registry: 'ABCCMM 444444-44' },
-      ]
-    },
-    // Relâmpago Negro (id: 2)
-    2: {
-      pai: { id: 101, name: 'Ouro', registry: 'ABCCMM 123456-78' },
-      mae: { id: 204, name: 'Serena', registry: 'ABCCMM 444444-44' },
-      avos: [
-        { id: 201, name: 'Hércules', registry: 'ABCCMM 111111-11' },
-        { id: 202, name: 'Safira', registry: 'ABCCMM 222222-22' },
-        { id: 307, name: 'Sol Poente', registry: 'ABCCMM 307307-07' },
-        { id: 308, name: 'Lua Cheia', registry: 'ABCCMM 308308-08' },
-      ]
-    },
-    // Default para animais sem genealogia
-    default: {
-      pai: null,
-      mae: null,
-      avos: []
-    }
-  };
-
-  const data = genealogyData[animal.id as keyof typeof genealogyData] || genealogyData.default;
+  const { data: genealogyData, isLoading } = useAnimalGenealogy(String(animal.id));
+  const genealogyView = buildGenealogyView(genealogyData, {
+    id: animal.id,
+    name: animal.name,
+    registry: animal.registry,
+    imageUrl: null,
+  });
+  const [father, mother] = genealogyView.parents;
+  const grandparents = genealogyView.grandparents;
+  const missingLabels = new Set([
+    'Pai nao registrado',
+    'Mae nao registrada',
+    'Avo (paterno) nao registrado',
+    'Avo (paterna) nao registrada',
+    'Avo (materno) nao registrado',
+    'Avo (materna) nao registrada',
+  ]);
+  const hasParentsData = genealogyView.parents.some((parent) => !missingLabels.has(parent.name));
+  const hasGrandparentsData = grandparents.some((grandparent) => !missingLabels.has(grandparent.name));
 
   const handleAnimalClick = (animalId: number) => {
     if (onViewAnimal) {
@@ -105,6 +71,12 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
+            {isLoading && (
+              <div className="text-center text-sm text-muted-foreground dark:text-[#99a1af]">
+                Carregando genealogia...
+              </div>
+            )}
+
             {/* Animal Principal */}
             <div className="text-center">
               <div className="inline-block bg-primary dark:bg-white text-white dark:text-black px-6 py-3 rounded-lg">
@@ -118,14 +90,14 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
               <h4 className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 text-center">Pais</h4>
               <div className="grid grid-cols-2 gap-4">
                 {/* Pai */}
-                {data.pai ? (
+                {father && !missingLabels.has(father.name) ? (
                   <div 
-                    className="bg-gray-500 dark:bg-gray-600 text-white px-4 py-3 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleAnimalClick(data.pai!.id)}
+                    className={`bg-gray-500 dark:bg-gray-600 text-white px-4 py-3 rounded-lg ${father.id ? 'cursor-pointer hover:opacity-90' : 'opacity-80'} transition-opacity`}
+                    onClick={() => father.id && handleAnimalClick(Number(father.id))}
                   >
                     <div className="text-xs opacity-90 mb-1">Pai</div>
-                    <div className="font-medium">{data.pai.name}</div>
-                    <div className="text-xs opacity-75 mt-1">{data.pai.registry}</div>
+                    <div className="font-medium">{father.name}</div>
+                    <div className="text-xs opacity-75 mt-1">{father.registry}</div>
                   </div>
                 ) : (
                   <div className="bg-gray-100 dark:bg-[#2a3441] px-4 py-3 rounded-lg border border-dashed border-gray-300 dark:border-[#3a4451]">
@@ -135,14 +107,14 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
                 )}
 
                 {/* Mãe */}
-                {data.mae ? (
+                {mother && !missingLabels.has(mother.name) ? (
                   <div 
-                    className="bg-pink-500 dark:bg-pink-600 text-white px-4 py-3 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleAnimalClick(data.mae!.id)}
+                    className={`bg-pink-500 dark:bg-pink-600 text-white px-4 py-3 rounded-lg ${mother.id ? 'cursor-pointer hover:opacity-90' : 'opacity-80'} transition-opacity`}
+                    onClick={() => mother.id && handleAnimalClick(Number(mother.id))}
                   >
                     <p className="text-xs opacity-80 mb-1">Mãe</p>
-                    <p className="font-medium text-sm">{data.mae.name}</p>
-                    <p className="text-xs opacity-90">{data.mae.registry}</p>
+                    <p className="font-medium text-sm">{mother.name}</p>
+                    <p className="text-xs opacity-90">{mother.registry}</p>
                   </div>
                 ) : (
                   <div className="bg-muted dark:bg-[#0d0d0d] px-4 py-3 rounded-lg">
@@ -154,15 +126,15 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
             </div>
 
             {/* Avós */}
-            {data.avos.length > 0 && (
+            {hasGrandparentsData && (
               <div>
                 <h4 className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 text-center">Avós</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  {data.avos.map((avo, index) => (
+                  {grandparents.map((avo, index) => (
                     <div
-                      key={avo.id}
-                      className="bg-muted dark:bg-[#0d0d0d] px-3 py-2 rounded-lg cursor-pointer hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors border border-border dark:border-[#3a3a3a]"
-                      onClick={() => handleAnimalClick(avo.id)}
+                      key={`${avo.id || 'avo'}-${index}`}
+                      className={`bg-muted dark:bg-[#0d0d0d] px-3 py-2 rounded-lg ${avo.id ? 'cursor-pointer hover:bg-accent dark:hover:bg-[#2a2a2a]' : 'opacity-80'} transition-colors border border-border dark:border-[#3a3a3a]`}
+                      onClick={() => avo.id && handleAnimalClick(Number(avo.id))}
                     >
                       <p className="text-xs text-muted-foreground dark:text-[#6b6b6b] mb-1">
                         {index < 2 ? 'Avô' : 'Avó'} {index % 2 === 0 ? 'Paterno' : 'Materno'}
@@ -176,7 +148,7 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
             )}
 
             {/* Mensagem se não houver genealogia */}
-            {!data.pai && !data.mae && data.avos.length === 0 && (
+            {!isLoading && !hasParentsData && !hasGrandparentsData && (
               <div className="text-center py-8">
                 <p className="text-muted-foreground dark:text-[#99a1af]">
                   Genealogia não cadastrada para este animal

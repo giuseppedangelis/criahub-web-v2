@@ -1,13 +1,12 @@
-import { Plus, Search, Calendar, Clock, CheckCircle2, AlertCircle, Edit, Trash2, Copy, PlayCircle, FileText, Bell } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Search, Calendar, CheckCircle2, AlertCircle, Edit, Trash2, Copy, PlayCircle, FileText, Bell } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { CreateProtocolModal, ProtocolFormData } from './CreateProtocolModal';
-import { ProtocolTemplatesModal } from './ProtocolTemplatesModal';
 import { ApplyProtocolModal } from './ApplyProtocolModal';
-import { ActiveProtocolsModal } from './ActiveProtocolsModal';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal, ReproductionProtocol, ReproductionProtocolApplication } from '@/types';
 
 interface Protocol {
-  id: number;
+  id: string;
   name: string;
   type: 'TE' | 'IATF' | 'Aspiração Folicular' | 'Personalizado';
   description: string;
@@ -19,7 +18,7 @@ interface Protocol {
 }
 
 interface ProtocolStep {
-  id: number;
+  id: string;
   name: string;
   dayOffset: number;
   description: string;
@@ -27,10 +26,24 @@ interface ProtocolStep {
 }
 
 interface CustomProtocolsTabProps {
-  onCreateProtocol?: () => void;
+  protocols?: ReproductionProtocol[];
+  applications?: ReproductionProtocolApplication[];
+  animals?: Animal[];
+  onCreateProtocol?: (data: ProtocolFormData) => Promise<void> | void;
+  onUpdateProtocol?: (id: string, data: ProtocolFormData) => Promise<void> | void;
+  onDeleteProtocol?: (id: string) => Promise<void> | void;
+  onApplyProtocol?: (protocolId: string, data: any) => Promise<void> | void;
 }
 
-export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps) {
+export function CustomProtocolsTab({
+  protocols,
+  applications,
+  animals,
+  onCreateProtocol,
+  onUpdateProtocol,
+  onDeleteProtocol,
+  onApplyProtocol,
+}: CustomProtocolsTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'TE' | 'IATF' | 'Aspiração Folicular' | 'Personalizado'>('all');
   
@@ -39,24 +52,23 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null);
-  const [protocolToDelete, setProtocolToDelete] = useState<number | null>(null);
-  const [protocols, setProtocols] = useState<Protocol[]>([]);
+  const [protocolToDelete, setProtocolToDelete] = useState<string | null>(null);
 
-  // Dados mockados de protocolos
+  // Dados mockados de protocolos (fallback)
   const mockProtocols: Protocol[] = [
     {
-      id: 1,
+      id: '1',
       name: 'Protocolo TE Completo',
       type: 'TE',
       description: 'Protocolo padrão de transferência de embrião com sincronização completa',
       steps: [
-        { id: 1, name: 'Aplicação de Progesterona', dayOffset: 0, description: 'Inserção de dispositivo intravaginal', type: 'Aplicação' },
-        { id: 2, name: 'Aplicação de Benzoato de Estradiol', dayOffset: 0, description: '2mg IM', type: 'Aplicação' },
-        { id: 3, name: 'Aplicação de eCG', dayOffset: 8, description: '300-400 UI IM', type: 'Aplicação' },
-        { id: 4, name: 'Aplicação de Prostaglandina', dayOffset: 8, description: 'Retirada do dispositivo', type: 'Aplicação' },
-        { id: 5, name: 'Aplicação de Cipionato de Estradiol', dayOffset: 9, description: '1mg IM', type: 'Aplicação' },
-        { id: 6, name: 'Transferência de Embrião', dayOffset: 16, description: 'Inovulação do embrião', type: 'Procedimento' },
-        { id: 7, name: 'Diagnóstico de Gestação', dayOffset: 30, description: 'Ultrassom para confirmar gestação', type: 'Exame' },
+        { id: '1', name: 'Aplicação de Progesterona', dayOffset: 0, description: 'Inserção de dispositivo intravaginal', type: 'Aplicação' },
+        { id: '2', name: 'Aplicação de Benzoato de Estradiol', dayOffset: 0, description: '2mg IM', type: 'Aplicação' },
+        { id: '3', name: 'Aplicação de eCG', dayOffset: 8, description: '300-400 UI IM', type: 'Aplicação' },
+        { id: '4', name: 'Aplicação de Prostaglandina', dayOffset: 8, description: 'Retirada do dispositivo', type: 'Aplicação' },
+        { id: '5', name: 'Aplicação de Cipionato de Estradiol', dayOffset: 9, description: '1mg IM', type: 'Aplicação' },
+        { id: '6', name: 'Transferência de Embrião', dayOffset: 16, description: 'Inovulação do embrião', type: 'Procedimento' },
+        { id: '7', name: 'Diagnóstico de Gestação', dayOffset: 30, description: 'Ultrassom para confirmar gestação', type: 'Exame' },
       ],
       totalDays: 30,
       isActive: true,
@@ -64,17 +76,17 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
       createdAt: '2024-10-15',
     },
     {
-      id: 2,
+      id: '2',
       name: 'IATF - Inseminação Artificial em Tempo Fixo',
       type: 'IATF',
       description: 'Protocolo de sincronização para inseminação em horário pré-determinado',
       steps: [
-        { id: 1, name: 'Aplicação de GnRH', dayOffset: 0, description: '100mcg IM', type: 'Aplicação' },
-        { id: 2, name: 'Exame Ultrassonográfico', dayOffset: 7, description: 'Avaliar desenvolvimento folicular', type: 'Exame' },
-        { id: 3, name: 'Aplicação de Prostaglandina', dayOffset: 7, description: 'Indução de luteólise', type: 'Aplicação' },
-        { id: 4, name: 'Aplicação de GnRH', dayOffset: 9, description: 'Indução de ovulação', type: 'Aplicação' },
-        { id: 5, name: 'Inseminação Artificial', dayOffset: 10, description: 'IA em tempo fixo', type: 'Procedimento' },
-        { id: 6, name: 'Coleta de Embrião', dayOffset: 18, description: '8 dias pós-IA', type: 'Coleta' },
+        { id: '1', name: 'Aplicação de GnRH', dayOffset: 0, description: '100mcg IM', type: 'Aplicação' },
+        { id: '2', name: 'Exame Ultrassonográfico', dayOffset: 7, description: 'Avaliar desenvolvimento folicular', type: 'Exame' },
+        { id: '3', name: 'Aplicação de Prostaglandina', dayOffset: 7, description: 'Indução de luteólise', type: 'Aplicação' },
+        { id: '4', name: 'Aplicação de GnRH', dayOffset: 9, description: 'Indução de ovulação', type: 'Aplicação' },
+        { id: '5', name: 'Inseminação Artificial', dayOffset: 10, description: 'IA em tempo fixo', type: 'Procedimento' },
+        { id: '6', name: 'Coleta de Embrião', dayOffset: 18, description: '8 dias pós-IA', type: 'Coleta' },
       ],
       totalDays: 18,
       isActive: true,
@@ -82,17 +94,17 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
       createdAt: '2024-09-20',
     },
     {
-      id: 3,
+      id: '3',
       name: 'Aspiração Folicular OPU',
       type: 'Aspiração Folicular',
       description: 'Protocolo de aspiração folicular guiada por ultrassom (OPU)',
       steps: [
-        { id: 1, name: 'Exame Ultrassonográfico', dayOffset: 0, description: 'Mapeamento folicular inicial', type: 'Exame' },
-        { id: 2, name: 'Aplicação de FSH', dayOffset: 0, description: 'Estimulação ovariana', type: 'Aplicação' },
-        { id: 3, name: 'Aplicação de FSH', dayOffset: 1, description: 'Dose de manutenção', type: 'Aplicação' },
-        { id: 4, name: 'Aplicação de hCG', dayOffset: 2, description: 'Maturação final', type: 'Aplicação' },
-        { id: 5, name: 'Aspiração Folicular (OPU)', dayOffset: 3, description: 'Coleta de oócitos via OPU', type: 'Coleta' },
-        { id: 6, name: 'Fecundação in vitro', dayOffset: 3, description: 'FIV dos oócitos coletados', type: 'Procedimento' },
+        { id: '1', name: 'Exame Ultrassonográfico', dayOffset: 0, description: 'Mapeamento folicular inicial', type: 'Exame' },
+        { id: '2', name: 'Aplicação de FSH', dayOffset: 0, description: 'Estimulação ovariana', type: 'Aplicação' },
+        { id: '3', name: 'Aplicação de FSH', dayOffset: 1, description: 'Dose de manutenção', type: 'Aplicação' },
+        { id: '4', name: 'Aplicação de hCG', dayOffset: 2, description: 'Maturação final', type: 'Aplicação' },
+        { id: '5', name: 'Aspiração Folicular (OPU)', dayOffset: 3, description: 'Coleta de oócitos via OPU', type: 'Coleta' },
+        { id: '6', name: 'Fecundação in vitro', dayOffset: 3, description: 'FIV dos oócitos coletados', type: 'Procedimento' },
       ],
       totalDays: 3,
       isActive: true,
@@ -100,15 +112,15 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
       createdAt: '2024-11-01',
     },
     {
-      id: 4,
+      id: '4',
       name: 'Protocolo P4 Gestacional',
       type: 'Personalizado',
       description: 'Série de aplicações de progesterona durante gestação inicial',
       steps: [
-        { id: 1, name: 'Aplicação P4 - 1ª', dayOffset: 0, description: 'Início do suporte gestacional', type: 'Aplicação' },
-        { id: 2, name: 'Aplicação P4 - 2ª', dayOffset: 10, description: 'Manutenção gestacional', type: 'Aplicação' },
-        { id: 3, name: 'Aplicação P4 - 3ª', dayOffset: 20, description: 'Manutenção gestacional', type: 'Aplicação' },
-        { id: 4, name: 'Aplicação P4 - 4ª', dayOffset: 30, description: 'Manutenção gestacional', type: 'Aplicação' },
+        { id: '1', name: 'Aplicação P4 - 1ª', dayOffset: 0, description: 'Início do suporte gestacional', type: 'Aplicação' },
+        { id: '2', name: 'Aplicação P4 - 2ª', dayOffset: 10, description: 'Manutenção gestacional', type: 'Aplicação' },
+        { id: '3', name: 'Aplicação P4 - 3ª', dayOffset: 20, description: 'Manutenção gestacional', type: 'Aplicação' },
+        { id: '4', name: 'Aplicação P4 - 4ª', dayOffset: 30, description: 'Manutenção gestacional', type: 'Aplicação' },
       ],
       totalDays: 30,
       isActive: false,
@@ -117,8 +129,48 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
     },
   ];
 
+  const usageCountByProtocol = useMemo(() => {
+    const map = new Map<string, number>();
+    (applications || []).forEach((app) => {
+      map.set(app.protocol_id, (map.get(app.protocol_id) || 0) + 1);
+    });
+    return map;
+  }, [applications]);
+
+  const protocolsFromBackend: Protocol[] = useMemo(() => {
+    if (!protocols || protocols.length === 0) return [];
+    return protocols.map((protocol) => {
+      const steps = (protocol.steps || []).map((step) => ({
+        id: step.id,
+        name: step.name,
+        dayOffset: step.day_offset,
+        description: step.description || '',
+        type: step.step_type as ProtocolStep['type'],
+      }));
+
+      const totalDays = protocol.total_days ?? (steps.length > 0 ? Math.max(...steps.map((step) => step.dayOffset)) : 0);
+
+      return {
+        id: protocol.id,
+        name: protocol.name,
+        type: protocol.type as Protocol['type'],
+        description: protocol.description || '',
+        steps,
+        totalDays,
+        isActive: protocol.is_active ?? true,
+        usageCount: usageCountByProtocol.get(protocol.id) || 0,
+        createdAt: protocol.created_at,
+      };
+    });
+  }, [protocols, usageCountByProtocol]);
+
+  const protocolList =
+    protocols !== undefined
+      ? (protocolsFromBackend.length > 0 ? protocolsFromBackend : [])
+      : mockProtocols;
+
   // Filtrar protocolos
-  const filteredProtocols = mockProtocols.filter((protocol) => {
+  const filteredProtocols = protocolList.filter((protocol) => {
     const matchesSearch = protocol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          protocol.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || protocol.type === filterType;
@@ -145,15 +197,14 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
     // TODO: Implementar lógica de cópia
   };
 
-  const handleDeleteProtocol = (protocolId: number) => {
+  const handleDeleteProtocol = (protocolId: string) => {
     setProtocolToDelete(protocolId);
     setShowDeleteConfirm(true);
   };
 
   const handleConfirmDelete = () => {
     if (protocolToDelete !== null) {
-      console.log('Excluir protocolo:', protocolToDelete);
-      // TODO: Implementar lógica de exclusão
+      onDeleteProtocol?.(protocolToDelete);
       setShowDeleteConfirm(false);
       setProtocolToDelete(null);
     }
@@ -164,11 +215,14 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
     setProtocolToDelete(null);
   };
 
-  const handleSaveProtocol = (data: ProtocolFormData) => {
-    console.log('Salvar protocolo:', data);
+  const handleSaveProtocol = async (data: ProtocolFormData) => {
+    if (selectedProtocol) {
+      await onUpdateProtocol?.(selectedProtocol.id, data);
+    } else {
+      await onCreateProtocol?.(data);
+    }
     setShowCreateModal(false);
     setSelectedProtocol(null);
-    // TODO: Implementar lógica de salvamento
   };
 
   const getTypeColor = (type: string) => {
@@ -226,7 +280,7 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
               <FileText className="w-4 h-4 text-muted-foreground dark:text-[#99a1af]" />
               <span className="text-sm text-muted-foreground dark:text-[#99a1af]">Total</span>
             </div>
-            <p className="text-2xl text-foreground dark:text-white font-semibold">{mockProtocols.length}</p>
+            <p className="text-2xl text-foreground dark:text-white font-semibold">{protocolList.length}</p>
           </div>
           
           <div className="bg-gray-50 dark:bg-[#0d0d0d] rounded-lg p-4 border border-gray-200 dark:border-[rgba(255,255,255,0.1)]">
@@ -235,7 +289,7 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
               <span className="text-sm text-muted-foreground dark:text-[#99a1af]">Ativos</span>
             </div>
             <p className="text-2xl text-foreground dark:text-white font-semibold">
-              {mockProtocols.filter(p => p.isActive).length}
+              {protocolList.filter(p => p.isActive).length}
             </p>
           </div>
 
@@ -245,7 +299,7 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
               <span className="text-sm text-muted-foreground dark:text-[#99a1af]">Em Uso</span>
             </div>
             <p className="text-2xl text-foreground dark:text-white font-semibold">
-              {mockProtocols.reduce((sum, p) => sum + p.usageCount, 0)}
+              {protocolList.reduce((sum, p) => sum + p.usageCount, 0)}
             </p>
           </div>
 
@@ -442,12 +496,13 @@ export function CustomProtocolsTab({ onCreateProtocol }: CustomProtocolsTabProps
       {showApplyModal && selectedProtocol && (
         <ApplyProtocolModal
           protocol={selectedProtocol}
+          animals={animals}
           onClose={() => {
             setShowApplyModal(false);
             setSelectedProtocol(null);
           }}
           onApply={(data) => {
-            console.log('Aplicar protocolo:', data);
+            onApplyProtocol?.(selectedProtocol.id, data);
             setShowApplyModal(false);
             setSelectedProtocol(null);
           }}

@@ -4,7 +4,9 @@
 
 export * from './base';
 export { animalsService } from './animals';
+export { animalLocationsService } from './animalLocations';
 export { animalVideosService } from './animalVideos';
+export { healthService } from './health';
 export { reproductionService } from './reproduction';
 export { financialService } from './financial';
 export { harasService } from './haras';

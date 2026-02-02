@@ -4,7 +4,8 @@ import { useState } from 'react';
 interface RegisterVaccineModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: VaccineData) => void;
+  onSave: (data: VaccineData) => Promise<void> | void;
+  isSaving?: boolean;
   animalName?: string;
 }
 
@@ -17,7 +18,7 @@ export interface VaccineData {
   observacoes: string;
 }
 
-export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: RegisterVaccineModalProps) {
+export function RegisterVaccineModal({ isOpen, onClose, onSave, isSaving, animalName }: RegisterVaccineModalProps) {
   const [formData, setFormData] = useState<VaccineData>({
     nome: '',
     data: '',
@@ -29,15 +30,29 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSave = () => {
+  const resetForm = () => {
+    setFormData({
+      nome: '',
+      data: '',
+      proximaDose: '',
+      veterinario: '',
+      lote: '',
+      observacoes: '',
+    });
+    setErrors({});
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+
     const newErrors: Record<string, string> = {};
 
     if (!formData.nome.trim()) {
-      newErrors.nome = 'Nome da vacina é obrigatório';
+      newErrors.nome = 'Nome da vacina e obrigatorio';
     }
 
     if (!formData.data) {
-      newErrors.data = 'Data de aplicação é obrigatória';
+      newErrors.data = 'Data de aplicacao e obrigatoria';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -45,28 +60,22 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
       return;
     }
 
-    onSave(formData);
-    setFormData({
-      nome: '',
-      data: '',
-      proximaDose: '',
-      veterinario: '',
-      lote: '',
-      observacoes: '',
-    });
-    setErrors({});
+    try {
+      await onSave({
+        ...formData,
+        nome: formData.nome.trim(),
+        veterinario: formData.veterinario.trim(),
+        lote: formData.lote.trim(),
+        observacoes: formData.observacoes.trim(),
+      });
+      resetForm();
+    } catch {
+      // Erro tratado pelo chamador
+    }
   };
 
   const handleClose = () => {
-    setFormData({
-      nome: '',
-      data: '',
-      proximaDose: '',
-      veterinario: '',
-      lote: '',
-      observacoes: '',
-    });
-    setErrors({});
+    resetForm();
     onClose();
   };
 
@@ -74,7 +83,10 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={handleClose}>
-      <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border dark:border-[rgba(255,255,255,0.1)]" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border dark:border-[rgba(255,255,255,0.1)]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl text-foreground dark:text-white">Adicionar Nova Vacina</h2>
@@ -104,7 +116,7 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
               className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border ${
                 errors.nome ? 'border-red-500' : 'border-border dark:border-[rgba(255,255,255,0.1)]'
               } rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white`}
-              placeholder="Ex: Tétano, Raiva, Influenza Equina"
+              placeholder="Ex: Tetano, Raiva, Influenza Equina"
             />
             {errors.nome && (
               <p className="text-sm text-red-500 mt-1">{errors.nome}</p>
@@ -114,7 +126,7 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Data de Aplicação *
+                Data de Aplicacao *
               </label>
               <input
                 type="date"
@@ -134,7 +146,7 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
 
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Próxima Dose
+                Proxima Dose
               </label>
               <input
                 type="date"
@@ -148,14 +160,14 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Veterinário Responsável
+                Veterinario Responsavel
               </label>
               <input
                 type="text"
                 value={formData.veterinario}
                 onChange={(e) => setFormData({ ...formData, veterinario: e.target.value })}
                 className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                placeholder="Dr. Nome do veterinário"
+                placeholder="Dr. Nome do veterinario"
               />
             </div>
 
@@ -168,21 +180,21 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
                 value={formData.lote}
                 onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
                 className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                placeholder="Número do lote"
+                placeholder="Numero do lote"
               />
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-foreground dark:text-white mb-2">
-              Observações
+              Observacoes
             </label>
             <textarea
               value={formData.observacoes}
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
               className="w-full px-4 py-3 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white resize-none"
               rows={4}
-              placeholder="Informações adicionais sobre a vacinação (reações, local de aplicação, etc.)"
+              placeholder="Informacoes adicionais sobre a vacinacao"
             />
           </div>
         </div>
@@ -196,9 +208,10 @@ export function RegisterVaccineModal({ isOpen, onClose, onSave, animalName }: Re
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+            disabled={isSaving}
+            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Salvar Vacina
+            {isSaving ? 'Salvando...' : 'Salvar Vacina'}
           </button>
         </div>
       </div>

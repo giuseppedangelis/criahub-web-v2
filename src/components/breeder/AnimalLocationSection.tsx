@@ -1,6 +1,9 @@
 import { MapPin, Users, Clock, Plus, Calendar, User, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { LocationChangeModal, LocationChangeData } from './LocationChangeModal';
+import { useAnimalLocationHistory, useCreateAnimalLocationChange } from '@/hooks/useAnimalLocations';
+import type { AnimalLocationType, AnimalServiceType } from '@/types';
 
 interface Partner {
   name: string;
@@ -8,86 +11,87 @@ interface Partner {
 }
 
 interface LocationHistory {
-  id: number;
+  id: string;
   date: string;
   time: string;
   previousLocation: string;
   newLocation: string;
-  reason?: string; // Motivo opcional
+  reason?: string;
   registeredBy: string;
   notes?: string;
 }
 
 interface AnimalLocationSectionProps {
+  animalId: string;
+  harasId?: string;
   currentLocation?: string;
-  locationType?: 'Baia' | 'Pasto' | 'Serviço';
-  serviceType?: 'Reprodução' | 'Trabalho' | 'Repouso' | 'Outro';
+  locationType?: AnimalLocationType;
+  serviceType?: AnimalServiceType;
   partners?: Partner[];
   locationHistory?: LocationHistory[];
+  availableBaias?: Array<{ id: string; name: string; status: string; animal?: string }>;
+  availablePastos?: Array<{ id: string; name: string; status: string; capacity?: number; current?: number }>;
 }
 
-export function AnimalLocationSection({ 
-  currentLocation = 'Baia 12',
+export function AnimalLocationSection({
+  animalId,
+  harasId,
+  currentLocation = '-',
   locationType = 'Baia',
   serviceType,
   partners = [],
   locationHistory = []
 }: AnimalLocationSectionProps) {
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [localHistory, setLocalHistory] = useState(locationHistory);
+  const { data: remoteHistory, isLoading } = useAnimalLocationHistory(animalId);
+  const { mutateAsync: createLocationChange, isPending: isSaving } = useCreateAnimalLocationChange();
 
-  // Dados mockados se não houver histórico
-  const mockHistory: LocationHistory[] = localHistory.length > 0 ? localHistory : [
-    {
-      id: 1,
-      date: '2024-11-15',
-      time: '14:30',
-      previousLocation: 'Pasto Sul',
-      newLocation: 'Baia 12',
-      reason: 'Preparação para cobertura',
-      registeredBy: 'João Silva',
-      notes: 'Animal apresentando ótimo comportamento'
-    },
-    {
-      id: 2,
-      date: '2024-10-20',
-      time: '09:15',
-      previousLocation: 'Baia 8',
-      newLocation: 'Pasto Sul',
-      reason: 'Período de descanso',
-      registeredBy: 'Maria Santos',
-    },
-    {
-      id: 3,
-      date: '2024-09-10',
-      time: '16:00',
-      previousLocation: 'Serviço - Fazenda Vizinha',
-      newLocation: 'Baia 8',
-      reason: 'Retorno de trabalho externo',
-      registeredBy: 'João Silva',
-      notes: 'Animal retornou em excelente estado'
-    },
-  ];
+  const historyEntries: LocationHistory[] = useMemo(() => {
+    if (remoteHistory && remoteHistory.length > 0) {
+      return remoteHistory.map((entry) => {
+        const [datePart, timePart = ''] = entry.changed_at.split('T');
+        return {
+          id: entry.id,
+          date: datePart,
+          time: timePart.slice(0, 5),
+          previousLocation: entry.previous_location || '-',
+          newLocation: entry.new_location,
+          reason: entry.reason || undefined,
+          registeredBy: entry.changed_by_name || 'Sistema',
+          notes: entry.notes || undefined,
+        };
+      });
+    }
 
-  const handleSaveLocationChange = (data: LocationChangeData) => {
-    const newEntry: LocationHistory = {
-      id: mockHistory.length + 1,
-      date: data.date,
-      time: data.time,
-      previousLocation: currentLocation,
-      newLocation: `${data.locationType}${data.locationType === 'Serviço' ? ` - ${data.serviceType}` : ''} - ${data.locationName}`,
-      reason: data.reason,
-      registeredBy: 'Usuário Atual', // Em produção, pegar do contexto de autenticação
-      notes: data.notes,
-    };
-    
-    setLocalHistory([newEntry, ...mockHistory]);
+    return locationHistory;
+  }, [remoteHistory, locationHistory]);
+
+  const handleSaveLocationChange = async (data: LocationChangeData) => {
+    try {
+      const changedAt = new Date(`${data.date}T${data.time}:00`).toISOString();
+      await createLocationChange({
+        animal_id: animalId,
+        haras_id: harasId,
+        location_type: data.locationType,
+        location_name: data.locationName,
+        service_type: data.locationType === 'Servico' ? data.serviceType : undefined,
+        reason: data.reason,
+        notes: data.notes,
+        changed_at: changedAt,
+      });
+      toast.success('Localizacao atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar localizacao:', error);
+      toast.error('Erro ao atualizar localizacao. Tente novamente.');
+      throw error;
+    }
   };
 
-  const getLocationIcon = (locationType: string) => {
-    if (locationType === 'Serviço') {
+  const getLocationIcon = (type: string) => {
+    if (type === 'Servico') {
       return <AlertCircle className="w-5 h-5" />;
-    } else if (locationType === 'Pasto') {
+    }
+    if (type === 'Pasto') {
       return <Calendar className="w-5 h-5" />;
     }
     return <Clock className="w-5 h-5" />;
@@ -97,22 +101,14 @@ export function AnimalLocationSection({
     return 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300';
   };
 
-  const getLocationTypeColor = (type: string) => {
-    if (type === 'Pasto') {
-      return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400';
-    }
-    return 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300';
-  };
-
   return (
     <div className="space-y-6">
-      {/* Localização Atual */}
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[rgba(255,255,255,0.1)] p-6">
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
           <div>
-            <h4 className="text-lg text-foreground dark:text-white mb-1">Localização Atual</h4>
+            <h4 className="text-lg text-foreground dark:text-white mb-1">Localizacao Atual</h4>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-              Onde o animal está localizado no momento
+              Onde o animal esta localizado no momento
             </p>
           </div>
           <button
@@ -120,29 +116,26 @@ export function AnimalLocationSection({
             className="w-full sm:w-auto px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Registrar Mudança
+            Registrar Mudanca
           </button>
         </div>
 
         <div className="space-y-4">
-          {/* Local */}
           <div className="flex items-start gap-3">
             <div className={`p-3 rounded-lg ${getLocationColor()}`}>
               <MapPin className="w-5 h-5" />
             </div>
             <div className="flex-1">
               <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                Localização
+                Localizacao
               </p>
               <div className="flex items-center gap-2">
                 <div className="text-foreground dark:text-white">
                   {getLocationIcon(locationType)}
                 </div>
-                <p className="text-foreground dark:text-white">
-                  {currentLocation}
-                </p>
+                <p className="text-foreground dark:text-white">{currentLocation}</p>
               </div>
-              {locationType === 'Serviço' && serviceType && (
+              {locationType === 'Servico' && serviceType && (
                 <div className="mt-2">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
                     Tipo: {serviceType}
@@ -152,7 +145,6 @@ export function AnimalLocationSection({
             </div>
           </div>
 
-          {/* Sócios/Propriedade */}
           {partners && partners.length > 0 && (
             <div className="flex items-start gap-3 pt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.1)]">
               <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/20">
@@ -160,11 +152,11 @@ export function AnimalLocationSection({
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                  Sócios / Propriedade
+                  Socios / Propriedade
                 </p>
                 <div className="space-y-2">
                   {partners.map((partner, index) => (
-                    <div 
+                    <div
                       key={index}
                       className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#0d0d0d] rounded-lg"
                     >
@@ -181,12 +173,11 @@ export function AnimalLocationSection({
         </div>
       </div>
 
-      {/* Histórico de Localização */}
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[rgba(255,255,255,0.1)] p-6">
         <div className="mb-6">
-          <h4 className="text-lg text-foreground dark:text-white mb-1">Histórico de Localização</h4>
+          <h4 className="text-lg text-foreground dark:text-white mb-1">Historico de Localizacao</h4>
           <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-            Todas as mudanças de localização registradas
+            Todas as mudancas de localizacao registradas
           </p>
         </div>
 
@@ -212,12 +203,12 @@ export function AnimalLocationSection({
               </tr>
             </thead>
             <tbody>
-              {mockHistory.map((entry) => {
+              {historyEntries.map((entry) => {
                 const [year, month, day] = entry.date.split('-');
                 const formattedDate = `${day}/${month}/${year}`;
-                
+
                 return (
-                  <tr 
+                  <tr
                     key={entry.id}
                     className="border-b border-gray-100 dark:border-[rgba(255,255,255,0.05)] hover:bg-gray-50 dark:hover:bg-[#0d0d0d] transition-colors"
                   >
@@ -245,7 +236,11 @@ export function AnimalLocationSection({
                     </td>
                     <td className="py-4 px-4">
                       <div className="text-sm text-foreground dark:text-white">
-                        {entry.reason || <span className="text-muted-foreground dark:text-[#99a1af] italic">Sem motivo informado</span>}
+                        {entry.reason || (
+                          <span className="text-muted-foreground dark:text-[#99a1af] italic">
+                            Sem motivo informado
+                          </span>
+                        )}
                       </div>
                       {entry.notes && (
                         <div className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
@@ -266,21 +261,28 @@ export function AnimalLocationSection({
           </table>
         </div>
 
-        {mockHistory.length === 0 && (
+        {!isLoading && historyEntries.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground dark:text-[#99a1af]">
-              Nenhuma mudança de localização registrada
+              Nenhuma mudanca de localizacao registrada
+            </p>
+          </div>
+        )}
+        {isLoading && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground dark:text-[#99a1af]">
+              Carregando historico de localizacao...
             </p>
           </div>
         )}
       </div>
 
-      {/* Modal de Mudança de Localização */}
       {showLocationModal && (
         <LocationChangeModal
           currentLocation={currentLocation}
           onClose={() => setShowLocationModal(false)}
           onSave={handleSaveLocationChange}
+          isSaving={isSaving}
         />
       )}
     </div>

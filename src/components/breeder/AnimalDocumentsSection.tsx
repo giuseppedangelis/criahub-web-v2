@@ -2,6 +2,9 @@ import { FileText, Download, Eye, Trash2, Plus, Filter, Search, Image as ImageIc
 import { useState } from 'react';
 import { AddDocumentModal, DocumentData } from './AddDocumentModal';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
+import { useUpdateAnimal } from '@/hooks/useAnimals';
 
 interface Document {
   id: number;
@@ -15,13 +18,15 @@ interface Document {
 }
 
 interface AnimalDocumentsSectionProps {
+  animalId: string;
   documents?: Document[];
   documentUrls?: string[];
 }
 
 // Helper function to convert URL to Document object
 function convertUrlToDocument(url: string, index: number): Document {
-  const fileName = url.split('/').pop() || `documento-${index + 1}`;
+  const fileNameWithQuery = url.split('/').pop() || `documento-${index + 1}`;
+  const fileName = decodeURIComponent(fileNameWithQuery.split('?')[0]);
   const extension = fileName.split('.').pop()?.toLowerCase() || '';
   
   // Determine file type
@@ -37,10 +42,14 @@ function convertUrlToDocument(url: string, index: number): Document {
   else if (nameLower.includes('exame') || nameLower.includes('hemograma')) type = 'Exame';
   
   // Clean up filename
-  const cleanName = fileName
-    .replace(/\.[^/.]+$/, '') // Remove extension
-    .replace(/[_-]/g, ' ') // Replace underscores and dashes with spaces
-    .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+  const baseName = fileName.replace(/\.[^/.]+$/, '');
+  const nameWithoutTimestamp = baseName
+    .replace(/^\d+_/, '')
+    .replace(/_\d+$/, '');
+
+  const cleanName = nameWithoutTimestamp
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
   
   return {
     id: index + 1,
@@ -53,14 +62,29 @@ function convertUrlToDocument(url: string, index: number): Document {
   };
 }
 
-export function AnimalDocumentsSection({ documents = [], documentUrls = [] }: AnimalDocumentsSectionProps) {
+function sanitizeFileBase(value: string): string {
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const cleaned = normalized
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned.slice(0, 80) || 'documento';
+}
+
+export function AnimalDocumentsSection({ animalId, documents = [], documentUrls = [] }: AnimalDocumentsSectionProps) {
+  const supabase = createClient();
+  const { mutateAsync: updateAnimal } = useUpdateAnimal();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [isSavingDocument, setIsSavingDocument] = useState(false);
+  const [persistedUrls, setPersistedUrls] = useState<string[]>(documentUrls);
   
   // Convert URLs to Document objects if provided
-  const documentsFromUrls = documentUrls.map((url, index) => convertUrlToDocument(url, index));
+  const documentsFromUrls = persistedUrls.map((url, index) => convertUrlToDocument(url, index));
   
   // Combine provided documents with converted URLs
   const allDocuments = documents.length > 0 ? documents : documentsFromUrls;
@@ -81,6 +105,9 @@ export function AnimalDocumentsSection({ documents = [], documentUrls = [] }: An
 
   const confirmDelete = () => {
     if (documentToDelete) {
+      if (documentToDelete.url && documentToDelete.url.startsWith('blob:')) {
+        URL.revokeObjectURL(documentToDelete.url);
+      }
       setLocalDocuments(prev => prev.filter(doc => doc.id !== documentToDelete.id));
       setShowDeleteModal(false);
       setDocumentToDelete(null);
@@ -133,19 +160,71 @@ export function AnimalDocumentsSection({ documents = [], documentUrls = [] }: An
     }
   };
 
-  const handleAddDocument = (documentData: DocumentData) => {
-    const newDocument: Document = {
-      id: Math.max(...localDocuments.map(d => d.id), 0) + 1,
-      name: documentData.name,
-      type: documentData.type,
-      fileType: documentData.fileType,
-      size: documentData.size,
-      date: new Date().toISOString().split('T')[0],
-      notes: documentData.notes
-    };
+  const uploadDocumentFile = async (file: File, displayName: string) => {
+    const ext = file.name.split('.').pop();
+    const safeBase = sanitizeFileBase(displayName || file.name.replace(/\.[^/.]+$/, ''));
+    const fileName = `${animalId}/documents/${safeBase}_${Date.now()}${ext ? `.${ext}` : ''}`;
 
-    setLocalDocuments([...localDocuments, newDocument]);
-    setShowAddModal(false);
+    const { error } = await supabase.storage
+      .from('animals')
+      .upload(fileName, file);
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('animals')
+      .getPublicUrl(fileName);
+
+    if (!data?.publicUrl) {
+      throw new Error('Erro ao obter URL do documento.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const handleAddDocument = async (documentData: DocumentData) => {
+    if (!documentData.file) {
+      toast.error('Selecione um arquivo para continuar.');
+      return;
+    }
+
+    try {
+      setIsSavingDocument(true);
+
+      const uploadedUrl = await uploadDocumentFile(documentData.file, documentData.name);
+      const nextUrls = [...persistedUrls, uploadedUrl];
+
+      await updateAnimal({
+        id: String(animalId),
+        documents: nextUrls,
+      });
+
+      const size = documentData.file.size
+        ? `${(documentData.file.size / 1024 / 1024).toFixed(2)} MB`
+        : '-';
+
+      const newDocument: Document = {
+        id: Math.max(...localDocuments.map(d => d.id), 0) + 1,
+        name: documentData.name,
+        type: documentData.type,
+        fileType: documentData.fileType,
+        size,
+        date: documentData.date,
+        notes: documentData.notes,
+        url: uploadedUrl,
+      };
+
+      setLocalDocuments([...localDocuments, newDocument]);
+      setPersistedUrls(nextUrls);
+      setShowAddModal(false);
+      toast.success('Documento adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar documento:', error);
+      toast.error('Erro ao salvar documento. Tente novamente.');
+      throw error;
+    } finally {
+      setIsSavingDocument(false);
+    }
   };
 
   return (
@@ -281,7 +360,8 @@ export function AnimalDocumentsSection({ documents = [], documentUrls = [] }: An
       {showAddModal && (
         <AddDocumentModal
           onClose={() => setShowAddModal(false)}
-          onAdd={handleAddDocument}
+          onSave={handleAddDocument}
+          isSaving={isSavingDocument}
         />
       )}
 

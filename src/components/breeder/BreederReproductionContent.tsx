@@ -1,19 +1,46 @@
-import { Search, Filter, Calendar, Eye, Plus, Upload, ChevronDown, X } from 'lucide-react';
-import { useState } from 'react';
+import { Eye, Plus, Upload, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { Heart, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
 import { CoberturaDetailsModal, OvuloDetailsModal, EmbriaoDetailsModal, GestacaoDetailsModal, DocumentoViewModal } from './ReproductionModals';
 import { ReproductionAutomationTab } from './ReproductionAutomationTab';
 import { CustomProtocolsTab } from './CustomProtocolsTab';
 import { GestationsTab } from './GestationsTab';
-import { RegisterCoberturaModal, CoberturaData } from './RegisterCoberturaModal';
-import { RegisterOvulosModal, OvulosData } from './RegisterOvulosModal';
-import { RegisterEmbriaoModal, EmbriaoData } from './RegisterEmbriaoModal';
+import { RegisterCoberturaModal } from './RegisterCoberturaModal';
+import { RegisterOvulosModal } from './RegisterOvulosModal';
+import { RegisterEmbriaoModal } from './RegisterEmbriaoModal';
+import type { ProtocolFormData } from './CreateProtocolModal';
+import type { ApplyProtocolData } from './ApplyProtocolModal';
+import { useUser } from '@/contexts/UserContext';
+import { useStallions, useMares } from '@/hooks/useAnimals';
+import {
+  useCoverings,
+  useCreateCovering,
+  useReproductiveEvents,
+  useGestations,
+  useCreateGestation,
+  useOvules,
+  useCreateOvule,
+  useEmbryos,
+  useCreateEmbryo,
+  useReproductionDocuments,
+  useCreateReproductionDocument,
+  useReproductionProtocols,
+  useCreateReproductionProtocol,
+  useUpdateReproductionProtocol,
+  useReplaceReproductionProtocolSteps,
+  useDeleteReproductionProtocol,
+  useApplyReproductionProtocol,
+  useReproductionProtocolApplications,
+} from '@/hooks/useReproduction';
+import type { Gestation } from '@/types';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 type ReproductionTab = 'automacao' | 'protocolos' | 'coberturas' | 'ovulos' | 'embrioes' | 'gestacoes' | 'documentos';
 
 interface Cobertura {
-  id: number;
+  id: string;
   pai: string;
   mae: string;
   tipo: string;
@@ -23,7 +50,7 @@ interface Cobertura {
 }
 
 interface Ovulo {
-  id: number;
+  id: string;
   doadora: string;
   quantidade: number;
   data: string;
@@ -33,7 +60,7 @@ interface Ovulo {
 }
 
 interface Embriao {
-  id: number;
+  id: string;
   doadora: string;
   garanhao: string;
   quantidade: number;
@@ -45,7 +72,7 @@ interface Embriao {
 }
 
 interface Documento {
-  id: number;
+  id: string;
   nome: string;
   tipo: string;
   data: string;
@@ -57,6 +84,10 @@ interface BreederReproductionContentProps {
 }
 
 export function BreederReproductionContent({ onNavigateToAgenda }: BreederReproductionContentProps = {}) {
+  const supabase = useMemo(() => createClient(), []);
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+
   const [activeTab, setActiveTab] = useState<ReproductionTab>('automacao');
   const [selectedAnimal, setSelectedAnimal] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -80,6 +111,40 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
   const [showRegisterOvulosModal, setShowRegisterOvulosModal] = useState(false);
   const [showRegisterEmbriaoModal, setShowRegisterEmbriaoModal] = useState(false);
 
+  const { data: stallionsData } = useStallions(harasId);
+  const { data: maresData } = useMares(harasId);
+  const shouldLoadEvents = activeTab === 'automacao';
+  const shouldLoadProtocols = activeTab === 'protocolos';
+  const shouldLoadDocuments = activeTab === 'documentos';
+  const shouldLoadOvules = activeTab === 'ovulos';
+  const shouldLoadEmbryos = activeTab === 'embrioes';
+
+  const { data: eventsResponse } = useReproductiveEvents(harasId, { page: 1, limit: 50 }, shouldLoadEvents);
+  const { data: coveringsResponse } = useCoverings(harasId, { page: 1, limit: 50 });
+  const { data: gestationsResponse, isLoading: isLoadingGestations } = useGestations({ haras_id: harasId }, { page: 1, limit: 50 });
+  const { data: ovulesResponse } = useOvules(harasId, { page: 1, limit: 50 }, shouldLoadOvules);
+  const { data: embryosResponse } = useEmbryos(harasId, { page: 1, limit: 50 }, shouldLoadEmbryos);
+  const { data: documentsData } = useReproductionDocuments(harasId, shouldLoadDocuments);
+  const { data: protocolsData } = useReproductionProtocols(harasId, shouldLoadProtocols);
+  const { data: protocolApplications } = useReproductionProtocolApplications(harasId, shouldLoadProtocols);
+
+  const { mutateAsync: createCovering } = useCreateCovering();
+  const { mutateAsync: createGestation, isPending: isSavingGestation } = useCreateGestation();
+  const { mutateAsync: createOvule } = useCreateOvule();
+  const { mutateAsync: createEmbryo } = useCreateEmbryo();
+  const { mutateAsync: createDocument, isPending: isSavingDocument } = useCreateReproductionDocument();
+  const { mutateAsync: createProtocol } = useCreateReproductionProtocol();
+  const { mutateAsync: updateProtocol } = useUpdateReproductionProtocol(harasId);
+  const { mutateAsync: replaceProtocolSteps } = useReplaceReproductionProtocolSteps(harasId);
+  const { mutateAsync: deleteProtocol } = useDeleteReproductionProtocol(harasId);
+  const { mutateAsync: applyProtocol } = useApplyReproductionProtocol();
+
+  const coverings = coveringsResponse?.data || [];
+  const reproductiveEvents = eventsResponse?.data || [];
+  const gestations = gestationsResponse?.data || [];
+  const ovules = ovulesResponse?.data || [];
+  const embryos = embryosResponse?.data || [];
+
   const tabs = [
     { id: 'automacao' as ReproductionTab, label: 'Sequência Automática' },
     { id: 'protocolos' as ReproductionTab, label: 'Protocolos Personalizados' },
@@ -90,116 +155,398 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
     { id: 'documentos' as ReproductionTab, label: 'Documentos' },
   ];
 
-  const coberturas: Cobertura[] = [
-    {
-      id: 1,
-      pai: 'Trovão',
-      mae: 'Estrela',
-      tipo: 'Monta Natural',
-      data: '15/11/2024',
-      veterinario: 'Dr. João Silva',
-      status: 'positivo',
-    },
-    {
-      id: 2,
-      pai: 'Trovão',
-      mae: 'Estrela',
-      tipo: 'Inseminação Artificial',
-      data: '10/11/2024',
-      veterinario: 'Dr. Maria Santos',
-      status: 'aguardando',
-    },
-    {
-      id: 3,
-      pai: 'Trovão',
-      mae: 'Estrela',
-      tipo: 'Monta Natural',
-      data: '05/11/2024',
-      veterinario: 'Dr. Carlos Lima',
-      status: 'negativo',
-    },
-  ];
+  const formatDate = (value?: string | null) => {
+    if (!value) return '-';
+    const [year, month, day] = value.split('T')[0].split('-');
+    if (!year || !month || !day) return value;
+    return `${day}/${month}/${year}`;
+  };
 
-  const ovulos: Ovulo[] = [
-    {
-      id: 1,
-      doadora: 'Estrela',
-      quantidade: 12,
-      data: '20/11/2024',
-      status: 'Congelado',
-      disponiveis: 12,
-      qualidade: 'excelente',
-    },
-    {
-      id: 2,
-      doadora: 'Íris',
-      quantidade: 8,
-      data: '15/11/2024',
-      status: 'Congelado',
-      disponiveis: 6,
-      qualidade: 'boa',
-    },
-    {
-      id: 3,
-      doadora: 'Lua',
-      quantidade: 5,
-      data: '10/11/2024',
-      status: 'Congelado',
-      disponiveis: 3,
-      qualidade: 'regular',
-    },
-  ];
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes || bytes <= 0) return '-';
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
 
-  const embrioes: Embriao[] = [
-    {
-      id: 1,
-      doadora: 'Estrela',
-      garanhao: 'Trovão',
-      quantidade: 10,
-      data: '25/11/2024',
-      status: 'Fresco',
-      disponiveis: 10,
-      grau: 'A',
-      tipo: 'Fresco',
-    },
-    {
-      id: 2,
-      doadora: 'Íris',
-      garanhao: 'Trovão',
-      quantidade: 6,
-      data: '20/11/2024',
-      status: 'Congelado',
-      disponiveis: 4,
-      grau: 'B',
-      tipo: 'Congelado',
-    },
-    {
-      id: 3,
-      doadora: 'Lua',
-      garanhao: 'Trovão',
-      quantidade: 3,
-      data: '15/11/2024',
-      status: 'Congelado',
-      disponiveis: 2,
-      grau: 'C',
-      tipo: 'Congelado',
-    },
-  ];
+  const coverageStatusFromGestation = (gestation?: Gestation) => {
+    if (!gestation) return 'aguardando' as const;
+    if (gestation.status === 'aborto' || gestation.status === 'reabsorvida') return 'negativo' as const;
+    return 'positivo' as const;
+  };
 
-  const documentos: Documento[] = [
-    { id: 1, nome: 'Contrato de Cobertura - Trovão x Estrela', tipo: 'PDF', data: '15/11/2024', tamanho: '2.4 MB' },
-    { id: 2, nome: 'Laudo Veterinário - Gestação Confirmada', tipo: 'PDF', data: '10/11/2024', tamanho: '1.8 MB' },
-    { id: 3, nome: 'Relatório de Coleta de Óvulos', tipo: 'PDF', data: '05/11/2024', tamanho: '3.2 MB' },
-  ];
+  const gestationsByCovering = useMemo(() => {
+    const map = new Map<string, Gestation>();
+    gestations.forEach((gestation) => {
+      if (gestation.reproductive_event_id) {
+        map.set(gestation.reproductive_event_id, gestation);
+      }
+    });
+    return map;
+  }, [gestations]);
+
+  const coberturas: Cobertura[] = useMemo(() => {
+    return coverings.map((covering) => {
+      const gestation = covering.id ? gestationsByCovering.get(covering.id) : undefined;
+      return {
+        id: covering.id,
+        pai: covering.stallion?.name || 'Não informado',
+        mae: covering.mare?.name || 'Não informado',
+        tipo: covering.type,
+        data: formatDate(covering.event_date),
+        veterinario: covering.veterinarian || '-',
+        status: coverageStatusFromGestation(gestation),
+      };
+    });
+  }, [coverings, gestationsByCovering]);
+
+  const ovulos: Ovulo[] = useMemo(() => {
+    return ovules.map((ovule) => ({
+      id: ovule.id,
+      doadora: ovule.donor?.name || 'Não informado',
+      quantidade: ovule.quantity,
+      data: formatDate(ovule.collection_date),
+      status: ovule.status || 'Congelado',
+      disponiveis: ovule.available,
+      qualidade: ovule.quality || 'regular',
+    }));
+  }, [ovules]);
+
+  const embrioes: Embriao[] = useMemo(() => {
+    return embryos.map((embryo) => ({
+      id: embryo.id,
+      doadora: embryo.donor?.name || 'Não informado',
+      garanhao: embryo.stallion?.name || 'Não informado',
+      quantidade: embryo.quantity,
+      data: formatDate(embryo.production_date),
+      status: embryo.status || embryo.storage_type || 'Congelado',
+      disponiveis: embryo.available,
+      grau: embryo.grade || 'C',
+      tipo: embryo.storage_type || 'Congelado',
+    }));
+  }, [embryos]);
+
+  const documentos: Documento[] = useMemo(() => {
+    return (documentsData || []).map((doc) => ({
+      id: doc.id,
+      nome: doc.title,
+      tipo: doc.document_type,
+      data: formatDate(doc.created_at),
+      tamanho: formatFileSize(typeof doc.file_size === 'string' ? Number(doc.file_size) : doc.file_size),
+    }));
+  }, [documentsData]);
+
+  const metrics = useMemo(() => {
+    const activeCoverings = coberturas.filter((cobertura) => cobertura.status === 'aguardando').length;
+    const gestationsInProgress = gestations.filter((gestation) => gestation.status === 'em_andamento').length;
+    const birthsThisYear = gestations.filter((gestation) => {
+      if (gestation.status !== 'nascimento' || !gestation.actual_birth_date) return false;
+      return gestation.actual_birth_date.startsWith(String(new Date().getFullYear()));
+    }).length;
+    const upcomingBirths = gestations.filter((gestation) => {
+      if (!gestation.expected_birth_date) return false;
+      if (gestation.status !== 'em_andamento' && gestation.status !== 'confirmada') return false;
+      const expected = new Date(gestation.expected_birth_date);
+      const diffDays = Math.ceil((expected.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 45;
+    }).length;
+
+    return {
+      activeCoverings,
+      gestationsInProgress,
+      birthsThisYear,
+      upcomingBirths,
+    };
+  }, [coberturas, gestations]);
+
+  const deadlines = useMemo(() => {
+    const now = new Date();
+    return gestations
+      .filter((gestation) => gestation.expected_birth_date)
+      .map((gestation) => {
+        const expected = new Date(gestation.expected_birth_date as string);
+        const days = Math.ceil((expected.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          id: gestation.id,
+          name: gestation.mare?.name || 'Gestação',
+          type: 'Parto Previsto',
+          days,
+          details: `Previsão de parto em ${formatDate(gestation.expected_birth_date)}`,
+        };
+      })
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 4);
+  }, [gestations]);
+
+  const recentActivities = useMemo(() => {
+    const coverageActivities = coberturas.slice(0, 2).map((cobertura) => ({
+      id: `coverage-${cobertura.id}`,
+      title: 'Cobertura registrada',
+      animal: `${cobertura.pai} x ${cobertura.mae}`,
+      time: cobertura.data,
+      type: 'covering',
+    }));
+
+    const gestationActivities = gestations.slice(0, 2).map((gestation) => ({
+      id: `gestation-${gestation.id}`,
+      title: 'Gestação confirmada',
+      animal: gestation.mare?.name || 'Gestação',
+      time: formatDate(gestation.confirmation_date || gestation.expected_birth_date || ''),
+      type: 'birth',
+    }));
+
+    return [...coverageActivities, ...gestationActivities].slice(0, 4);
+  }, [coberturas, gestations]);
+
+  const animalOptions = useMemo(() => {
+    const names = new Set<string>();
+    (maresData || []).forEach((mare) => {
+      if (mare.name) names.add(mare.name);
+    });
+    (stallionsData || []).forEach((stallion) => {
+      if (stallion.name) names.add(stallion.name);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [maresData, stallionsData]);
+
+  const protocolAnimals = useMemo(() => {
+    const list = [...(maresData || []), ...(stallionsData || [])];
+    const seen = new Set<string>();
+    return list.filter((animal) => {
+      if (seen.has(animal.id)) return false;
+      seen.add(animal.id);
+      return true;
+    });
+  }, [maresData, stallionsData]);
+
+  const filteredCoberturas = useMemo(() => {
+    return coberturas.filter((cobertura) => {
+      if (selectedAnimal) {
+        const match =
+          cobertura.pai.toLowerCase().includes(selectedAnimal.toLowerCase()) ||
+          cobertura.mae.toLowerCase().includes(selectedAnimal.toLowerCase());
+        if (!match) return false;
+      }
+      if (selectedStatus && cobertura.status !== selectedStatus) return false;
+      return true;
+    });
+  }, [coberturas, selectedAnimal, selectedStatus]);
+
+  const filteredOvulos = useMemo(() => {
+    return ovulos.filter((ovulo) => {
+      if (selectedAnimal && !ovulo.doadora.toLowerCase().includes(selectedAnimal.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [ovulos, selectedAnimal]);
+
+  const filteredEmbrioes = useMemo(() => {
+    return embrioes.filter((embriao) => {
+      if (selectedAnimal) {
+        const match =
+          embriao.doadora.toLowerCase().includes(selectedAnimal.toLowerCase()) ||
+          embriao.garanhao.toLowerCase().includes(selectedAnimal.toLowerCase());
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [embrioes, selectedAnimal]);
+
+  const handleConfirmGestation = async (input: {
+    mareId: string;
+    stallionId?: string;
+    confirmationDate: string;
+    method: string;
+    observations?: string;
+  }) => {
+    try {
+      if (!harasId) {
+        toast.error('Haras não identificado.');
+        return;
+      }
+
+      const latestCovering = coverings
+        .filter((covering) => covering.mare_id === input.mareId)
+        .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())[0];
+
+      await createGestation({
+        haras_id: harasId,
+        mare_id: input.mareId,
+        stallion_id: input.stallionId || latestCovering?.stallion_id || undefined,
+        reproductive_event_id: latestCovering?.id,
+        start_date: latestCovering?.event_date || input.confirmationDate,
+        confirmation_date: input.confirmationDate,
+        status: 'em_andamento',
+        diagnosis_type: input.method === 'Exame Laboratorial' ? 'Exame de sangue' : input.method,
+        observations: input.observations,
+      });
+
+      toast.success('Gestação confirmada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao confirmar gestação:', error);
+      toast.error('Erro ao confirmar gestação. Tente novamente.');
+      throw error;
+    }
+  };
+
+  const handleCreateProtocol = async (data: ProtocolFormData) => {
+    try {
+      if (!harasId) {
+        toast.error('Haras não identificado.');
+        return;
+      }
+      const totalDays = data.steps.length > 0 ? Math.max(...data.steps.map((step) => step.dayOffset)) : 0;
+
+      await createProtocol({
+        input: {
+          haras_id: harasId,
+          name: data.name,
+          type: data.type,
+          description: data.description,
+          total_days: totalDays,
+          is_active: true,
+        },
+        steps: data.steps.map((step, index) => ({
+          name: step.name,
+          day_offset: step.dayOffset,
+          description: step.description,
+          step_type: step.type,
+          sort_order: index,
+        })),
+      });
+
+      toast.success('Protocolo criado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao criar protocolo:', error);
+      toast.error('Erro ao criar protocolo. Tente novamente.');
+    }
+  };
+
+  const handleUpdateProtocol = async (protocolId: string, data: ProtocolFormData) => {
+    try {
+      const totalDays = data.steps.length > 0 ? Math.max(...data.steps.map((step) => step.dayOffset)) : 0;
+      await updateProtocol({
+        id: protocolId,
+        input: {
+          name: data.name,
+          type: data.type,
+          description: data.description,
+          total_days: totalDays,
+        },
+      });
+      await replaceProtocolSteps(protocolId, data.steps.map((step, index) => ({
+        protocol_id: protocolId,
+        name: step.name,
+        day_offset: step.dayOffset,
+        description: step.description,
+        step_type: step.type,
+        sort_order: index,
+      })));
+      toast.success('Protocolo atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar protocolo:', error);
+      toast.error('Erro ao atualizar protocolo. Tente novamente.');
+    }
+  };
+
+  const handleDeleteProtocol = async (protocolId: string) => {
+    try {
+      await deleteProtocol(protocolId);
+      toast.success('Protocolo excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir protocolo:', error);
+      toast.error('Erro ao excluir protocolo. Tente novamente.');
+    }
+  };
+
+  const handleApplyProtocol = async (protocolId: string, data: ApplyProtocolData) => {
+    try {
+      if (!harasId) {
+        toast.error('Haras não identificado.');
+        return;
+      }
+      const animal =
+        (data.animalId && (maresData?.find((mare) => mare.id === data.animalId) ||
+          stallionsData?.find((stallion) => stallion.id === data.animalId))) ||
+        maresData?.find((mare) => mare.name === data.animalName) ||
+        stallionsData?.find((stallion) => stallion.name === data.animalName);
+
+      if (!animal) {
+        toast.error('Animal não encontrado.');
+        return;
+      }
+
+      await applyProtocol({
+        haras_id: harasId,
+        protocol_id: protocolId,
+        animal_id: animal.id,
+        start_date: data.startDate,
+        notes: data.notes,
+      });
+
+      toast.success('Protocolo aplicado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao aplicar protocolo:', error);
+      toast.error('Erro ao aplicar protocolo. Tente novamente.');
+    }
+  };
+
+  const sanitizeFileName = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-_]/g, '');
+
+  const handleUploadDocument = async (data: { nome: string; tipo: string; descricao?: string; file: File }) => {
+    try {
+      if (!harasId) {
+        toast.error('Haras não identificado.');
+        return;
+      }
+      const ext = data.file.name.split('.').pop();
+      const safeName = sanitizeFileName(data.nome) || 'documento';
+      const fileName = `${harasId}/reproduction/${Date.now()}_${safeName}${ext ? `.${ext}` : ''}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('animals')
+        .upload(fileName, data.file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from('animals')
+        .getPublicUrl(fileName);
+
+      await createDocument({
+        haras_id: harasId,
+        title: data.nome,
+        document_type: data.tipo,
+        file_url: publicUrl.publicUrl,
+        file_name: data.file.name,
+        file_size: data.file.size,
+        file_type: data.file.type,
+      });
+
+      toast.success('Documento carregado com sucesso!');
+      setShowUploadModal(false);
+    } catch (error) {
+      console.error('Erro ao carregar documento:', error);
+      toast.error('Erro ao carregar documento. Tente novamente.');
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <MetricCard title="Coberturas Ativas" value="8" icon={Heart} iconColor="text-pink-500" />
-        <MetricCard title="Gestações em Andamento" value="5" icon={TrendingUp} iconColor="text-green-500" />
-        <MetricCard title="Nascimentos este ano" value="3" icon={Heart} iconColor="text-purple-500" />
-        <MetricCard title="Próximos partos" value="2" icon={CalendarIcon} iconColor="text-purple-500" />
+        <MetricCard title="Coberturas Ativas" value={String(metrics.activeCoverings)} icon={Heart} iconColor="text-pink-500" />
+        <MetricCard title="Gestações em Andamento" value={String(metrics.gestationsInProgress)} icon={TrendingUp} iconColor="text-green-500" />
+        <MetricCard title="Nascimentos este ano" value={String(metrics.birthsThisYear)} icon={Heart} iconColor="text-purple-500" />
+        <MetricCard title="Próximos partos" value={String(metrics.upcomingBirths)} icon={CalendarIcon} iconColor="text-purple-500" />
       </div>
 
       {/* Próximos Prazos e Atividades Recentes lado a lado */}
@@ -208,42 +555,23 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h3 className="text-xl text-foreground dark:text-white mb-6">Próximos Prazos</h3>
           <div className="space-y-4">
-            <DeadlineItem 
-              name="Bella Vista" 
-              type="Parto Previsto" 
-              days={45} 
-              onClick={() => {
-                setSelectedDeadline({ name: 'Bella Vista', type: 'Parto Previsto', days: 45, details: 'Parto previsto para 02/02/2025. Égua em ótimo estado de saúde.' });
-                setShowDeadlineModal(true);
-              }}
-            />
-            <DeadlineItem 
-              name="Sol Nascente" 
-              type="Exame Gestacional" 
-              days={15} 
-              onClick={() => {
-                setSelectedDeadline({ name: 'Sol Nascente', type: 'Exame Gestacional', days: 15, details: 'Exame gestacional de acompanhamento agendado para 03/01/2025.' });
-                setShowDeadlineModal(true);
-              }}
-            />
-            <DeadlineItem 
-              name="Lua Dourada" 
-              type="Cobertura" 
-              days={-5} 
-              onClick={() => {
-                setSelectedDeadline({ name: 'Lua Dourada', type: 'Cobertura', days: -5, details: 'Cobertura estava agendada para 14/12/2024. ATRASADO!' });
-                setShowDeadlineModal(true);
-              }}
-            />
-            <DeadlineItem 
-              name="Estrela" 
-              type="Avaliação Reprodutiva" 
-              days={7} 
-              onClick={() => {
-                setSelectedDeadline({ name: 'Estrela', type: 'Avaliação Reprodutiva', days: 7, details: 'Avaliação reprodutiva agendada para 26/12/2024.' });
-                setShowDeadlineModal(true);
-              }}
-            />
+            {deadlines.length === 0 && (
+              <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                Nenhum prazo encontrado no momento.
+              </p>
+            )}
+            {deadlines.map((deadline) => (
+              <DeadlineItem
+                key={deadline.id}
+                name={deadline.name}
+                type={deadline.type}
+                days={deadline.days}
+                onClick={() => {
+                  setSelectedDeadline(deadline);
+                  setShowDeadlineModal(true);
+                }}
+              />
+            ))}
           </div>
         </div>
 
@@ -251,10 +579,20 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h3 className="text-xl text-foreground dark:text-white mb-6">Atividades Recentes</h3>
           <div className="space-y-4">
-            <ActivityItem title="Cobertura realizada" animal="Trovão x Estrela" time="2 horas atrás" type="covering" />
-            <ActivityItem title="Gestação confirmada" animal="Bella Vista" time="1 dia atrás" type="birth" />
-            <ActivityItem title="Coleta de óvulos" animal="Íris - 8 óvulos" time="2 dias atrás" type="report" />
-            <ActivityItem title="Exame realizado" animal="Sol Nascente" time="3 dias atrás" type="update" />
+            {recentActivities.length === 0 && (
+              <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                Nenhuma atividade recente registrada.
+              </p>
+            )}
+            {recentActivities.map((activity) => (
+              <ActivityItem
+                key={activity.id}
+                title={activity.title}
+                animal={activity.animal}
+                time={activity.time}
+                type={activity.type}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -300,10 +638,11 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               onChange={(e) => setSelectedAnimal(e.target.value)}
             >
               <option value="">Animal</option>
-              <option value="trovao">Trovão</option>
-              <option value="estrela">Estrela</option>
-              <option value="iris">Íris</option>
-              <option value="lua">Lua</option>
+              {animalOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
             </NativeSelect>
           </div>
 
@@ -338,11 +677,19 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
         {/* FASE 42: Tab Sequência Automática */}
         {activeTab === 'automacao' && (
-          <ReproductionAutomationTab onNavigateToAgenda={onNavigateToAgenda} />
+          <ReproductionAutomationTab onNavigateToAgenda={onNavigateToAgenda} events={reproductiveEvents} />
         )}
 
         {activeTab === 'protocolos' && (
-          <CustomProtocolsTab />
+          <CustomProtocolsTab
+            protocols={protocolsData || []}
+            applications={protocolApplications || []}
+            animals={protocolAnimals}
+            onCreateProtocol={handleCreateProtocol}
+            onUpdateProtocol={handleUpdateProtocol}
+            onDeleteProtocol={handleDeleteProtocol}
+            onApplyProtocol={handleApplyProtocol}
+          />
         )}
 
         {activeTab === 'coberturas' && (
@@ -351,7 +698,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               <div>
                 <h3 className="text-xl text-foreground dark:text-white">Coberturas Registradas</h3>
                 <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-                  {coberturas.length} {coberturas.length === 1 ? 'cobertura' : 'coberturas'} registrada(s)
+                  {filteredCoberturas.length} {filteredCoberturas.length === 1 ? 'cobertura' : 'coberturas'} registrada(s)
                 </p>
               </div>
               <button
@@ -363,7 +710,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {coberturas.map((cobertura) => (
+              {filteredCoberturas.map((cobertura) => (
                 <CoberturaCard 
                   key={cobertura.id} 
                   cobertura={cobertura} 
@@ -387,7 +734,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               <div>
                 <h3 className="text-xl text-foreground dark:text-white">Óvulos Coletados</h3>
                 <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-                  {ovulos.length} {ovulos.length === 1 ? 'coleta' : 'coletas'} registrada(s)
+                  {filteredOvulos.length} {filteredOvulos.length === 1 ? 'coleta' : 'coletas'} registrada(s)
                 </p>
               </div>
               <button
@@ -399,7 +746,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {ovulos.map((ovulo) => (
+              {filteredOvulos.map((ovulo) => (
                 <OvuloCard 
                   key={ovulo.id} 
                   ovulo={ovulo} 
@@ -423,7 +770,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               <div>
                 <h3 className="text-xl text-foreground dark:text-white">Embriões Registrados</h3>
                 <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-                  {embrioes.length} {embrioes.length === 1 ? 'embrião' : 'embriões'} registrado(s)
+                  {filteredEmbrioes.length} {filteredEmbrioes.length === 1 ? 'embrião' : 'embriões'} registrado(s)
                 </p>
               </div>
               <button
@@ -435,7 +782,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {embrioes.map((item) => (
+              {filteredEmbrioes.map((item) => (
                 <EmbriaoCard 
                   key={item.id} 
                   embriao={item} 
@@ -454,7 +801,13 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
         )}
 
         {activeTab === 'gestacoes' && (
-          <GestationsTab />
+          <GestationsTab
+            gestations={gestations}
+            mares={maresData || []}
+            stallions={stallionsData || []}
+            onConfirmGestation={handleConfirmGestation}
+            isSaving={isSavingGestation}
+          />
         )}
 
         {activeTab === 'documentos' && (
@@ -486,7 +839,11 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
 
       {/* Modal Upload Documento */}
       {showUploadModal && (
-        <UploadDocumentModal onClose={() => setShowUploadModal(false)} />
+        <UploadDocumentModal
+          onClose={() => setShowUploadModal(false)}
+          onUpload={handleUploadDocument}
+          isSaving={isSavingDocument}
+        />
       )}
 
       {/* Modals de Detalhes */}
@@ -555,10 +912,29 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       {showRegisterCoberturaModal && (
         <RegisterCoberturaModal 
           onClose={() => setShowRegisterCoberturaModal(false)}
-          onSubmit={(data) => {
-            console.log('Nova cobertura registrada:', data);
-            // Aqui você adicionaria a lógica para salvar os dados
-            setShowRegisterCoberturaModal(false);
+          stallions={stallionsData || []}
+          mares={maresData || []}
+          onSubmit={async (data) => {
+            try {
+              if (!harasId) {
+                toast.error('Haras não identificado.');
+                return;
+              }
+              await createCovering({
+                haras_id: harasId,
+                mare_id: data.mareId,
+                stallion_id: data.stallionId,
+                event_date: data.data,
+                type: data.tipo,
+                veterinarian: data.veterinario,
+                observations: data.observacoes,
+              });
+              toast.success('Cobertura registrada com sucesso!');
+              setShowRegisterCoberturaModal(false);
+            } catch (error) {
+              console.error('Erro ao registrar cobertura:', error);
+              toast.error('Erro ao registrar cobertura. Tente novamente.');
+            }
           }}
         />
       )}
@@ -567,10 +943,30 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       {showRegisterOvulosModal && (
         <RegisterOvulosModal 
           onClose={() => setShowRegisterOvulosModal(false)}
-          onSubmit={(data) => {
-            console.log('Nova coleta de óvulos registrada:', data);
-            // Aqui você adicionaria a lógica para salvar os dados
-            setShowRegisterOvulosModal(false);
+          donors={maresData || []}
+          onSubmit={async (data) => {
+            try {
+              if (!harasId) {
+                toast.error('Haras não identificado.');
+                return;
+              }
+              await createOvule({
+                haras_id: harasId,
+                donor_id: data.donorId,
+                collection_date: data.data,
+                quantity: data.quantidade,
+                quality: data.qualidade,
+                method: data.metodo,
+                veterinarian: data.veterinario,
+                observations: data.observacoes,
+                status: 'Congelado',
+              });
+              toast.success('Coleta de óvulos registrada com sucesso!');
+              setShowRegisterOvulosModal(false);
+            } catch (error) {
+              console.error('Erro ao registrar coleta de óvulos:', error);
+              toast.error('Erro ao registrar coleta. Tente novamente.');
+            }
           }}
         />
       )}
@@ -579,10 +975,33 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       {showRegisterEmbriaoModal && (
         <RegisterEmbriaoModal 
           onClose={() => setShowRegisterEmbriaoModal(false)}
-          onSubmit={(data) => {
-            console.log('Novos embriões registrados:', data);
-            // Aqui você adicionaria a lógica para salvar os dados
-            setShowRegisterEmbriaoModal(false);
+          donors={maresData || []}
+          stallions={stallionsData || []}
+          onSubmit={async (data) => {
+            try {
+              if (!harasId) {
+                toast.error('Haras não identificado.');
+                return;
+              }
+              await createEmbryo({
+                haras_id: harasId,
+                donor_id: data.donorId,
+                stallion_id: data.stallionId,
+                production_date: data.data,
+                quantity: data.quantidade,
+                grade: data.grau,
+                storage_type: data.tipo,
+                method: data.metodo,
+                veterinarian: data.veterinario,
+                observations: data.observacoes,
+                status: data.tipo,
+              });
+              toast.success('Embriões registrados com sucesso!');
+              setShowRegisterEmbriaoModal(false);
+            } catch (error) {
+              console.error('Erro ao registrar embriões:', error);
+              toast.error('Erro ao registrar embriões. Tente novamente.');
+            }
           }}
         />
       )}
@@ -719,12 +1138,40 @@ function DocumentoItem({ documento, onView }: { documento: Documento; onView: ()
   );
 }
 
-function UploadDocumentModal({ onClose }: { onClose: () => void }) {
+function UploadDocumentModal({
+  onClose,
+  onUpload,
+  isSaving,
+}: {
+  onClose: () => void;
+  onUpload: (data: { nome: string; tipo: string; descricao?: string; file: File }) => Promise<void> | void;
+  isSaving?: boolean;
+}) {
   const [formData, setFormData] = useState({
     nome: '',
     tipo: 'cobertura',
     descricao: '',
   });
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!formData.nome.trim()) {
+      setError('Informe o nome do documento.');
+      return;
+    }
+    if (!file) {
+      setError('Selecione um arquivo para upload.');
+      return;
+    }
+    setError(null);
+    await onUpload({
+      nome: formData.nome.trim(),
+      tipo: formData.tipo,
+      descricao: formData.descricao.trim() || undefined,
+      file,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -784,14 +1231,26 @@ function UploadDocumentModal({ onClose }: { onClose: () => void }) {
 
           <div>
             <label className="block text-sm text-foreground dark:text-white mb-2">Arquivo *</label>
-            <div className="flex items-center justify-center w-full h-40 border-2 border-dashed border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg cursor-pointer hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
+            <label className="flex items-center justify-center w-full h-40 border-2 border-dashed border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg cursor-pointer hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
               <div className="text-center">
                 <Upload className="w-12 h-12 mx-auto mb-2 text-muted-foreground dark:text-[#99a1af]" />
-                <p className="text-muted-foreground dark:text-[#99a1af] mb-1">Clique ou arraste o arquivo aqui</p>
+                <p className="text-muted-foreground dark:text-[#99a1af] mb-1">
+                  {file ? file.name : 'Clique ou arraste o arquivo aqui'}
+                </p>
                 <p className="text-xs text-muted-foreground dark:text-[#99a1af]">PDF, JPG, PNG (máx. 10MB)</p>
               </div>
-            </div>
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(event) => {
+                  const selected = event.target.files?.[0];
+                  if (selected) setFile(selected);
+                }}
+              />
+            </label>
           </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 
         <div className="flex flex-col lg:flex-row gap-4 mt-6">
@@ -802,10 +1261,13 @@ function UploadDocumentModal({ onClose }: { onClose: () => void }) {
             Cancelar
           </button>
           <button
-            onClick={onClose}
-            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+            onClick={async () => {
+              await handleSubmit();
+            }}
+            disabled={isSaving}
+            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Carregar Documento
+            {isSaving ? 'Carregando...' : 'Carregar Documento'}
           </button>
         </div>
       </div>

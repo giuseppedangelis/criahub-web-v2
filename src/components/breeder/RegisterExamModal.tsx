@@ -4,7 +4,8 @@ import { useState } from 'react';
 interface RegisterExamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: ExamData) => void;
+  onSave: (data: ExamData) => Promise<void> | void;
+  isSaving?: boolean;
   animalName?: string;
 }
 
@@ -17,7 +18,7 @@ export interface ExamData {
   arquivo?: File;
 }
 
-export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: RegisterExamModalProps) {
+export function RegisterExamModal({ isOpen, onClose, onSave, isSaving, animalName }: RegisterExamModalProps) {
   const [formData, setFormData] = useState<ExamData>({
     nome: '',
     data: '',
@@ -29,26 +30,40 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const resetForm = () => {
+    setFormData({
+      nome: '',
+      data: '',
+      veterinario: '',
+      resultado: '',
+      observacoes: '',
+    });
+    setSelectedFile(null);
+    setErrors({});
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
         setSelectedFile(file);
       } else {
-        alert('Por favor, selecione apenas arquivos PDF ou imagens');
+        window.alert('Selecione apenas arquivos PDF ou imagem');
       }
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
+
     const newErrors: Record<string, string> = {};
 
     if (!formData.nome.trim()) {
-      newErrors.nome = 'Tipo de exame é obrigatório';
+      newErrors.nome = 'Tipo de exame e obrigatorio';
     }
 
     if (!formData.data) {
-      newErrors.data = 'Data do exame é obrigatória';
+      newErrors.data = 'Data do exame e obrigatoria';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -56,32 +71,23 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
       return;
     }
 
-    onSave({
-      ...formData,
-      arquivo: selectedFile || undefined,
-    });
+    try {
+      await onSave({
+        ...formData,
+        nome: formData.nome.trim(),
+        veterinario: formData.veterinario.trim(),
+        observacoes: formData.observacoes.trim(),
+        arquivo: selectedFile || undefined,
+      });
 
-    setFormData({
-      nome: '',
-      data: '',
-      veterinario: '',
-      resultado: '',
-      observacoes: '',
-    });
-    setSelectedFile(null);
-    setErrors({});
+      resetForm();
+    } catch {
+      // Erro tratado pelo chamador
+    }
   };
 
   const handleClose = () => {
-    setFormData({
-      nome: '',
-      data: '',
-      veterinario: '',
-      resultado: '',
-      observacoes: '',
-    });
-    setSelectedFile(null);
-    setErrors({});
+    resetForm();
     onClose();
   };
 
@@ -89,7 +95,10 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={handleClose}>
-      <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border dark:border-[rgba(255,255,255,0.1)]" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border dark:border-[rgba(255,255,255,0.1)]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl text-foreground dark:text-white">Adicionar Novo Exame</h2>
@@ -119,7 +128,7 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
               className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border ${
                 errors.nome ? 'border-red-500' : 'border-border dark:border-[rgba(255,255,255,0.1)]'
               } rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white`}
-              placeholder="Ex: Hemograma Completo, Exame Parasitológico, Ultrassom"
+              placeholder="Ex: Hemograma completo, Exame parasitologico, Ultrassom"
             />
             {errors.nome && (
               <p className="text-sm text-red-500 mt-1">{errors.nome}</p>
@@ -149,14 +158,14 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
 
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Veterinário Responsável
+                Veterinario Responsavel
               </label>
               <input
                 type="text"
                 value={formData.veterinario}
                 onChange={(e) => setFormData({ ...formData, veterinario: e.target.value })}
                 className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                placeholder="Dr. Nome do veterinário"
+                placeholder="Dr. Nome do veterinario"
               />
             </div>
           </div>
@@ -173,21 +182,21 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
               <option value="">Selecione o resultado</option>
               <option value="Normal">Normal</option>
               <option value="Alterado">Alterado</option>
-              <option value="Aguardando">Aguardando Resultado</option>
+              <option value="Aguardando">Aguardando resultado</option>
               <option value="Inconclusivo">Inconclusivo</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm text-foreground dark:text-white mb-2">
-              Observações
+              Observacoes
             </label>
             <textarea
               value={formData.observacoes}
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
               className="w-full px-4 py-3 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white resize-none"
               rows={4}
-              placeholder="Informações adicionais sobre o exame, valores de referência, recomendações, etc."
+              placeholder="Informacoes adicionais sobre o exame"
             />
           </div>
 
@@ -222,7 +231,7 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
                       Clique ou arraste o arquivo aqui
                     </p>
                     <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
-                      PDF ou imagem até 10MB
+                      PDF ou imagem ate 10MB
                     </p>
                   </>
                 )}
@@ -248,9 +257,10 @@ export function RegisterExamModal({ isOpen, onClose, onSave, animalName }: Regis
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+            disabled={isSaving}
+            className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Salvar Exame
+            {isSaving ? 'Salvando...' : 'Salvar Exame'}
           </button>
         </div>
       </div>

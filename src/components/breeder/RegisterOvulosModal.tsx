@@ -1,9 +1,10 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal } from '@/types';
 
 export interface OvulosData {
-  doadora: string;
+  donorId: string;
   quantidade: number;
   data: string;
   qualidade: 'excelente' | 'boa' | 'regular';
@@ -15,11 +16,16 @@ export interface OvulosData {
 interface RegisterOvulosModalProps {
   onClose: () => void;
   onSubmit: (data: OvulosData) => void;
+  donors?: Animal[];
 }
 
-export function RegisterOvulosModal({ onClose, onSubmit }: RegisterOvulosModalProps) {
+export function RegisterOvulosModal({
+  onClose,
+  onSubmit,
+  donors = [],
+}: RegisterOvulosModalProps) {
   const [formData, setFormData] = useState<OvulosData>({
-    doadora: '',
+    donorId: '',
     quantidade: 1,
     data: new Date().toISOString().split('T')[0],
     qualidade: 'boa',
@@ -33,8 +39,8 @@ export function RegisterOvulosModal({ onClose, onSubmit }: RegisterOvulosModalPr
   const validate = () => {
     const newErrors: Partial<Record<keyof OvulosData, string>> = {};
 
-    if (!formData.doadora.trim()) {
-      newErrors.doadora = 'Selecione a égua doadora';
+    if (!formData.donorId.trim()) {
+      newErrors.donorId = 'Selecione a égua doadora';
     }
     if (formData.quantidade < 1) {
       newErrors.quantidade = 'Quantidade deve ser maior que zero';
@@ -82,20 +88,18 @@ export function RegisterOvulosModal({ onClose, onSubmit }: RegisterOvulosModalPr
               Égua Doadora *
             </label>
             <NativeSelect
-              value={formData.doadora}
-              onChange={(e) => setFormData({ ...formData, doadora: e.target.value })}
+              value={formData.donorId}
+              onChange={(e) => setFormData({ ...formData, donorId: e.target.value })}
               className="w-full"
             >
               <option value="">Selecione a égua doadora</option>
-              <option value="Estrela">Estrela</option>
-              <option value="Bella Vista">Bella Vista</option>
-              <option value="Íris">Íris</option>
-              <option value="Lua">Lua</option>
-              <option value="Serena">Serena</option>
-              <option value="Aurora">Aurora</option>
-              <option value="Diamante Rosa">Diamante Rosa</option>
+              {donors.map((donor) => (
+                <option key={donor.id} value={donor.id}>
+                  {donor.name}
+                </option>
+              ))}
             </NativeSelect>
-            {errors.doadora && <p className="text-red-500 text-xs mt-1">{errors.doadora}</p>}
+            {errors.donorId && <p className="text-red-500 text-xs mt-1">{errors.donorId}</p>}
           </div>
 
           {/* Quantidade */}

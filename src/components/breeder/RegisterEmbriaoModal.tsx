@@ -1,10 +1,11 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal } from '@/types';
 
 export interface EmbriaoData {
-  doadora: string;
-  garanhao: string;
+  donorId: string;
+  stallionId: string;
   quantidade: number;
   data: string;
   grau: 'A' | 'B' | 'C';
@@ -17,12 +18,19 @@ export interface EmbriaoData {
 interface RegisterEmbriaoModalProps {
   onClose: () => void;
   onSubmit: (data: EmbriaoData) => void;
+  donors?: Animal[];
+  stallions?: Animal[];
 }
 
-export function RegisterEmbriaoModal({ onClose, onSubmit }: RegisterEmbriaoModalProps) {
+export function RegisterEmbriaoModal({
+  onClose,
+  onSubmit,
+  donors = [],
+  stallions = [],
+}: RegisterEmbriaoModalProps) {
   const [formData, setFormData] = useState<EmbriaoData>({
-    doadora: '',
-    garanhao: '',
+    donorId: '',
+    stallionId: '',
     quantidade: 1,
     data: new Date().toISOString().split('T')[0],
     grau: 'A',
@@ -37,11 +45,11 @@ export function RegisterEmbriaoModal({ onClose, onSubmit }: RegisterEmbriaoModal
   const validate = () => {
     const newErrors: Partial<Record<keyof EmbriaoData, string>> = {};
 
-    if (!formData.doadora.trim()) {
-      newErrors.doadora = 'Selecione a égua doadora';
+    if (!formData.donorId.trim()) {
+      newErrors.donorId = 'Selecione a égua doadora';
     }
-    if (!formData.garanhao.trim()) {
-      newErrors.garanhao = 'Selecione o garanhão';
+    if (!formData.stallionId.trim()) {
+      newErrors.stallionId = 'Selecione o garanhão';
     }
     if (formData.quantidade < 1) {
       newErrors.quantidade = 'Quantidade deve ser maior que zero';
@@ -89,20 +97,18 @@ export function RegisterEmbriaoModal({ onClose, onSubmit }: RegisterEmbriaoModal
               Égua Doadora *
             </label>
             <NativeSelect
-              value={formData.doadora}
-              onChange={(e) => setFormData({ ...formData, doadora: e.target.value })}
+              value={formData.donorId}
+              onChange={(e) => setFormData({ ...formData, donorId: e.target.value })}
               className="w-full"
             >
               <option value="">Selecione a égua doadora</option>
-              <option value="Estrela">Estrela</option>
-              <option value="Bella Vista">Bella Vista</option>
-              <option value="Íris">Íris</option>
-              <option value="Lua">Lua</option>
-              <option value="Serena">Serena</option>
-              <option value="Aurora">Aurora</option>
-              <option value="Diamante Rosa">Diamante Rosa</option>
+              {donors.map((donor) => (
+                <option key={donor.id} value={donor.id}>
+                  {donor.name}
+                </option>
+              ))}
             </NativeSelect>
-            {errors.doadora && <p className="text-red-500 text-xs mt-1">{errors.doadora}</p>}
+            {errors.donorId && <p className="text-red-500 text-xs mt-1">{errors.donorId}</p>}
           </div>
 
           {/* Garanhão */}
@@ -111,18 +117,18 @@ export function RegisterEmbriaoModal({ onClose, onSubmit }: RegisterEmbriaoModal
               Garanhão *
             </label>
             <NativeSelect
-              value={formData.garanhao}
-              onChange={(e) => setFormData({ ...formData, garanhao: e.target.value })}
+              value={formData.stallionId}
+              onChange={(e) => setFormData({ ...formData, stallionId: e.target.value })}
               className="w-full"
             >
               <option value="">Selecione o garanhão</option>
-              <option value="Trovão Negro">Trovão Negro</option>
-              <option value="Imperador">Imperador</option>
-              <option value="Sol Nascente">Sol Nascente</option>
-              <option value="Relâmpago">Relâmpago</option>
-              <option value="Diamante">Diamante</option>
+              {stallions.map((stallion) => (
+                <option key={stallion.id} value={stallion.id}>
+                  {stallion.name}
+                </option>
+              ))}
             </NativeSelect>
-            {errors.garanhao && <p className="text-red-500 text-xs mt-1">{errors.garanhao}</p>}
+            {errors.stallionId && <p className="text-red-500 text-xs mt-1">{errors.stallionId}</p>}
           </div>
 
           {/* Quantidade */}

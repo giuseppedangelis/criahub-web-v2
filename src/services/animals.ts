@@ -6,11 +6,13 @@
 import { supabase, applyPagination, formatPaginatedResponse, handleSupabaseError } from './base';
 import type {
     Animal,
+    AnimalGenealogy,
     AnimalFilters,
     CreateAnimalInput,
     UpdateAnimalInput,
     PaginationParams,
-    PaginatedResponse
+    PaginatedResponse,
+    GenealogyNode
 } from '@/types';
 
 const CATEGORY_MAPPING: Record<string, string> = {
@@ -45,6 +47,19 @@ function mapCategoryFromDb(dbCategory: string): string {
     return DB_TO_FRONTEND_CATEGORY[dbCategory] || dbCategory;
 }
 
+function parseStatusManejo(value: string | null | undefined): { motivo?: string; data?: string } | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (!trimmed.startsWith('{')) return null;
+    try {
+        const parsed = JSON.parse(trimmed) as { motivo?: string; data?: string };
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
 // Mapeamento do status do banco para o frontend
 const STATUS_MAPPING: Record<string, string> = {
     'Ativo': 'ativo',
@@ -57,6 +72,43 @@ const REVERSE_STATUS_MAPPING: Record<string, string> = Object.entries(STATUS_MAP
     acc[value] = key;
     return acc;
 }, {} as Record<string, string>);
+
+const GENEALOGY_SELECT_FIELDS = `
+    id, nome, registro, foto_url, images, pai_id, mae_id, father_name, mother_name
+`;
+
+function mapGenealogyNode(row: any): GenealogyNode {
+    const images = Array.isArray(row.images) ? row.images : [];
+    const mainImage = row.foto_url || (images.length > 0 ? images[0] : null);
+
+    return {
+        id: row.id,
+        name: row.nome,
+        registry_number: row.registro ?? null,
+        main_image_url: mainImage,
+        father_id: row.pai_id ?? null,
+        mother_id: row.mae_id ?? null,
+        father_name: row.father_name ?? null,
+        mother_name: row.mother_name ?? null
+    };
+}
+
+async function fetchGenealogyNodesByIds(ids: string[]): Promise<GenealogyNode[]> {
+    if (!ids.length) return [];
+
+    const { data, error } = await supabase
+        .from('animals')
+        .select(GENEALOGY_SELECT_FIELDS)
+        .in('id', ids);
+
+    if (error) handleSupabaseError(error);
+
+    return (data || []).map(mapGenealogyNode);
+}
+
+function getUniqueIds(ids: Array<string | null | undefined>): string[] {
+    return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+}
 
 export const animalsService = {
     /**
@@ -304,8 +356,8 @@ export const animalsService = {
             reproductionType: data.tipo_servico,
             activeForReproduction: data.para_venda,
             statusHistorico: [],
-            motivoInativacao: data.status !== 'Ativo' ? data.status : null,
-            dataInativacao: null,
+            motivoInativacao: parseStatusManejo(data.status_manejo)?.motivo || (data.status !== 'Ativo' ? data.status : null),
+            dataInativacao: parseStatusManejo(data.status_manejo)?.data || null,
 
             // Outros campos
             father_name: data.father_name,
@@ -314,6 +366,46 @@ export const animalsService = {
         };
 
         return mappedData as unknown as Animal;
+    },
+
+    /**
+     * Busca a genealogia do animal até bisavós
+     */
+    async getGenealogy(animalId: string): Promise<AnimalGenealogy> {
+        const { data, error } = await supabase
+            .from('animals')
+            .select(GENEALOGY_SELECT_FIELDS)
+            .eq('id', animalId)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return { root: null, nodes: {} };
+            }
+            handleSupabaseError(error);
+        }
+
+        if (!data) return { root: null, nodes: {} };
+
+        const root = mapGenealogyNode(data);
+        const nodes: Record<string, GenealogyNode> = {
+            [root.id]: root,
+        };
+
+        let currentIds = getUniqueIds([root.father_id, root.mother_id]);
+
+        for (let level = 0; level < 3 && currentIds.length > 0; level++) {
+            const fetched = await fetchGenealogyNodesByIds(currentIds);
+            fetched.forEach((node) => {
+                nodes[node.id] = node;
+            });
+
+            currentIds = getUniqueIds(
+                fetched.flatMap((node) => [node.father_id, node.mother_id])
+            );
+        }
+
+        return { root, nodes };
     },
 
     /**
@@ -391,6 +483,7 @@ export const animalsService = {
         if (updateData.observations !== undefined) dbInput.observacoes = updateData.observations;
         if (updateData.origin_haras !== undefined) dbInput.haras_origem = updateData.origin_haras;
         if (updateData.service_type !== undefined) dbInput.tipo_servico = updateData.service_type;
+        if (updateData.management_status !== undefined) dbInput.status_manejo = updateData.management_status;
         // Handle images - always include the array even if empty to clear existing images
         if (updateData.images !== undefined) {
             dbInput.images = updateData.images;

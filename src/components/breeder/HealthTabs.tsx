@@ -6,13 +6,14 @@ import { ExamsHistoryTab } from './ExamsHistoryTab';
 import { NativeSelect } from '../ui/native-select';
 
 interface HealthTabsProps {
-  animalId: number;
+  animalId: string;
   animalName: string;
+  onRegisterProcedure: () => void;
   onRegisterVaccine: () => void;
   onRegisterExam: () => void;
 }
 
-export function HealthTabs({ animalId, animalName, onRegisterVaccine, onRegisterExam }: HealthTabsProps) {
+export function HealthTabs({ animalId, animalName, onRegisterProcedure, onRegisterVaccine, onRegisterExam }: HealthTabsProps) {
   const [activeSubTab, setActiveSubTab] = useState('dashboard');
 
   const subTabs = [
@@ -65,7 +66,7 @@ export function HealthTabs({ animalId, animalName, onRegisterVaccine, onRegister
         )}
 
         {activeSubTab === 'procedures' && (
-          <HealthTab animalId={animalId} />
+          <HealthTab animalId={animalId} onRegisterProcedure={onRegisterProcedure} />
         )}
 
         {activeSubTab === 'vaccines' && (

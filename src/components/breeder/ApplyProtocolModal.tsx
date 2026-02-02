@@ -1,8 +1,9 @@
 import { X, Calendar, CheckCircle2, Zap, AlertCircle, Search, Plus, Bell } from 'lucide-react';
 import { useState } from 'react';
+import type { Animal } from '@/types';
 
 interface Protocol {
-  id: number;
+  id: string;
   name: string;
   type: 'TE' | 'IATF' | 'Aspiração Folicular' | 'Personalizado';
   description: string;
@@ -17,6 +18,7 @@ interface ApplyProtocolModalProps {
   protocol: Protocol;
   onClose: () => void;
   onApply: (data: ApplyProtocolData) => void;
+  animals?: Animal[];
 }
 
 interface ProtocolStep {
@@ -28,6 +30,7 @@ interface ProtocolStep {
 }
 
 export interface ApplyProtocolData {
+  animalId?: string;
   animalName: string;
   startDate: string;
   startTime: string;
@@ -43,9 +46,10 @@ interface ScheduledEvent {
   description: string;
 }
 
-export function ApplyProtocolModal({ protocol, onClose, onApply }: ApplyProtocolModalProps) {
+export function ApplyProtocolModal({ protocol, onClose, onApply, animals = [] }: ApplyProtocolModalProps) {
   const [formData, setFormData] = useState<ApplyProtocolData>({
     animalName: '',
+    animalId: '',
     startDate: new Date().toISOString().split('T')[0],
     startTime: '09:00',
     notes: '',
@@ -55,18 +59,10 @@ export function ApplyProtocolModal({ protocol, onClose, onApply }: ApplyProtocol
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Animais mockados para seleção
-  const animals = [
-    'Estrela da Manhã',
-    'Flor do Campo',
-    'Lua Nova',
-    'Rainha do Mar',
-    'Vento Sul',
-    'Diamante Negro',
-  ];
+  const animalOptions = animals.length > 0 ? animals : [];
 
-  const filteredAnimals = animals.filter((animal) =>
-    animal.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAnimals = animalOptions.filter((animal) =>
+    animal.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const calculateEventDate = (startDate: string, dayOffset: number): string => {
@@ -288,19 +284,19 @@ export function ApplyProtocolModal({ protocol, onClose, onApply }: ApplyProtocol
             <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
               {filteredAnimals.map((animal) => (
                 <button
-                  key={animal}
+                  key={animal.id}
                   type="button"
                   onClick={() => {
-                    setFormData({ ...formData, animalName: animal });
+                    setFormData({ ...formData, animalName: animal.name, animalId: animal.id });
                     setSearchTerm('');
                   }}
                   className={`p-3 rounded-lg border-2 text-left transition-all ${
-                    formData.animalName === animal
+                    formData.animalId === animal.id
                       ? 'border-primary dark:border-white bg-primary/5 dark:bg-white/5'
                       : 'border-gray-200 dark:border-[rgba(255,255,255,0.1)] hover:border-gray-300 dark:hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
-                  <p className="text-sm text-foreground dark:text-white font-medium">{animal}</p>
+                  <p className="text-sm text-foreground dark:text-white font-medium">{animal.name}</p>
                 </button>
               ))}
             </div>

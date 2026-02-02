@@ -1,10 +1,11 @@
 import { X, Calendar } from 'lucide-react';
 import { useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal } from '@/types';
 
 export interface CoberturaData {
-  pai: string;
-  mae: string;
+  stallionId: string;
+  mareId: string;
   tipo: 'Monta Natural' | 'Inseminação Artificial' | 'Transferência de Embrião';
   data: string;
   veterinario: string;
@@ -14,12 +15,19 @@ export interface CoberturaData {
 interface RegisterCoberturaModalProps {
   onClose: () => void;
   onSubmit: (data: CoberturaData) => void;
+  stallions?: Animal[];
+  mares?: Animal[];
 }
 
-export function RegisterCoberturaModal({ onClose, onSubmit }: RegisterCoberturaModalProps) {
+export function RegisterCoberturaModal({
+  onClose,
+  onSubmit,
+  stallions = [],
+  mares = [],
+}: RegisterCoberturaModalProps) {
   const [formData, setFormData] = useState<CoberturaData>({
-    pai: '',
-    mae: '',
+    stallionId: '',
+    mareId: '',
     tipo: 'Monta Natural',
     data: new Date().toISOString().split('T')[0],
     veterinario: '',
@@ -31,11 +39,11 @@ export function RegisterCoberturaModal({ onClose, onSubmit }: RegisterCoberturaM
   const validate = () => {
     const newErrors: Partial<Record<keyof CoberturaData, string>> = {};
 
-    if (!formData.pai.trim()) {
-      newErrors.pai = 'Selecione o garanhão (pai)';
+    if (!formData.stallionId.trim()) {
+      newErrors.stallionId = 'Selecione o garanhão (pai)';
     }
-    if (!formData.mae.trim()) {
-      newErrors.mae = 'Selecione a égua (mãe)';
+    if (!formData.mareId.trim()) {
+      newErrors.mareId = 'Selecione a égua (mãe)';
     }
     if (!formData.data) {
       newErrors.data = 'Informe a data da cobertura';
@@ -80,18 +88,18 @@ export function RegisterCoberturaModal({ onClose, onSubmit }: RegisterCoberturaM
               Garanhão (Pai) *
             </label>
             <NativeSelect
-              value={formData.pai}
-              onChange={(e) => setFormData({ ...formData, pai: e.target.value })}
+              value={formData.stallionId}
+              onChange={(e) => setFormData({ ...formData, stallionId: e.target.value })}
               className="w-full"
             >
               <option value="">Selecione o garanhão</option>
-              <option value="Trovão Negro">Trovão Negro</option>
-              <option value="Imperador">Imperador</option>
-              <option value="Sol Nascente">Sol Nascente</option>
-              <option value="Relâmpago">Relâmpago</option>
-              <option value="Diamante">Diamante</option>
+              {stallions.map((stallion) => (
+                <option key={stallion.id} value={stallion.id}>
+                  {stallion.name}
+                </option>
+              ))}
             </NativeSelect>
-            {errors.pai && <p className="text-red-500 text-xs mt-1">{errors.pai}</p>}
+            {errors.stallionId && <p className="text-red-500 text-xs mt-1">{errors.stallionId}</p>}
           </div>
 
           {/* Égua (Mãe) */}
@@ -100,19 +108,18 @@ export function RegisterCoberturaModal({ onClose, onSubmit }: RegisterCoberturaM
               Égua (Mãe) *
             </label>
             <NativeSelect
-              value={formData.mae}
-              onChange={(e) => setFormData({ ...formData, mae: e.target.value })}
+              value={formData.mareId}
+              onChange={(e) => setFormData({ ...formData, mareId: e.target.value })}
               className="w-full"
             >
               <option value="">Selecione a égua</option>
-              <option value="Estrela">Estrela</option>
-              <option value="Bella Vista">Bella Vista</option>
-              <option value="Íris">Íris</option>
-              <option value="Lua">Lua</option>
-              <option value="Serena">Serena</option>
-              <option value="Aurora">Aurora</option>
+              {mares.map((mare) => (
+                <option key={mare.id} value={mare.id}>
+                  {mare.name}
+                </option>
+              ))}
             </NativeSelect>
-            {errors.mae && <p className="text-red-500 text-xs mt-1">{errors.mae}</p>}
+            {errors.mareId && <p className="text-red-500 text-xs mt-1">{errors.mareId}</p>}
           </div>
 
           {/* Tipo de Cobertura */}

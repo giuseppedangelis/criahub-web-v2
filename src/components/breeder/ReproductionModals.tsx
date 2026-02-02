@@ -2,7 +2,7 @@ import { X, Calendar, User, FileText, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Cobertura {
-  id: number;
+  id: string;
   pai: string;
   mae: string;
   tipo: string;
@@ -12,7 +12,7 @@ interface Cobertura {
 }
 
 interface Ovulo {
-  id: number;
+  id: string;
   doadora: string;
   quantidade: number;
   data: string;
@@ -21,8 +21,20 @@ interface Ovulo {
   qualidade: 'excelente' | 'boa' | 'regular';
 }
 
+interface Embriao {
+  id: string;
+  doadora: string;
+  garanhao: string;
+  quantidade: number;
+  data: string;
+  status: string;
+  disponiveis: number;
+  grau: 'A' | 'B' | 'C';
+  tipo: 'Fresco' | 'Congelado';
+}
+
 interface Documento {
-  id: number;
+  id: string;
   nome: string;
   tipo: string;
   data: string;
@@ -308,14 +320,19 @@ export function OvuloDetailsModal({ ovulo, onClose }: { ovulo: Ovulo; onClose: (
   );
 }
 
-export function EmbriaoDetailsModal({ embriao, onClose }: { embriao: Ovulo; onClose: () => void }) {
+export function EmbriaoDetailsModal({ embriao, onClose }: { embriao: Embriao; onClose: () => void }) {
   const qualidadeConfig = {
     excelente: { label: 'Grau A', color: 'bg-emerald-500' },
     boa: { label: 'Grau B', color: 'bg-[#2472bc]' },
     regular: { label: 'Grau C', color: 'bg-amber-500' },
   };
 
-  const config = qualidadeConfig[embriao.qualidade];
+  const config =
+    embriao.grau === 'A'
+      ? qualidadeConfig.excelente
+      : embriao.grau === 'B'
+        ? qualidadeConfig.boa
+        : qualidadeConfig.regular;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
@@ -349,7 +366,7 @@ export function EmbriaoDetailsModal({ embriao, onClose }: { embriao: Ovulo; onCl
             </div>
             <div>
               <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Garanhão</p>
-              <p className="text-lg text-foreground dark:text-white">Trovão</p>
+              <p className="text-lg text-foreground dark:text-white">{embriao.garanhao}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Quantidade Produzida</p>
@@ -375,7 +392,7 @@ export function EmbriaoDetailsModal({ embriao, onClose }: { embriao: Ovulo; onCl
             </div>
             <div>
               <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Método</p>
-              <p className="text-lg text-foreground dark:text-white">FIV</p>
+              <p className="text-lg text-foreground dark:text-white">{embriao.tipo}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Taxa de Utilização</p>

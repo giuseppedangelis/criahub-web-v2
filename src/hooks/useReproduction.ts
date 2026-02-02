@@ -12,7 +12,14 @@ import type {
     CreateReproductiveEventInput,
     CreateGestationInput,
     PaginationParams,
-    Gestation
+    Gestation,
+    CreateCoveringInput,
+    CreateOvuleInput,
+    CreateEmbryoInput,
+    CreateReproductionDocumentInput,
+    CreateReproductionProtocolInput,
+    CreateReproductionProtocolStepInput,
+    CreateReproductionProtocolApplicationInput
 } from '@/types'
 
 // Query Keys
@@ -31,6 +38,21 @@ export const reproductionKeys = {
         [...reproductionKeys.gestations(), 'active', harasId] as const,
     stats: (harasId: string, year?: number) =>
         [...reproductionKeys.all, 'stats', harasId, year] as const,
+    coverings: () => [...reproductionKeys.all, 'coverings'] as const,
+    coveringsByHaras: (harasId: string, pagination: PaginationParams) =>
+        [...reproductionKeys.coverings(), harasId, pagination] as const,
+    ovules: () => [...reproductionKeys.all, 'ovules'] as const,
+    ovulesByHaras: (harasId: string, pagination: PaginationParams) =>
+        [...reproductionKeys.ovules(), harasId, pagination] as const,
+    embryos: () => [...reproductionKeys.all, 'embryos'] as const,
+    embryosByHaras: (harasId: string, pagination: PaginationParams) =>
+        [...reproductionKeys.embryos(), harasId, pagination] as const,
+    documents: (harasId: string) =>
+        [...reproductionKeys.all, 'documents', harasId] as const,
+    protocols: (harasId: string) =>
+        [...reproductionKeys.all, 'protocols', harasId] as const,
+    protocolApplications: (harasId: string) =>
+        [...reproductionKeys.all, 'protocols', 'applications', harasId] as const,
 }
 
 /**
@@ -38,12 +60,13 @@ export const reproductionKeys = {
  */
 export function useReproductiveEvents(
     harasId: string,
-    pagination: PaginationParams = { page: 1, limit: 20 }
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
 ) {
     return useQuery({
         queryKey: reproductionKeys.eventsByHaras(harasId, pagination),
         queryFn: () => reproductionService.listEvents(harasId, pagination),
-        enabled: !!harasId,
+        enabled: enabled && !!harasId,
     })
 }
 
@@ -83,11 +106,13 @@ export function useCreateReproductiveEvent() {
  */
 export function useGestations(
     filters: GestationFilters = {},
-    pagination: PaginationParams = { page: 1, limit: 20 }
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
 ) {
     return useQuery({
         queryKey: reproductionKeys.gestationsList(filters, pagination),
         queryFn: () => reproductionService.listGestations(filters, pagination),
+        enabled: enabled && !!filters.haras_id,
     })
 }
 
@@ -155,5 +180,217 @@ export function useReproductionStats(harasId: string, year?: number) {
         queryKey: reproductionKeys.stats(harasId, year),
         queryFn: () => reproductionService.getStats(harasId, year),
         enabled: !!harasId,
+    })
+}
+
+// ============================================
+// COBERTURAS
+// ============================================
+
+export function useCoverings(
+    harasId: string,
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
+) {
+    return useQuery({
+        queryKey: reproductionKeys.coveringsByHaras(harasId, pagination),
+        queryFn: () => reproductionService.listCoverings(harasId, pagination),
+        enabled: enabled && !!harasId,
+    })
+}
+
+export function useCreateCovering() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: CreateCoveringInput) =>
+            reproductionService.createCovering(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.coverings() })
+            if (variables.haras_id) {
+                queryClient.invalidateQueries({
+                    queryKey: reproductionKeys.coveringsByHaras(variables.haras_id, { page: 1, limit: 20 })
+                })
+            }
+        },
+    })
+}
+
+// ============================================
+// OVULOS
+// ============================================
+
+export function useOvules(
+    harasId: string,
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
+) {
+    return useQuery({
+        queryKey: reproductionKeys.ovulesByHaras(harasId, pagination),
+        queryFn: () => reproductionService.listOvules(harasId, pagination),
+        enabled: enabled && !!harasId,
+    })
+}
+
+export function useCreateOvule() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: CreateOvuleInput) =>
+            reproductionService.createOvule(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.ovules() })
+            if (variables.haras_id) {
+                queryClient.invalidateQueries({
+                    queryKey: reproductionKeys.ovulesByHaras(variables.haras_id, { page: 1, limit: 20 })
+                })
+            }
+        },
+    })
+}
+
+// ============================================
+// EMBRIOES
+// ============================================
+
+export function useEmbryos(
+    harasId: string,
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
+) {
+    return useQuery({
+        queryKey: reproductionKeys.embryosByHaras(harasId, pagination),
+        queryFn: () => reproductionService.listEmbryos(harasId, pagination),
+        enabled: enabled && !!harasId,
+    })
+}
+
+export function useCreateEmbryo() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: CreateEmbryoInput) =>
+            reproductionService.createEmbryo(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.embryos() })
+            if (variables.haras_id) {
+                queryClient.invalidateQueries({
+                    queryKey: reproductionKeys.embryosByHaras(variables.haras_id, { page: 1, limit: 20 })
+                })
+            }
+        },
+    })
+}
+
+// ============================================
+// DOCUMENTOS
+// ============================================
+
+export function useReproductionDocuments(harasId: string, enabled: boolean = true) {
+    return useQuery({
+        queryKey: reproductionKeys.documents(harasId),
+        queryFn: () => reproductionService.listDocuments(harasId),
+        enabled: enabled && !!harasId,
+    })
+}
+
+export function useCreateReproductionDocument() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: CreateReproductionDocumentInput) =>
+            reproductionService.createDocument(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.documents(variables.haras_id) })
+        },
+    })
+}
+
+// ============================================
+// PROTOCOLOS
+// ============================================
+
+export function useReproductionProtocols(harasId: string, enabled: boolean = true) {
+    return useQuery({
+        queryKey: reproductionKeys.protocols(harasId),
+        queryFn: () => reproductionService.listProtocols(harasId),
+        enabled: enabled && !!harasId,
+    })
+}
+
+export function useCreateReproductionProtocol() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({
+            input,
+            steps,
+        }: {
+            input: CreateReproductionProtocolInput;
+            steps?: CreateReproductionProtocolStepInput[];
+        }) => reproductionService.createProtocol(input, steps),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.protocols(variables.input.haras_id) })
+        },
+    })
+}
+
+export function useUpdateReproductionProtocol(harasId: string) {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ id, input }: { id: string; input: Partial<CreateReproductionProtocolInput> }) =>
+            reproductionService.updateProtocol(id, input),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.protocols(harasId) })
+        },
+    })
+}
+
+export function useReplaceReproductionProtocolSteps(harasId: string) {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({
+            protocolId,
+            steps,
+        }: {
+            protocolId: string;
+            steps: CreateReproductionProtocolStepInput[];
+        }) => reproductionService.replaceProtocolSteps(protocolId, steps),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.protocols(harasId) })
+        },
+    })
+}
+
+export function useDeleteReproductionProtocol(harasId: string) {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (id: string) => reproductionService.deleteProtocol(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.protocols(harasId) })
+        },
+    })
+}
+
+export function useApplyReproductionProtocol() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: CreateReproductionProtocolApplicationInput) =>
+            reproductionService.applyProtocol(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reproductionKeys.protocolApplications(variables.haras_id) })
+        },
+    })
+}
+
+export function useReproductionProtocolApplications(harasId: string, enabled: boolean = true) {
+    return useQuery({
+        queryKey: reproductionKeys.protocolApplications(harasId),
+        queryFn: () => reproductionService.listProtocolApplications(harasId),
+        enabled: enabled && !!harasId,
     })
 }

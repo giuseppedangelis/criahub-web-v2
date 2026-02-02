@@ -24,6 +24,7 @@ export const animalKeys = {
     details: () => [...animalKeys.all, 'detail'] as const,
     detail: (id: string) => [...animalKeys.details(), id] as const,
     offspring: (id: string) => [...animalKeys.detail(id), 'offspring'] as const,
+    genealogy: (id: string) => [...animalKeys.detail(id), 'genealogy'] as const,
     stallions: (harasId: string) => [...animalKeys.all, 'stallions', harasId] as const,
     mares: (harasId: string) => [...animalKeys.all, 'mares', harasId] as const,
 }
@@ -59,6 +60,17 @@ export function useAnimalOffspring(animalId: string) {
     return useQuery({
         queryKey: animalKeys.offspring(animalId),
         queryFn: () => animalsService.getOffspring(animalId),
+        enabled: !!animalId,
+    })
+}
+
+/**
+ * Hook para buscar genealogia (até bisavós)
+ */
+export function useAnimalGenealogy(animalId: string) {
+    return useQuery({
+        queryKey: animalKeys.genealogy(animalId),
+        queryFn: () => animalsService.getGenealogy(animalId),
         enabled: !!animalId,
     })
 }
@@ -108,10 +120,8 @@ export function useUpdateAnimal() {
 
     return useMutation({
         mutationFn: (input: UpdateAnimalInput) => animalsService.update(input),
-        onSuccess: (data) => {
-            // Atualizar cache do animal específico
-            queryClient.setQueryData(animalKeys.detail(data.id), data)
-            // Invalidar lista
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: animalKeys.detail(variables.id) })
             queryClient.invalidateQueries({ queryKey: animalKeys.lists() })
         },
     })

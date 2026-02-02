@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { X, Plus, Trash2, Upload, FileText } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
 
@@ -9,28 +9,69 @@ interface Medication {
   duration: string;
 }
 
+export interface VeterinaryProcedureData {
+  date: string;
+  time: string;
+  type: string;
+  veterinarian: string;
+  crm: string;
+  clinic: string;
+  reason: string;
+  diagnosis: string;
+  procedures: string;
+  examsSolicited: string;
+  recommendations: string;
+  nextAppointment: string;
+  cost: string;
+  notes: string;
+  medications: Medication[];
+  files: File[];
+}
+
 interface RegisterVeterinaryProcedureModalProps {
+  isOpen: boolean;
   onClose: () => void;
+  onSave: (data: VeterinaryProcedureData) => Promise<void> | void;
+  isSaving?: boolean;
   animalName: string;
 }
 
-export function RegisterVeterinaryProcedureModal({ onClose, animalName }: RegisterVeterinaryProcedureModalProps) {
-  const [formData, setFormData] = useState({
-    date: '',
-    time: '',
-    type: '',
-    veterinarian: '',
-    crm: '',
-    clinic: '',
-    reason: '',
-    diagnosis: '',
-    procedures: '',
-    examsSolicited: '',
-    recommendations: '',
-    nextAppointment: '',
-    cost: '',
-    notes: '',
+const INITIAL_FORM_DATA = {
+  date: '',
+  time: '',
+  type: '',
+  veterinarian: '',
+  crm: '',
+  clinic: '',
+  reason: '',
+  diagnosis: '',
+  procedures: '',
+  examsSolicited: '',
+  recommendations: '',
+  nextAppointment: '',
+  cost: '',
+  notes: '',
+};
+
+function formatCurrencyValue(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  const numberValue = Number(digits) / 100;
+  return numberValue.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
+}
+
+export function RegisterVeterinaryProcedureModal({
+  isOpen,
+  onClose,
+  onSave,
+  isSaving,
+  animalName,
+}: RegisterVeterinaryProcedureModalProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
   const [medications, setMedications] = useState<Medication[]>([]);
   const [newMedication, setNewMedication] = useState<Medication>({
@@ -40,12 +81,54 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
     duration: '',
   });
   const [showMedicationForm, setShowMedicationForm] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData(INITIAL_FORM_DATA);
+    setMedications([]);
+    setNewMedication({ name: '', dosage: '', frequency: '', duration: '' });
+    setShowMedicationForm(false);
+    setUploadedFiles([]);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Aqui seria a lógica de salvar
-    console.log('Procedimento registrado:', { ...formData, medications, uploadedFiles });
+
+    if (!e.currentTarget.checkValidity()) {
+      e.currentTarget.reportValidity();
+      return;
+    }
+
+    if (isSaving) return;
+
+    try {
+      await onSave({
+        ...formData,
+        date: formData.date.trim(),
+        time: formData.time.trim(),
+        type: formData.type.trim(),
+        veterinarian: formData.veterinarian.trim(),
+        crm: formData.crm.trim(),
+        clinic: formData.clinic.trim(),
+        reason: formData.reason.trim(),
+        diagnosis: formData.diagnosis.trim(),
+        procedures: formData.procedures.trim(),
+        examsSolicited: formData.examsSolicited.trim(),
+        recommendations: formData.recommendations.trim(),
+        nextAppointment: formData.nextAppointment.trim(),
+        cost: formData.cost.trim(),
+        notes: formData.notes.trim(),
+        medications,
+        files: uploadedFiles,
+      });
+      resetForm();
+    } catch {
+      // Erro tratado pelo chamador
+    }
+  };
+
+  const handleClose = () => {
+    resetForm();
     onClose();
   };
 
@@ -61,19 +144,26 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
     setMedications(medications.filter((_, i) => i !== index));
   };
 
-  const handleFileUpload = () => {
-    // Mock de upload
-    const fileName = `documento_${Date.now()}.pdf`;
-    setUploadedFiles([...uploadedFiles, fileName]);
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setUploadedFiles((prev) => [...prev, ...files]);
+    }
+    event.target.value = '';
   };
 
   const removeFile = (index: number) => {
     setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl border border-border dark:border-[rgba(255,255,255,0.1)] max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleClose}>
+      <div
+        className="bg-card dark:bg-[#1a1a1a] rounded-2xl border border-border dark:border-[rgba(255,255,255,0.1)] max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)] sticky top-0 bg-card dark:bg-[#1a1a1a] z-10">
           <div>
@@ -81,7 +171,7 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
             <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">Animal: {animalName}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-muted-foreground dark:text-[#99a1af] hover:text-foreground dark:hover:text-white transition-colors"
           >
             <X className="w-6 h-6" />
@@ -402,10 +492,10 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
                   Custo Total (R$)
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.cost}
-                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, cost: formatCurrencyValue(e.target.value) })}
                   placeholder="0,00"
                   className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
                 />
@@ -432,12 +522,19 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
               <h4 className="text-lg text-foreground dark:text-white font-medium">Documentos</h4>
               <button
                 type="button"
-                onClick={handleFileUpload}
+                onClick={() => fileInputRef.current?.click()}
                 className="px-3 py-2 border border-border dark:border-[#333333] text-foreground dark:text-white rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors flex items-center gap-2 text-sm"
               >
                 <Upload className="w-4 h-4" />
                 Anexar Documento
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                multiple
+                onChange={handleFileUpload}
+              />
             </div>
 
             {uploadedFiles.length > 0 && (
@@ -446,7 +543,7 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
                   <div key={index} className="bg-muted dark:bg-[#0d0d0d] rounded-lg p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-muted-foreground dark:text-[#99a1af]" />
-                      <span className="text-sm text-foreground dark:text-white">{file}</span>
+                      <span className="text-sm text-foreground dark:text-white">{file.name}</span>
                     </div>
                     <button
                       type="button"
@@ -465,16 +562,17 @@ export function RegisterVeterinaryProcedureModal({ onClose, animalName }: Regist
           <div className="flex gap-3 pt-4 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-6 py-3 border border-border dark:border-[#333333] text-foreground dark:text-white rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+              disabled={isSaving}
+              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Salvar Procedimento
+              {isSaving ? 'Salvando...' : 'Salvar Procedimento'}
             </button>
           </div>
         </form>

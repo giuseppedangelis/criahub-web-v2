@@ -1,19 +1,24 @@
-import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle } from 'lucide-react';
-import { useState, useEffect, type ChangeEvent } from 'react';
+import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle, Clock, Stethoscope, Syringe, Heart } from 'lucide-react';
+import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from './GenealogyTree';
 import { AwardsDetailModal } from './AwardsDetailModal';
 import { AnimalLocationSection } from './AnimalLocationSection';
 import { AnimalDocumentsSection } from './AnimalDocumentsSection';
 import { HealthTabs } from './HealthTabs';
-import { RegisterVaccineModal } from './RegisterVaccineModal';
-import { RegisterExamModal } from './RegisterExamModal';
+import { RegisterVaccineModal, type VaccineData } from './RegisterVaccineModal';
+import { RegisterExamModal, type ExamData } from './RegisterExamModal';
+import { RegisterVeterinaryProcedureModal, type VeterinaryProcedureData } from './RegisterVeterinaryProcedureModal';
 
 import { NativeSelect } from '../ui/native-select';
-import { useAnimal, useAnimalOffspring } from '@/hooks/useAnimals';
+import { useAnimal, useAnimalGenealogy, useAnimalOffspring, useUpdateAnimal } from '@/hooks/useAnimals';
+import { useAnimalExams, useAnimalHealthRecords, useAnimalVaccines, useCreateExam, useCreateHealthRecord, useCreateVaccine } from '@/hooks/useAnimalHealth';
 import { useAnimalVideos, useCreateAnimalVideo, useUpdateAnimalVideo, useDeleteAnimalVideo } from '@/hooks/useAnimalVideos';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { buildGenealogyView } from '@/lib/genealogy';
+import { useAnimalLocationHistory } from '@/hooks/useAnimalLocations';
+import { useAnimalReproductiveEvents } from '@/hooks/useReproduction';
 
 
 // Função auxiliar para formatar data de nascimento (FASE 20)
@@ -84,6 +89,32 @@ function buildThumbnailUrl(url: string): string | null {
   const youtubeId = extractYoutubeId(url);
   if (youtubeId) return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
   return null;
+}
+
+function normalizeLocationType(value?: string | null): 'Baia' | 'Pasto' | 'Servico' | undefined {
+  if (!value) return undefined;
+  const key = value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  if (key.includes('baia')) return 'Baia';
+  if (key.includes('pasto')) return 'Pasto';
+  if (key.includes('servico')) return 'Servico';
+  return undefined;
+}
+
+function normalizeServiceType(value?: string | null): 'Reproducao' | 'Trabalho' | 'Repouso' | 'Outro' | undefined {
+  if (!value) return undefined;
+  const key = value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  if (key.includes('reproducao')) return 'Reproducao';
+  if (key.includes('trabalho')) return 'Trabalho';
+  if (key.includes('repouso')) return 'Repouso';
+  return 'Outro';
 }
 
 function isDirectVideoUrl(url: string): boolean {
@@ -191,6 +222,25 @@ interface Award {
   certificate?: string;
 }
 
+interface HistoryEvent {
+  id: string;
+  type: string;
+  title: string;
+  date: string;
+  dateValue: number;
+  description?: string;
+  icon: typeof Stethoscope;
+  color: string;
+}
+
+type StatusHistoryEntry = {
+  data: string;
+  statusAnterior: string;
+  statusNovo: string;
+  motivo?: string;
+  usuario: string;
+};
+
 interface Animal {
   id: number;
   haras_id?: string;
@@ -208,15 +258,9 @@ interface Animal {
   statusColor: string;
   // NOVOS CAMPOS: Gestão de Status no Plantel (Ativo/Inativo)
   statusAtividade?: 'Ativo' | 'Inativo'; // Status no Plantel
-  motivoInativacao?: 'Vendido' | 'Óbito' | 'Doado' | 'Transferido'; // Motivo da inativação
+  motivoInativacao?: 'Vendido' | 'Obito' | 'Doado' | 'Transferido'; // Motivo da inativação
   dataInativacao?: string; // Data da inativação (ISO format)
-  statusHistorico?: Array<{ // Histórico de mudanças de status
-    data: string;
-    statusAnterior: string;
-    statusNovo: string;
-    motivo?: string;
-    usuario: string;
-  }>;
+  statusHistorico?: StatusHistoryEntry[]; // Histórico de mudanças de status
   localizacao?: string;  // Baia, Pasto, Serviço
   servicoTipo?: string;  // Reprodução, Trabalho, Repouso, Outro
   filhos?: number;  // Contador de descendentes
@@ -228,7 +272,7 @@ interface Animal {
   reproductionType?: 'Doadora' | 'Matriz' | 'Garanhão' | 'Castrado' | 'Receptora';
   activeForReproduction?: boolean;
   coverageCount?: number; // FASE 26: Contador de coberturas
-  lastReproductiveEvent?: { // FASE 27: Último evento reprodutivo
+  lastReproductiveEvent?: { // FASE 27: ?sltimo evento reprodutivo
     type: string;
     date: string;
   };
@@ -250,6 +294,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   const [activeTab, setActiveTab] = useState(initialTab);
   const [documentTab, setDocumentTab] = useState('todos');
   const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [showAddProcedureModal, setShowAddProcedureModal] = useState(false);
   const [showAddVaccineModal, setShowAddVaccineModal] = useState(false);
   const [showAddExamModal, setShowAddExamModal] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -292,8 +337,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   // NOVOS ESTADOS: Modal de Inativação
   const [showInactivateModal, setShowInactivateModal] = useState(false);
-  const [inactivateReason, setInactivateReason] = useState<'Vendido' | 'Óbito' | 'Doado' | 'Transferido'>('Vendido');
+  const [inactivateReason, setInactivateReason] = useState<'Vendido' | 'Obito' | 'Doado' | 'Transferido'>('Vendido');
   const [inactivateDate, setInactivateDate] = useState(new Date().toISOString().split('T')[0]);
+  const [localStatusHistory, setLocalStatusHistory] = useState<StatusHistoryEntry[]>([]);
   // FASE 33-37: Estados para Premiações
   const [showAddAwardModal, setShowAddAwardModal] = useState(false);
   const [showAwardDetailsModal, setShowAwardDetailsModal] = useState(false);
@@ -309,10 +355,20 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   // FASE 2: Dados Dinâmicos
   const { data: animalDetails, isLoading: isLoadingDetails } = useAnimal(String(animal.id));
   const { data: offspringList, isLoading: isLoadingOffspring } = useAnimalOffspring(String(animal.id));
+  const { data: genealogyData, isLoading: isLoadingGenealogy } = useAnimalGenealogy(String(animal.id));
   const { data: animalVideos, isLoading: isLoadingVideos } = useAnimalVideos(String(animal.id));
+  const { data: healthRecords, isLoading: isLoadingHistoryHealth } = useAnimalHealthRecords(String(animal.id));
+  const { data: vaccineRecords, isLoading: isLoadingHistoryVaccines } = useAnimalVaccines(String(animal.id));
+  const { data: examRecords, isLoading: isLoadingHistoryExams } = useAnimalExams(String(animal.id));
+  const { data: locationHistory, isLoading: isLoadingHistoryLocations } = useAnimalLocationHistory(String(animal.id));
+  const { data: reproductiveEvents, isLoading: isLoadingHistoryReproduction } = useAnimalReproductiveEvents(String(animal.id));
   const { mutateAsync: createVideo } = useCreateAnimalVideo();
   const { mutateAsync: updateVideo } = useUpdateAnimalVideo();
   const { mutateAsync: deleteVideo } = useDeleteAnimalVideo();
+  const { mutateAsync: updateAnimal, isPending: isSavingInactivation } = useUpdateAnimal();
+  const { mutateAsync: createHealthRecord, isPending: isSavingProcedure } = useCreateHealthRecord();
+  const { mutateAsync: createVaccine, isPending: isSavingVaccine } = useCreateVaccine();
+  const { mutateAsync: createExam, isPending: isSavingExam } = useCreateExam();
 
   // Merge prop animal with details - usar fullAnimal em vez de animal para ter acesso a todos os dados sincronizados
   const fullAnimal = { ...animal, ...animalDetails };
@@ -359,6 +415,292 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   const animalImages = fullAnimal.images || [fullAnimal.image];
 
   const currentAnimalId = String(fullAnimal.id || animal.id);
+  const resolvedLocationType = normalizeLocationType(fullAnimal.localizacao);
+  const resolvedServiceType = normalizeServiceType(fullAnimal.servicoTipo);
+  const genealogyView = buildGenealogyView(genealogyData, {
+    id: fullAnimal.id || animal.id,
+    name: fullAnimal.name,
+    registry: fullAnimal.registry,
+    imageUrl: fullAnimal.image || (fullAnimal.images && fullAnimal.images[0]) || null,
+  });
+
+  const formatEventDate = (value?: string | null) => {
+    if (!value) return '-';
+    const datePart = value.split('T')[0];
+    const [year, month, day] = datePart.split('-');
+    if (!year || !month || !day) return value;
+    return `${day}/${month}/${year}`;
+  };
+
+  const toDateValue = (value?: string | null) => {
+    if (!value) return 0;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  };
+
+  const getReproductionLabel = (value?: string | null) => {
+    switch (value) {
+      case 'cobertura':
+        return 'Cobertura';
+      case 'inseminacao':
+        return 'Inseminação';
+      case 'coleta_ovulos':
+        return 'Coleta de Óvulos';
+      case 'transferencia_embriao':
+        return 'Transferência de Embrião';
+      case 'ovulacao':
+        return 'Ovulação';
+      default:
+        return 'Evento Reprodutivo';
+    }
+  };
+
+  const mapInactivationStatus = (reason: 'Vendido' | 'Obito' | 'Doado' | 'Transferido') => {
+    if (reason === 'Obito') return 'Falecido';
+    if (reason === 'Doado') return 'Transferido';
+    return reason;
+  };
+
+  const mergedStatusHistory = useMemo(
+    () => [
+      ...(fullAnimal.statusHistorico || []),
+      ...localStatusHistory,
+    ],
+    [fullAnimal.statusHistorico, localStatusHistory]
+  );
+
+  const historyEvents = useMemo<HistoryEvent[]>(() => {
+    const events: HistoryEvent[] = [];
+
+    (healthRecords || []).forEach((record) => {
+      events.push({
+        id: `health-${record.id}`,
+        type: 'Procedimento',
+        title: record.description || 'Procedimento veterinario',
+        date: record.procedure_date,
+        dateValue: toDateValue(record.procedure_date),
+        description: record.type || undefined,
+        icon: Stethoscope,
+        color: 'text-emerald-500',
+      });
+    });
+
+    (vaccineRecords || []).forEach((vaccine) => {
+      events.push({
+        id: `vaccine-${vaccine.id}`,
+        type: 'Vacina',
+        title: vaccine.name,
+        date: vaccine.application_date,
+        dateValue: toDateValue(vaccine.application_date),
+        description: vaccine.veterinarian ? `Veterinario: ${vaccine.veterinarian}` : undefined,
+        icon: Syringe,
+        color: 'text-blue-500',
+      });
+    });
+
+    (examRecords || []).forEach((exam) => {
+      events.push({
+        id: `exam-${exam.id}`,
+        type: 'Exame',
+        title: exam.exam_type || 'Exame',
+        date: exam.exam_date,
+        dateValue: toDateValue(exam.exam_date),
+        description: exam.result ? `Resultado: ${exam.result}` : undefined,
+        icon: FileText,
+        color: 'text-amber-500',
+      });
+    });
+
+    (locationHistory || []).forEach((entry) => {
+      const title = entry.new_location
+        ? `Mudanca de localizacao`
+        : `Localizacao atualizada`;
+      const descriptionParts = [];
+      if (entry.previous_location) descriptionParts.push(`De ${entry.previous_location}`);
+      if (entry.new_location) descriptionParts.push(`Para ${entry.new_location}`);
+      if (entry.reason) descriptionParts.push(`Motivo: ${entry.reason}`);
+      const description = descriptionParts.join(' · ') || undefined;
+
+      events.push({
+        id: `location-${entry.id}`,
+        type: 'Localizacao',
+        title,
+        date: entry.changed_at,
+        dateValue: toDateValue(entry.changed_at),
+        description,
+        icon: MapPin,
+        color: 'text-purple-500',
+      });
+    });
+
+    (reproductiveEvents || []).forEach((event) => {
+      const label = getReproductionLabel(event.event_type);
+      const description = event.veterinarian ? `Veterinario: ${event.veterinarian}` : event.protocol || undefined;
+
+      events.push({
+        id: `repro-${event.id}`,
+        type: 'Reproducao',
+        title: label,
+        date: event.event_date,
+        dateValue: toDateValue(event.event_date),
+        description,
+        icon: Heart,
+        color: 'text-pink-500',
+      });
+    });
+
+    mergedStatusHistory.forEach((status, index) => {
+      const description = status.motivo ? `Motivo: ${status.motivo}` : undefined;
+      events.push({
+        id: `status-${status.data}-${index}`,
+        type: 'Status',
+        title: `${status.statusAnterior} -> ${status.statusNovo}`,
+        date: status.data,
+        dateValue: toDateValue(status.data),
+        description,
+        icon: AlertCircle,
+        color: 'text-red-500',
+      });
+    });
+
+    return events.sort((a, b) => b.dateValue - a.dateValue);
+  }, [
+    healthRecords,
+    vaccineRecords,
+    examRecords,
+    locationHistory,
+    reproductiveEvents,
+    mergedStatusHistory,
+  ]);
+
+  const isHistoryLoading =
+    isLoadingHistoryHealth ||
+    isLoadingHistoryVaccines ||
+    isLoadingHistoryExams ||
+    isLoadingHistoryLocations ||
+    isLoadingHistoryReproduction;
+
+  const uploadProcedureFiles = async (animalId: string, files: File[]): Promise<string[]> => {
+    if (!files.length) return [];
+
+    const uploaded: string[] = [];
+    for (const file of files) {
+      const ext = file.name.split('.').pop();
+      const fileName = `${animalId}/procedures/${Date.now()}_${Math.random().toString(36).substring(7)}${ext ? `.${ext}` : ''}`;
+
+      const { error } = await supabase.storage
+        .from('animals')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data } = supabase.storage
+        .from('animals')
+        .getPublicUrl(fileName);
+
+      if (data?.publicUrl) uploaded.push(data.publicUrl);
+    }
+
+    return uploaded;
+  };
+
+  const buildProcedureObservations = (data: VeterinaryProcedureData, uploadedUrls: string[]) => {
+    const parts: string[] = [];
+
+    if (data.time) parts.push(`Horario: ${data.time}`);
+    if (data.crm) parts.push(`CRM: ${data.crm}`);
+    if (data.clinic) parts.push(`Clinica: ${data.clinic}`);
+    if (data.diagnosis) parts.push(`Diagnostico: ${data.diagnosis}`);
+    if (data.procedures) parts.push(`Procedimentos: ${data.procedures}`);
+    if (data.examsSolicited) parts.push(`Exames solicitados: ${data.examsSolicited}`);
+    if (data.recommendations) parts.push(`Recomendacoes: ${data.recommendations}`);
+    if (data.notes) parts.push(`Observacoes gerais: ${data.notes}`);
+
+    if (data.medications.length > 0) {
+      const meds = data.medications
+        .map((med) => {
+          const details = [med.dosage, med.frequency, med.duration].filter(Boolean).join(' / ');
+          return details ? `${med.name} (${details})` : med.name;
+        })
+        .join(', ');
+      parts.push(`Medicamentos: ${meds}`);
+    }
+
+    if (uploadedUrls.length > 0) {
+      parts.push(`Anexos: ${uploadedUrls.join(', ')}`);
+    }
+
+    return parts.length > 0 ? parts.join(' | ') : null;
+  };
+
+  const handleSaveProcedure = async (data: VeterinaryProcedureData) => {
+    try {
+      const digitsOnly = data.cost ? data.cost.replace(/\D/g, '') : '';
+      const costValue = digitsOnly ? Number(digitsOnly) / 100 : null;
+      const uploadedUrls = await uploadProcedureFiles(currentAnimalId, data.files);
+
+      await createHealthRecord({
+        animal_id: currentAnimalId,
+        haras_id: fullAnimal.haras_id,
+        procedure_date: data.date,
+        type: data.type,
+        veterinarian: data.veterinarian || null,
+        description: data.reason || data.procedures || 'Procedimento veterinario',
+        cost: Number.isFinite(costValue) ? costValue : null,
+        next_date: data.nextAppointment || null,
+        observations: buildProcedureObservations(data, uploadedUrls),
+      });
+
+      toast.success('Procedimento registrado com sucesso!');
+      setShowAddProcedureModal(false);
+    } catch (error) {
+      console.error('Erro ao registrar procedimento:', error);
+      toast.error('Erro ao registrar procedimento. Tente novamente.');
+      throw error;
+    }
+  };
+
+  const handleSaveVaccine = async (data: VaccineData) => {
+    try {
+      await createVaccine({
+        animal_id: currentAnimalId,
+        haras_id: fullAnimal.haras_id,
+        name: data.nome.trim(),
+        application_date: data.data,
+        next_dose_date: data.proximaDose || null,
+        lot: data.lote || null,
+        veterinarian: data.veterinario || null,
+        observations: data.observacoes || null,
+      });
+      toast.success('Vacina registrada com sucesso!');
+      setShowAddVaccineModal(false);
+    } catch (error) {
+      console.error('Erro ao registrar vacina:', error);
+      toast.error('Erro ao registrar vacina. Tente novamente.');
+      throw error;
+    }
+  };
+
+  const handleSaveExam = async (data: ExamData) => {
+    try {
+      await createExam({
+        animal_id: currentAnimalId,
+        haras_id: fullAnimal.haras_id,
+        exam_type: data.nome.trim(),
+        exam_date: data.data,
+        veterinarian: data.veterinario || null,
+        result: data.resultado || null,
+        observations: data.observacoes || null,
+        files: data.arquivo ? [data.arquivo] : undefined,
+      });
+      toast.success('Exame registrado com sucesso!');
+      setShowAddExamModal(false);
+    } catch (error) {
+      console.error('Erro ao registrar exame:', error);
+      toast.error('Erro ao registrar exame. Tente novamente.');
+      throw error;
+    }
+  };
 
   const handleVideoFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -663,7 +1005,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
             <p className="text-muted-foreground dark:text-[#99a1af]">{fullAnimal.registry}</p>
           </div>
           <div className="flex flex-col md:flex-row gap-3 w-full lg:w-auto">
-            {fullAnimal.statusAtividade !== 'Inativo' && (
+            {fullAnimal.statusAtividade !== 'Inativo' ? (
               <button
                 onClick={() => setShowInactivateModal(true)}
                 className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
@@ -671,6 +1013,11 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                 <X className="w-5 h-5" />
                 Marcar como Inativo
               </button>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                <AlertCircle className="w-4 h-4" />
+                Este animal já está inativo.
+              </div>
             )}
             <button className="w-full md:w-auto px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2" onClick={onEdit}>
               Editar Animal
@@ -863,20 +1210,20 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                 </div>
               </div>
 
-              {/* NOVA SEÇÃO: Histórico de Mudanças de Status */}
-              {fullAnimal.statusHistorico && fullAnimal.statusHistorico.length > 0 && (
+              {/* NOVA SE??O: Hist?rico de Mudan?as de Status */}
+              {mergedStatusHistory.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-foreground dark:text-white">Histórico de Mudanças de Status</h4>
                   </div>
                   <div className="space-y-2">
-                    {fullAnimal.statusHistorico.map((historico, index) => (
+                    {mergedStatusHistory.map((historico, index) => (
                       <div key={index} className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg border-l-4 border-primary dark:border-white">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                           <div className="flex-1">
                             <p className="text-foreground dark:text-white">
                               <span className="text-red-600 dark:text-red-400">{historico.statusAnterior}</span>
-                              {' → '}
+                              {' -> '}
                               <span className={historico.statusNovo === 'Inativo' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
                                 {historico.statusNovo}
                               </span>
@@ -920,7 +1267,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                         <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                           <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Status Reprodutivo</p>
                           <p className="text-foreground dark:text-white">
-                            {fullAnimal.activeForReproduction ? '✅ Ativo para Reprodução' : '❌ Inativo para Reprodução'}
+                            {fullAnimal.activeForReproduction ? '?o. Ativo para Reprodução' : '?O Inativo para Reprodução'}
                           </p>
                         </div>
                       )}
@@ -935,23 +1282,23 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                               onClick={() => alert('Funcionalidade de detalhes de coberturas será implementada em breve')}
                               className="text-sm text-primary dark:text-white hover:underline"
                             >
-                              Ver Detalhes →
+                              Ver Detalhes ??'
                             </button>
                           </div>
                         </div>
                       )}
 
-                      {/* FASE 27: Último Evento Reprodutivo */}
+                      {/* FASE 27: ?sltimo Evento Reprodutivo */}
                       {fullAnimal.lastReproductiveEvent && (
                         <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
-                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Último Evento Reprodutivo</p>
+                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">?sltimo Evento Reprodutivo</p>
                           <p className="text-foreground dark:text-white mb-1">{fullAnimal.lastReproductiveEvent.type}</p>
                           <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{fullAnimal.lastReproductiveEvent.date}</p>
                           <button
                             onClick={() => alert('Funcionalidade de detalhes do evento reprodutivo será implementada em breve')}
                             className="mt-2 text-sm text-primary dark:text-white hover:underline"
                           >
-                            Ver Evento Completo →
+                            Ver Evento Completo ??'
                           </button>
                         </div>
                       )}
@@ -985,8 +1332,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
           {/* BLOCO 13: Módulo de Saúde Consolidado */}
           {activeTab === 'health' && (
             <HealthTabs
-              animalId={fullAnimal.id}
+              animalId={currentAnimalId}
               animalName={fullAnimal.name}
+              onRegisterProcedure={() => setShowAddProcedureModal(true)}
               onRegisterVaccine={() => setShowAddVaccineModal(true)}
               onRegisterExam={() => setShowAddExamModal(true)}
             />
@@ -1111,131 +1459,87 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   }}
                   className="space-y-6"
                 >
+                  {isLoadingGenealogy && (
+                    <div className="text-center text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Carregando genealogia...
+                    </div>
+                  )}
+
                   {/* Nível 1 - Animal Principal */}
                   <div className="flex justify-center">
                     <GenealogyCard
-                      name={fullAnimal.name}
-                      registry={fullAnimal.registry}
-                      image={fullAnimal.image}
+                      name={genealogyView.root.name}
+                      registry={genealogyView.root.registry}
+                      image={genealogyView.root.imageUrl}
                       isMain={true}
+                      isPlaceholder={genealogyView.root.isPlaceholder}
                     />
                   </div>
 
-                  {/* Título Pais */}
-                  <div className="text-center">
-                    <h5 className="text-lg text-foreground dark:text-white">Pais</h5>
-                  </div>
+                  {selectedFilters.pais && (
+                    <>
+                      <div className="text-center">
+                        <h5 className="text-lg text-foreground dark:text-white">Pais</h5>
+                      </div>
 
-                  {/* Nível 2 - Pais */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-                    <GenealogyCard
-                      name={animalDetails?.father?.name || "Pai não registrado"}
-                      registry={animalDetails?.father?.registry_number || "-"}
-                      image="https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080"
-                      onViewDetails={() => animalDetails?.father?.id && onViewAnimal?.(Number(animalDetails.father.id))}
-                    />
-                    <GenealogyCard
-                      name={animalDetails?.mother?.name || "Mãe não registrada"}
-                      registry={animalDetails?.mother?.registry_number || "-"}
-                      image="https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080"
-                      onViewDetails={() => animalDetails?.mother?.id && onViewAnimal?.(Number(animalDetails.mother.id))}
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                        {genealogyView.parents.map((parent, index) => (
+                          <GenealogyCard
+                            key={`parent-${index}`}
+                            name={parent.name}
+                            registry={parent.registry}
+                            image={parent.imageUrl}
+                            isPlaceholder={parent.isPlaceholder}
+                            onViewDetails={parent.id ? () => onViewAnimal?.(Number(parent.id)) : undefined}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
 
-                  {/* Título Avós */}
-                  <div className="text-center">
-                    <h5 className="text-lg text-foreground dark:text-white">Avós</h5>
-                  </div>
+                  {selectedFilters.avos && (
+                    <>
+                      <div className="text-center">
+                        <h5 className="text-lg text-foreground dark:text-white">Avós</h5>
+                      </div>
 
-                  {/* Nível 3 - Avós */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <GenealogyCard
-                      name="Hércules"
-                      registry="ABCCMM 111111-11"
-                      image="https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isSmall={true}
-                      onViewDetails={() => onViewAnimal?.(201)}
-                    />
-                    <GenealogyCard
-                      name="Safira"
-                      registry="ABCCMM 222222-22"
-                      image="https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080"
-                      isSmall={true}
-                      onViewDetails={() => onViewAnimal?.(202)}
-                    />
-                    <GenealogyCard
-                      name="Trovão"
-                      registry="ABCCMM 333333-33"
-                      image="https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isSmall={true}
-                      onViewDetails={() => onViewAnimal?.(203)}
-                    />
-                    <GenealogyCard
-                      name="Serena"
-                      registry="ABCCMM 444444-44"
-                      image="https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080"
-                      isSmall={true}
-                      onViewDetails={() => onViewAnimal?.(204)}
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {genealogyView.grandparents.map((grandparent, index) => (
+                          <GenealogyCard
+                            key={`grandparent-${index}`}
+                            name={grandparent.name}
+                            registry={grandparent.registry}
+                            image={grandparent.imageUrl}
+                            isSmall={true}
+                            isPlaceholder={grandparent.isPlaceholder}
+                            onViewDetails={grandparent.id ? () => onViewAnimal?.(Number(grandparent.id)) : undefined}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
 
-                  {/* Título Bisavós */}
-                  <div className="text-center">
-                    <h5 className="text-lg text-foreground dark:text-white">Bisavós</h5>
-                  </div>
+                  {selectedFilters.bisavos && (
+                    <>
+                      <div className="text-center">
+                        <h5 className="text-lg text-foreground dark:text-white">Bisavós</h5>
+                      </div>
 
-                  {/* Nível 4 - Bisavós */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                    {/* Nota: Bisavós são isTiny, então não exibem botão "Ver Detalhes" */}
-                    <GenealogyCard
-                      name="Casarão"
-                      registry="ABCCMM 11-11"
-                      image="https://images.unsplash.com/photo-1648242977013-6f21e5a695f4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMGhvcnNlJTIwZm9hbHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Iris"
-                      registry="ABCCMM 22-22"
-                      image="https://images.unsplash.com/photo-1748212550010-74453d20e3ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXklMjBob3JzZSUyMHJ1bm5pbmd8ZW58MXx8fHwxNzYzNTAwMTE0fDA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Atlas"
-                      registry="ABCCMM 33-33"
-                      image="https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Lua"
-                      registry="ABCCMM 44-44"
-                      image="https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Valente"
-                      registry="ABCCMM 55-55"
-                      image="https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Jasmin"
-                      registry="ABCCMM 66-66"
-                      image="https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Imperador"
-                      registry="ABCCMM 77-77"
-                      image="https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                    <GenealogyCard
-                      name="Alice"
-                      registry="ABCCMM 88-88"
-                      image="https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080"
-                      isTiny={true}
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                        {genealogyView.greatGrandparents.map((greatGrandparent, index) => (
+                          <GenealogyCard
+                            key={`great-grandparent-${index}`}
+                            name={greatGrandparent.name}
+                            registry={greatGrandparent.registry}
+                            image={greatGrandparent.imageUrl}
+                            isTiny={true}
+                            isPlaceholder={greatGrandparent.isPlaceholder}
+                            onViewDetails={greatGrandparent.id ? () => onViewAnimal?.(Number(greatGrandparent.id)) : undefined}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1276,7 +1580,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     <option value="Potro">Potros</option>
                     <option value="Potra">Potrancas</option>
                     <option value="Garanhão">Garanhões</option>
-                    <option value="Égua">Éguas</option>
+                    <option value="??gua">??guas</option>
                     <option value="Castrado">Castrados</option>
                   </NativeSelect>
 
@@ -1288,7 +1592,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     <option value="all">Todos os Status</option>
                     <option value="Ativo">Ativos</option>
                     <option value="Vendido">Vendidos</option>
-                    <option value="Óbito">Falecidos</option>
+                    <option value="Obito">Falecidos</option>
                   </NativeSelect>
                 </div>
               </div>
@@ -1317,7 +1621,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs px-2 py-0.5 bg-primary/10 dark:bg-white/10 rounded">
-                              {child.sex === 'Macho' ? '♂' : '♀'} {child.sex}
+                              {child.sex === 'Macho' ? '?T,' : '?T?'} {child.sex}
                             </span>
                             <span className="text-xs text-muted-foreground dark:text-[#99a1af]">
                               {child.category}
@@ -1357,14 +1661,86 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
           )}
 
           {activeTab === 'documents' && (
-            <AnimalDocumentsSection documentUrls={fullAnimal.documents || []} />
+            <AnimalDocumentsSection
+              animalId={currentAnimalId}
+              documentUrls={fullAnimal.documents || []}
+            />
+          )}
+
+          {activeTab === 'history' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-500/10 dark:bg-gray-500/20 rounded-lg">
+                  <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg text-foreground dark:text-white">Linha do Tempo</h2>
+                  <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                    Eventos vinculados ao animal
+                  </p>
+                </div>
+              </div>
+
+              {isHistoryLoading && (
+                <div className="text-center text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Carregando historico...
+                </div>
+              )}
+
+              {!isHistoryLoading && historyEvents.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground dark:text-[#99a1af]">
+                    Nenhum evento historico encontrado para este animal.
+                  </p>
+                </div>
+              )}
+
+              {!isHistoryLoading && historyEvents.length > 0 && (
+                <div className="relative">
+                  <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border dark:bg-[#3a3a3a]"></div>
+
+                  <div className="space-y-6">
+                    {historyEvents.map((event) => {
+                      const Icon = event.icon;
+                      return (
+                        <div key={event.id} className="relative flex items-start gap-4">
+                          <div className="relative z-10 p-2 bg-card dark:bg-[#1a1a1a] rounded-lg border-2 border-border dark:border-[#3a3a3a]">
+                            <Icon className={`w-5 h-5 ${event.color}`} />
+                          </div>
+                          <div className="flex-1 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-foreground dark:text-white">{event.title}</p>
+                                {event.description && (
+                                  <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
+                                    {event.description}
+                                  </p>
+                                )}
+                              </div>
+                              <span className={`px-2 py-1 rounded text-xs ${event.color} bg-current/10 whitespace-nowrap`}>
+                                {event.type}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-2">
+                              {formatEventDate(event.date)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'location' && (
             <AnimalLocationSection
+              animalId={currentAnimalId}
+              harasId={fullAnimal.haras_id}
               currentLocation={fullAnimal.localizacao}
-              locationType={fullAnimal.localizacao?.includes('Baia') ? 'Baia' : fullAnimal.localizacao?.includes('Pasto') ? 'Pasto' : 'Serviço'}
-              serviceType={fullAnimal.servicoTipo as 'Reprodução' | 'Trabalho' | 'Repouso' | 'Outro' | undefined}
+              locationType={resolvedLocationType}
+              serviceType={resolvedServiceType}
               availableBaias={[
                 { id: 1, name: 'Baia 01 - Setor A', status: 'ocupada', animal: 'Thor' },
                 { id: 2, name: 'Baia 02 - Setor A', status: 'disponível' },
@@ -1377,11 +1753,6 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                 { id: 2, name: 'Pasto 02 - Norte', status: 'cheio', capacity: 15, current: 15 },
                 { id: 3, name: 'Pasto 03 - Sul', status: 'disponível', capacity: 25, current: 8 },
               ]}
-              onUpdateLocation={async (location: string, serviceType?: string) => {
-                console.log('Atualizando localização:', { location, serviceType });
-                // TODO: Implementar atualização no banco
-                alert(`Localização atualizada para: ${location}${serviceType ? ` (${serviceType})` : ''}`);
-              }}
             />
           )}
 
@@ -1754,35 +2125,12 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
 
       {/* Modal: Árvore Genealógica Completa */}
       {showFullGenealogyTree && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
-              <div>
-                <h3 className="text-xl text-foreground dark:text-white">
-                  Árvore Genealógica Completa
-                </h3>
-                <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                  {fullAnimal.name} • {fullAnimal.registry}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowFullGenealogyTree(false)}
-                className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-6">
-              <GenealogyTree
-                animalId={fullAnimal.id}
-                onViewAnimal={onViewAnimal}
-              />
-            </div>
-          </div>
-        </div>
+        <GenealogyTree
+          genealogy={genealogyView}
+          isLoading={isLoadingGenealogy}
+          onClose={() => setShowFullGenealogyTree(false)}
+          onViewAnimal={onViewAnimal}
+        />
       )}
 
       {/* Modais de Vídeo */}
@@ -2363,28 +2711,28 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
         </div>
       )}
 
-      {/* BLOCO 17: Modais de Saúde */}
+      {/* BLOCO 17: Modais de Saude */}
+      <RegisterVeterinaryProcedureModal
+        isOpen={showAddProcedureModal}
+        onClose={() => setShowAddProcedureModal(false)}
+        onSave={handleSaveProcedure}
+        isSaving={isSavingProcedure}
+        animalName={fullAnimal.name}
+      />
+
       <RegisterVaccineModal
         isOpen={showAddVaccineModal}
         onClose={() => setShowAddVaccineModal(false)}
-        onSubmit={async (data) => {
-          console.log('Vacina registrada:', data);
-          // TODO: Implementar registro no banco
-          alert('Vacina registrada com sucesso!');
-          setShowAddVaccineModal(false);
-        }}
+        onSave={handleSaveVaccine}
+        isSaving={isSavingVaccine}
         animalName={fullAnimal.name}
       />
 
       <RegisterExamModal
         isOpen={showAddExamModal}
         onClose={() => setShowAddExamModal(false)}
-        onSubmit={async (data) => {
-          console.log('Exame registrado:', data);
-          // TODO: Implementar registro no banco
-          alert('Exame registrado com sucesso!');
-          setShowAddExamModal(false);
-        }}
+        onSave={handleSaveExam}
+        isSaving={isSavingExam}
         animalName={fullAnimal.name}
       />
 
@@ -2405,16 +2753,44 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
 
             {/* Content */}
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                console.log('Inativando animal:', {
-                  animalId: fullAnimal.id,
-                  reason: inactivateReason,
-                  date: inactivateDate,
-                });
-                // TODO: Implementar atualização no banco
-                alert(`${fullAnimal.name} foi marcado como inativo: ${inactivateReason}`);
-                setShowInactivateModal(false);
+                if (isSavingInactivation) return;
+                if (fullAnimal.statusAtividade === 'Inativo') {
+                  toast.info('Este animal já está inativo.');
+                  setShowInactivateModal(false);
+                  return;
+                }
+                try {
+                  const mappedStatus = mapInactivationStatus(inactivateReason);
+                  const managementPayload = JSON.stringify({
+                    motivo: inactivateReason,
+                    data: inactivateDate,
+                  });
+
+                  await updateAnimal({
+                    id: currentAnimalId,
+                    status: mappedStatus,
+                    management_status: managementPayload,
+                  });
+
+                  setLocalStatusHistory((prev) => [
+                    {
+                      data: inactivateDate,
+                      statusAnterior: fullAnimal.statusAtividade || 'Ativo',
+                      statusNovo: 'Inativo',
+                      motivo: inactivateReason,
+                      usuario: 'Você',
+                    },
+                    ...prev,
+                  ]);
+
+                  toast.success(`${fullAnimal.name} foi marcado como inativo.`);
+                  setShowInactivateModal(false);
+                } catch (error) {
+                  console.error('Erro ao inativar animal:', error);
+                  toast.error('Erro ao marcar como inativo. Tente novamente.');
+                }
               }}
               className="p-6 space-y-4"
             >
@@ -2442,7 +2818,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   onChange={(e) => setInactivateReason(e.target.value as typeof inactivateReason)}
                 >
                   <option value="Vendido">Venda</option>
-                  <option value="Óbito">Óbito</option>
+                  <option value="Obito">Obito</option>
                   <option value="Doado">Doação</option>
                   <option value="Transferido">Transferência</option>
                 </NativeSelect>
@@ -2473,9 +2849,10 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  disabled={isSavingInactivation}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Confirmar Inativação
+                  {isSavingInactivation ? 'Salvando...' : 'Confirmar Inativação'}
                 </button>
               </div>
             </form>
@@ -2496,12 +2873,13 @@ function InfoRow({ label, value, valueClassName }: { label: string; value: strin
   );
 }
 
-// Componente para badge de localização
+// Componente para badge de localizacao
 function LocationBadge({ localizacao, servicoTipo }: { localizacao?: string; servicoTipo?: string }) {
   const getLocationColor = (loc: string) => {
-    if (loc.includes('Baia')) return 'bg-blue-500/20 text-blue-600 dark:text-blue-400';
-    if (loc.includes('Pasto')) return 'bg-green-500/20 text-green-600 dark:text-green-400';
-    if (loc.includes('Serviço')) return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400';
+    const type = normalizeLocationType(loc);
+    if (type === 'Baia') return 'bg-blue-500/20 text-blue-600 dark:text-blue-400';
+    if (type === 'Pasto') return 'bg-green-500/20 text-green-600 dark:text-green-400';
+    if (type === 'Servico') return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400';
     return 'bg-muted dark:bg-[#0d0d0d] text-muted-foreground dark:text-[#99a1af]';
   };
 
@@ -2528,13 +2906,14 @@ interface GenealogyCardProps {
   isMain?: boolean;
   isSmall?: boolean;
   isTiny?: boolean;
+  isPlaceholder?: boolean;
   onViewDetails?: () => void;
 }
 
-function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, onViewDetails }: GenealogyCardProps) {
+function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlaceholder, onViewDetails }: GenealogyCardProps) {
   if (isTiny) {
     return (
-      <div className="text-center">
+      <div className={`text-center ${isPlaceholder ? 'opacity-70' : ''}`}>
         <img
           src={image}
           alt={name}
@@ -2547,7 +2926,7 @@ function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, onViewD
   }
 
   return (
-    <div className={`bg-muted dark:bg-[#0d0d0d] rounded-xl overflow-hidden border border-border dark:border-[rgba(255,255,255,0.1)] ${isMain ? 'ring-2 ring-primary dark:ring-white' : ''}`}>
+    <div className={`bg-muted dark:bg-[#0d0d0d] rounded-xl overflow-hidden border border-border dark:border-[rgba(255,255,255,0.1)] ${isMain ? 'ring-2 ring-primary dark:ring-white' : ''} ${isPlaceholder ? 'opacity-70' : ''}`}>
       <img
         src={image}
         alt={name}
@@ -2561,7 +2940,7 @@ function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, onViewD
             onClick={onViewDetails}
             className="mt-2 text-xs text-primary dark:text-white hover:underline"
           >
-            Ver Detalhes →
+            Ver Detalhes
           </button>
         )}
       </div>

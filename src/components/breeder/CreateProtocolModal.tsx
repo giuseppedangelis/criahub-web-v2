@@ -2,7 +2,7 @@ import { X, Plus, Trash2, GripVertical, CheckCircle2, AlertCircle, Bell, Calenda
 import { useState } from 'react';
 
 interface Protocol {
-  id: number;
+  id: string;
   name: string;
   type: 'TE' | 'IATF' | 'Aspiração Folicular' | 'Personalizado';
   description: string;
@@ -14,7 +14,7 @@ interface Protocol {
 }
 
 interface ProtocolStep {
-  id: number;
+  id: string;
   name: string;
   dayOffset: number;
   description: string;

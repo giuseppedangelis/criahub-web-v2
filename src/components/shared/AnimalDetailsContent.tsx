@@ -2,6 +2,8 @@ import { ChevronLeft, ChevronRight, MapPin, Heart, Calendar, Award, Users, Baby,
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from '../breeder/GenealogyTree';
+import { useAnimalGenealogy } from '@/hooks/useAnimals';
+import { buildGenealogyView } from '@/lib/genealogy';
 
 interface Animal {
   id: number;
@@ -52,6 +54,7 @@ function formatBirthDate(isoDate: string | undefined): string {
 
 export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalDetailsContentProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const { data: genealogyData, isLoading: isLoadingGenealogy } = useAnimalGenealogy(String(animal.id));
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -67,6 +70,12 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
 
   const animalImages = animal.images || [animal.image];
   const registryValue = animal.registration || animal.registry || 'N/A';
+  const genealogyView = buildGenealogyView(genealogyData, {
+    id: animal.id,
+    name: animal.name,
+    registry: registryValue,
+    imageUrl: animal.image || (animal.images && animal.images[0]) || null,
+  });
 
   // Visão Geral
   if (activeTab === 'overview') {
@@ -343,7 +352,11 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
   if (activeTab === 'genealogy') {
     return (
       <div className="space-y-6">
-        <GenealogyTree animalId={animal.id} animalName={animal.name} />
+        <GenealogyTree
+          genealogy={genealogyView}
+          isLoading={isLoadingGenealogy}
+          onClose={() => onTabChange?.('overview')}
+        />
       </div>
     );
   }

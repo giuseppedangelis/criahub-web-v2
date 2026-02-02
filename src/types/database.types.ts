@@ -307,6 +307,50 @@ export interface Database {
           updated_at?: string
         }
       }
+      animal_location_history: {
+        Row: {
+          id: string
+          animal_id: string
+          haras_id: string
+          location_type: string
+          location_name: string
+          service_type: string | null
+          previous_location: string | null
+          new_location: string
+          reason: string | null
+          notes: string | null
+          changed_at: string
+          changed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          animal_id: string
+          haras_id: string
+          location_type: string
+          location_name: string
+          service_type?: string | null
+          previous_location?: string | null
+          new_location: string
+          reason?: string | null
+          notes?: string | null
+          changed_at?: string
+          changed_by?: string | null
+        }
+        Update: {
+          animal_id?: string
+          haras_id?: string
+          location_type?: string
+          location_name?: string
+          service_type?: string | null
+          previous_location?: string | null
+          new_location?: string
+          reason?: string | null
+          notes?: string | null
+          changed_at?: string
+          changed_by?: string | null
+        }
+      }
       reproductive_events: {
         Row: {
           id: string
@@ -561,6 +605,7 @@ export type Haras = Database['public']['Tables']['haras']['Row']
 export type HarasMember = Database['public']['Tables']['haras_members']['Row']
 export type Animal = Database['public']['Tables']['animals']['Row']
 export type AnimalVideo = Database['public']['Tables']['animal_videos']['Row']
+export type AnimalLocationHistory = Database['public']['Tables']['animal_location_history']['Row']
 export type ReproductiveEvent = Database['public']['Tables']['reproductive_events']['Row']
 export type Gestation = Database['public']['Tables']['gestations']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']

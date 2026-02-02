@@ -37,7 +37,7 @@ export function ProtocolTemplatesModal({ onClose, onSelectTemplate }: ProtocolTe
         steps: [
           {
             id: crypto.randomUUID(),
-            name: 'Aplicaç��o de Progesterona',
+            name: 'Aplicaç??o de Progesterona',
             dayOffset: 0,
             description: 'Inserção de dispositivo intravaginal de P4',
             type: 'Aplicação',
