@@ -7,23 +7,23 @@ export type Json =
   | Json[]
 
 // Apenas os 3 roles principais para a versão web
-export type UserRole = 'admin' | 'criador' | 'assessor'
+export type UserRole = 'admin' | 'criador' | 'assessor' | 'acessor'
 
-export type AnimalSex = 'M' | 'F'
+export type AnimalSex = 'Macho' | 'Fêmea'
 
 export type AnimalCategory =
-  | 'potro'
-  | 'potra'
-  | 'garanhao'
-  | 'egua'
-  | 'castrado'
+  | 'Potro'
+  | 'Potranca'
+  | 'Garanhão'
+  | 'Égua'
+  | 'Castrado'
 
 export type AnimalStatus =
-  | 'ativo'
-  | 'vendido'
-  | 'morto'
-  | 'emprestado'
-  | 'em_servico'
+  | 'Ativo'
+  | 'Vendido'
+  | 'Falecido'
+  | 'Transferido'
+  | 'Em serviço'
 
 export type ReproductiveEventType =
   | 'cobertura'
@@ -110,7 +110,7 @@ export interface Database {
       haras: {
         Row: {
           id: string
-          name: string
+          nome: string
           owner_id: string
           cnpj: string | null
           address: string | null
@@ -126,7 +126,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          name: string
+          nome: string
           owner_id: string
           cnpj?: string | null
           address?: string | null
@@ -139,7 +139,7 @@ export interface Database {
           subscription_status?: string
         }
         Update: {
-          name?: string
+          nome?: string
           owner_id?: string
           cnpj?: string | null
           address?: string | null
@@ -180,63 +180,130 @@ export interface Database {
         Row: {
           id: string
           haras_id: string
-          name: string
-          registry_number: string | null
-          chip_number: string | null
-          brand: string | null
-          sex: AnimalSex
-          category: AnimalCategory
-          birth_date: string | null
-          coat_color: string | null
+          nome: string
+          registro: string | null
+          chip: string | null
+          marca: string | null
+          sexo: AnimalSex
+          categoria: AnimalCategory
+          data_nascimento: string | null
+          pelagem: string | null
           status: AnimalStatus
-          father_id: string | null
-          mother_id: string | null
-          origin_haras: string | null
-          location: string | null
-          observations: string | null
-          main_image_url: string | null
-          images: string[] | null
+          pai_id: string | null
+          mae_id: string | null
+          localizacao: string | null
+          piquete: string | null
+          haras_origem: string | null
+          para_venda: boolean | null
+          valor_venda: number | null
+          foto_url: string | null
+          observacoes: string | null
+          weight: number | null
+          height: number | null
+          father_name: string | null
+          mother_name: string | null
+          status_manejo: string | null
+          tipo_servico: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           haras_id: string
-          name: string
-          registry_number?: string | null
-          chip_number?: string | null
-          brand?: string | null
-          sex: AnimalSex
-          category: AnimalCategory
-          birth_date?: string | null
-          coat_color?: string | null
+          nome: string
+          registro?: string | null
+          chip?: string | null
+          marca?: string | null
+          sexo: AnimalSex
+          categoria: AnimalCategory
+          data_nascimento?: string | null
+          pelagem?: string | null
           status?: AnimalStatus
-          father_id?: string | null
-          mother_id?: string | null
-          origin_haras?: string | null
-          location?: string | null
-          observations?: string | null
-          main_image_url?: string | null
-          images?: string[] | null
+          pai_id?: string | null
+          mae_id?: string | null
+          localizacao?: string | null
+          piquete?: string | null
+          haras_origem?: string | null
+          para_venda?: boolean | null
+          valor_venda?: number | null
+          foto_url?: string | null
+          observacoes?: string | null
+          weight?: number | null
+          height?: number | null
+          father_name?: string | null
+          mother_name?: string | null
+          status_manejo?: string | null
+          tipo_servico?: string | null
         }
         Update: {
           haras_id?: string
-          name?: string
-          registry_number?: string | null
-          chip_number?: string | null
-          brand?: string | null
-          sex?: AnimalSex
-          category?: AnimalCategory
-          birth_date?: string | null
-          coat_color?: string | null
+          nome?: string
+          registro?: string | null
+          chip?: string | null
+          marca?: string | null
+          sexo?: AnimalSex
+          categoria?: AnimalCategory
+          data_nascimento?: string | null
+          pelagem?: string | null
           status?: AnimalStatus
-          father_id?: string | null
-          mother_id?: string | null
-          origin_haras?: string | null
-          location?: string | null
-          observations?: string | null
-          main_image_url?: string | null
-          images?: string[] | null
+          pai_id?: string | null
+          mae_id?: string | null
+          localizacao?: string | null
+          piquete?: string | null
+          haras_origem?: string | null
+          para_venda?: boolean | null
+          valor_venda?: number | null
+          foto_url?: string | null
+          observacoes?: string | null
+          weight?: number | null
+          height?: number | null
+          father_name?: string | null
+          mother_name?: string | null
+          status_manejo?: string | null
+          tipo_servico?: string | null
+          updated_at?: string
+        }
+      }
+      animal_videos: {
+        Row: {
+          id: string
+          animal_id: string
+          haras_id: string
+          title: string
+          url: string
+          source: string | null
+          type: string | null
+          visibility: string | null
+          caption: string | null
+          duration: string | null
+          thumbnail_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          animal_id: string
+          haras_id: string
+          title: string
+          url: string
+          source?: string | null
+          type?: string | null
+          visibility?: string | null
+          caption?: string | null
+          duration?: string | null
+          thumbnail_url?: string | null
+        }
+        Update: {
+          animal_id?: string
+          haras_id?: string
+          title?: string
+          url?: string
+          source?: string | null
+          type?: string | null
+          visibility?: string | null
+          caption?: string | null
+          duration?: string | null
+          thumbnail_url?: string | null
           updated_at?: string
         }
       }
@@ -493,6 +560,7 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Haras = Database['public']['Tables']['haras']['Row']
 export type HarasMember = Database['public']['Tables']['haras_members']['Row']
 export type Animal = Database['public']['Tables']['animals']['Row']
+export type AnimalVideo = Database['public']['Tables']['animal_videos']['Row']
 export type ReproductiveEvent = Database['public']['Tables']['reproductive_events']['Row']
 export type Gestation = Database['public']['Tables']['gestations']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']

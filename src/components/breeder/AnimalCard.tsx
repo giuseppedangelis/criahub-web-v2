@@ -9,7 +9,7 @@ function formatBirthDate(isoDate: string): string {
 }
 
 interface Animal {
-  id: number;
+  id: string | number;
   name: string;
   registry: string;
   chip?: string;
@@ -50,14 +50,14 @@ export function AnimalCard({
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentImageIndex((prev) => 
+    setCurrentImageIndex((prev) =>
       prev === 0 ? animal.images.length - 1 : prev - 1
     );
   };
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentImageIndex((prev) => 
+    setCurrentImageIndex((prev) =>
       prev === animal.images.length - 1 ? 0 : prev + 1
     );
   };
@@ -94,7 +94,7 @@ export function AnimalCard({
           alt={animal.name}
           className="w-full h-full object-cover"
         />
-        
+
         {/* Contador de fotos - sempre visível */}
         {animal.images.length > 1 && (
           <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/70 backdrop-blur-sm rounded-lg">
@@ -103,7 +103,7 @@ export function AnimalCard({
             </span>
           </div>
         )}
-        
+
         {/* Navigation Arrows - Only show if multiple images */}
         {animal.images.length > 1 && (
           <>
@@ -121,17 +121,16 @@ export function AnimalCard({
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            
+
             {/* Indicators */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
               {animal.images.map((_, index) => (
                 <div
                   key={index}
-                  className={`h-2 rounded-full transition-all ${
-                    index === currentImageIndex
+                  className={`h-2 rounded-full transition-all ${index === currentImageIndex
                       ? 'bg-white w-6'
                       : 'bg-white/60 w-2'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -172,38 +171,38 @@ export function AnimalCard({
           </p>
         </div>
       )}
-      
+
       {/* Card Content */}
       <div className="p-4">
         <p className="text-foreground dark:text-white mb-1">{animal.name}</p>
         <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">{animal.registry}</p>
-        
+
         {animal.marca && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
             Marca: {animal.marca}
           </p>
         )}
-        
+
         {animal.birthDate && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
             Nascimento: {formatBirthDate(animal.birthDate)}
           </p>
         )}
-        
+
         <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 mt-2">{animal.category} • {animal.age}</p>
-        
+
         {animal.filhos !== undefined && animal.filhos > 0 && (
           <p className="text-xs text-primary dark:text-white mb-1 flex items-center gap-1">
             <Baby className="w-3 h-3" /> {animal.filhos} {animal.filhos === 1 ? 'filho' : 'filhos'}
           </p>
         )}
-        
+
         {animal.premiacoes !== undefined && animal.premiacoes > 0 && (
           <p className="text-xs text-yellow-600 dark:text-yellow-500 mb-2 flex items-center gap-1">
             <Award className="w-3 h-3" /> {animal.premiacoes} {animal.premiacoes === 1 ? 'premiação' : 'premiações'}
           </p>
         )}
-        
+
         <span className={`inline-block px-3 py-1 ${animal.statusColor} text-white text-xs rounded-full`}>
           {animal.status}
         </span>

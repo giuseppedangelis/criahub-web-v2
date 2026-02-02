@@ -13,6 +13,51 @@ import type {
     PaginatedResponse
 } from '@/types';
 
+const CATEGORY_MAPPING: Record<string, string> = {
+    'potro': 'Potro',
+    'potra': 'Potranca',
+    'garanhao': 'Garanhão',
+    'egua': 'Égua',
+    'castrado': 'Castrado'
+};
+
+// Reverse mapping: database values -> frontend values
+const DB_TO_FRONTEND_CATEGORY: Record<string, string> = {
+    'Potro': 'potro',
+    'Potranca': 'potra',
+    'Garanhão': 'garanhao',
+    'Égua': 'egua',
+    'Castrado': 'castrado'
+};
+
+const REVERSE_CATEGORY_MAPPING: Record<string, string> = Object.entries(CATEGORY_MAPPING).reduce((acc, [key, value]) => {
+    acc[value] = key;
+    return acc;
+}, {} as Record<string, string>);
+
+// Helper function to map frontend category to database category
+function mapCategoryToDb(category: string): string {
+    return CATEGORY_MAPPING[category] || category;
+}
+
+// Helper function to map database category to frontend category  
+function mapCategoryFromDb(dbCategory: string): string {
+    return DB_TO_FRONTEND_CATEGORY[dbCategory] || dbCategory;
+}
+
+// Mapeamento do status do banco para o frontend
+const STATUS_MAPPING: Record<string, string> = {
+    'Ativo': 'ativo',
+    'Vendido': 'vendido',
+    'Falecido': 'morto',
+    'Transferido': 'emprestado'
+};
+
+const REVERSE_STATUS_MAPPING: Record<string, string> = Object.entries(STATUS_MAPPING).reduce((acc, [key, value]) => {
+    acc[value] = key;
+    return acc;
+}, {} as Record<string, string>);
+
 export const animalsService = {
     /**
      * Lista animais com filtros e paginação
@@ -23,72 +68,291 @@ export const animalsService = {
     ): Promise<PaginatedResponse<Animal>> {
         let query = supabase
             .from('animals')
-            .select('*, father:animals!animals_father_id_fkey(id, name), mother:animals!animals_mother_id_fkey(id, name)', { count: 'exact' });
+            .select(`
+                id, haras_id, nome, registro, chip, marca,
+                sexo, categoria, data_nascimento, pelagem, andamento,
+                status, status_manejo, pai_id, mae_id, localizacao, piquete,
+                height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
+                foto_url, images, documents, observacoes, father_name, mother_name,
+                created_at, updated_at
+            `, { count: 'exact' });
 
         // Aplicar filtros
         if (filters.haras_id) {
             query = query.eq('haras_id', filters.haras_id);
         }
         if (filters.sex) {
-            query = query.eq('sex', filters.sex);
+            query = query.eq('sexo', filters.sex);
         }
         if (filters.category) {
-            query = query.eq('category', filters.category);
+            query = query.eq('categoria', CATEGORY_MAPPING[filters.category] || filters.category);
         }
         if (filters.status) {
-            query = query.eq('status', filters.status);
+            // Mapear status do filtro para status do banco
+            const dbStatus = REVERSE_STATUS_MAPPING[filters.status] || filters.status;
+            query = query.eq('status', dbStatus);
         }
         if (filters.search) {
-            query = query.or(`name.ilike.%${filters.search}%,registry_number.ilike.%${filters.search}%`);
+            query = query.or(`nome.ilike.%${filters.search}%,registro.ilike.%${filters.search}%`);
         }
 
         // Ordenar e paginar
-        query = query.order('name', { ascending: true });
+        query = query.order('nome', { ascending: true });
         query = applyPagination(query, pagination);
 
         const { data, error, count } = await query;
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mappedData = (data || []).map((item: any) => ({
+            ...item,
+            // Mapear para os nomes que o frontend espera
+            name: item.nome,
+            registry_number: item.registro,
+            chip_number: item.chip,
+            brand: item.marca,
+            sex: item.sexo,
+            birth_date: item.data_nascimento,
+            coat_color: item.pelagem,
+            gait: item.andamento,
+            weight: item.weight,
+            height: item.height,
+            origin_haras: item.haras_origem,
+            status: STATUS_MAPPING[item.status] || item.status?.toLowerCase(),
+            father_id: item.pai_id,
+            mother_id: item.mae_id,
+            location: item.localizacao,
+            management_status: item.status === 'Ativo' ? 'ativo' : 'inativo',
+            service_type: item.tipo_servico,
+            father_name: item.father_name,
+            mother_name: item.mother_name,
+            observations: item.observacoes,
+            main_image_url: item.foto_url,
+            images: item.images || (item.foto_url ? [item.foto_url] : []),
+            documents: item.documents || [],
+            category: REVERSE_CATEGORY_MAPPING[item.categoria] || item.categoria,
+            _raw_status: item.status,
+        }));
+
+        return formatPaginatedResponse(mappedData as Animal[], count || 0, pagination);
     },
 
     /**
-     * Busca um animal pelo ID
+     * Busca um animal pelo ID com dados completos para a ficha do animal
      */
     async getById(id: string): Promise<Animal | null> {
-        const { data, error } = await supabase
+        // Buscar dados do animal
+        const { data: animalData, error: animalError } = await supabase
             .from('animals')
             .select(`
-        *,
-        father:animals!animals_father_id_fkey(id, name, registry_number),
-        mother:animals!animals_mother_id_fkey(id, name, registry_number),
-        haras(id, name)
-      `)
+                id, haras_id, nome, registro, chip, marca,
+                sexo, categoria, data_nascimento, pelagem, andamento,
+                status, status_manejo, pai_id, mae_id, localizacao, piquete,
+                height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
+                foto_url, images, documents, observacoes, father_name, mother_name,
+                created_at, updated_at
+            `)
             .eq('id', id)
             .single();
 
-        if (error) {
-            if (error.code === 'PGRST116') return null; // Not found
-            handleSupabaseError(error);
+        console.log('Raw animal data from DB:', JSON.stringify(animalData, null, 2));
+        console.log('Raw images from DB:', JSON.stringify((animalData as any)?.images));
+        console.log('Raw documents from DB:', JSON.stringify((animalData as any)?.documents));
+
+        if (animalError) {
+            if (animalError.code === 'PGRST116') return null; // Not found
+            handleSupabaseError(animalError);
         }
 
-        return data as Animal;
+        if (!animalData) return null;
+
+        const data = animalData as any;
+
+        // Buscar dados do pai separadamente (se existir pai_id)
+        let fatherData = null;
+        if (data.pai_id) {
+            const { data: father } = await supabase
+                .from('animals')
+                .select('id, nome, registro')
+                .eq('id', data.pai_id)
+                .single();
+            if (father) {
+                fatherData = {
+                    id: father.id,
+                    name: father.nome,
+                    registry_number: father.registro
+                };
+            }
+        }
+
+        // Buscar dados da mãe separadamente (se existir mae_id)
+        let motherData = null;
+        if (data.mae_id) {
+            const { data: mother } = await supabase
+                .from('animals')
+                .select('id, nome, registro')
+                .eq('id', data.mae_id)
+                .single();
+            if (mother) {
+                motherData = {
+                    id: mother.id,
+                    name: mother.nome,
+                    registry_number: mother.registro
+                };
+            }
+        }
+
+        // Buscar dados do haras separadamente
+        let harasData = null;
+        if (data.haras_id) {
+            const { data: haras } = await supabase
+                .from('haras')
+                .select('id, nome')
+                .eq('id', data.haras_id)
+                .single();
+            if (haras) {
+                harasData = {
+                    id: haras.id,
+                    name: haras.nome
+                };
+            }
+        }
+
+        // Buscar contagem de filhos
+        const { count: offspringCount, error: offspringError } = await supabase
+            .from('animals')
+            .select('*', { count: 'exact', head: true })
+            .or(`pai_id.eq.${id},mae_id.eq.${id}`);
+
+        if (offspringError) {
+            console.error('Erro ao buscar filhos:', offspringError);
+        }
+
+        // Buscar eventos reprodutivos para coberturas e último evento
+        const { data: reproEvents, error: reproError } = await supabase
+            .from('reproductive_events')
+            .select('*')
+            .eq('animal_id', id)
+            .order('event_date', { ascending: false });
+
+        if (reproError) {
+            console.error('Erro ao buscar eventos reprodutivos:', reproError);
+        }
+
+        // Calcular dados reprodutivos
+        const coverageCount = (reproEvents as any)?.filter((e: any) =>
+            e.event_type === 'cobertura' || e.event_type === 'inseminacao'
+        ).length || 0;
+
+        const lastReproductiveEvent = reproEvents && reproEvents.length > 0 ? {
+            type: (reproEvents[0] as any).event_type,
+            date: (reproEvents[0] as any).event_date
+        } : null;
+
+        // Mapear para o formato que o componente espera
+        const mappedData = {
+            // Dados básicos do banco
+            id: data.id,
+            haras_id: data.haras_id,
+            name: data.nome,
+            registry_number: data.registro,
+            chip_number: data.chip,
+            brand: data.marca,
+            sex: data.sexo,
+            category: REVERSE_CATEGORY_MAPPING[data.categoria] || data.categoria,
+            birth_date: data.data_nascimento,
+            coat_color: data.pelagem,
+            gait: data.andamento,
+            status: STATUS_MAPPING[data.status] || data.status?.toLowerCase(),
+            father_id: data.pai_id,
+            mother_id: data.mae_id,
+            location: data.localizacao,
+            weight: data.weight,
+            height: data.height,
+            origin_haras: data.haras_origem,
+            images: (data.images?.length ? data.images : (data.foto_url ? [data.foto_url] : [])),
+            documents: data.documents || [],
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+
+            // Mapear nomes de campos para o formato do componente
+            registry: data.registro,
+            chip: data.chip,
+            marca: data.marca,
+            birthDate: data.data_nascimento,
+            harasOrigem: data.haras_origem,
+            localizacao: data.localizacao,
+            servicoTipo: data.tipo_servico,
+            haras: harasData?.name || '-',
+            image: data.foto_url || '',
+
+            // Adicionar relacionamentos
+            father: fatherData,
+            mother: motherData,
+
+            // Status no plantel (mapear do status)
+            statusAtividade: data.status === 'Ativo' ? 'Ativo' : 'Inativo',
+
+            // Dados calculados
+            filhos: offspringCount || 0,
+            coverageCount,
+            lastReproductiveEvent,
+
+            // Dados que não existem no banco (inicializar como null/0)
+            premiacoes: 0,
+            videos: [],
+            reproductionType: data.tipo_servico,
+            activeForReproduction: data.para_venda,
+            statusHistorico: [],
+            motivoInativacao: data.status !== 'Ativo' ? data.status : null,
+            dataInativacao: null,
+
+            // Outros campos
+            father_name: data.father_name,
+            mother_name: data.mother_name,
+            observations: data.observacoes,
+        };
+
+        return mappedData as unknown as Animal;
     },
 
     /**
      * Cria um novo animal
      */
     async create(input: CreateAnimalInput): Promise<Animal> {
+        const dbInput = {
+            haras_id: input.haras_id,
+            nome: input.name,
+            registro: input.registry_number,
+            chip: input.chip_number,
+            marca: input.brand,
+            sexo: input.sex,
+            categoria: CATEGORY_MAPPING[input.category] || input.category,
+            data_nascimento: input.birth_date,
+            pelagem: input.coat_color,
+            status: (REVERSE_STATUS_MAPPING[input.status || 'ativo'] || 'Ativo'),
+            pai_id: input.father_id,
+            mae_id: input.mother_id,
+            localizacao: input.location,
+            weight: input.weight,
+            height: input.height,
+            haras_origem: input.origin_haras,
+            tipo_servico: input.service_type,
+            foto_url: input.main_image_url,
+            father_name: input.father_name,
+            mother_name: input.mother_name,
+            observacoes: input.observations
+        };
+
         const { data, error } = await supabase
             .from('animals')
-            .insert(input)
+            .insert(dbInput)
             .select()
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return data as Animal;
+        return data as unknown as Animal;
     },
 
     /**
@@ -97,25 +361,80 @@ export const animalsService = {
     async update(input: UpdateAnimalInput): Promise<Animal> {
         const { id, ...updateData } = input;
 
+        const dbInput: any = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (updateData.name !== undefined) dbInput.nome = updateData.name;
+        if (updateData.registry_number !== undefined) dbInput.registro = updateData.registry_number;
+        if (updateData.chip_number !== undefined) dbInput.chip = updateData.chip_number;
+        if (updateData.brand !== undefined) dbInput.marca = updateData.brand;
+        if (updateData.sex !== undefined) dbInput.sexo = updateData.sex;
+        if (updateData.category !== undefined) dbInput.categoria = CATEGORY_MAPPING[updateData.category] || updateData.category;
+        if (updateData.birth_date !== undefined) {
+            // Only set date if it's not empty, otherwise set to null
+            dbInput.data_nascimento = updateData.birth_date || null;
+        }
+        if (updateData.coat_color !== undefined) {
+            // Only set coat_color if it's not empty, otherwise set to null
+            dbInput.pelagem = updateData.coat_color || null;
+        }
+        if (updateData.gait !== undefined) dbInput.andamento = updateData.gait;
+        if (updateData.status !== undefined) dbInput.status = REVERSE_STATUS_MAPPING[updateData.status] || updateData.status;
+        if (updateData.father_id !== undefined) dbInput.pai_id = updateData.father_id;
+        if (updateData.mother_id !== undefined) dbInput.mae_id = updateData.mother_id;
+        if (updateData.location !== undefined) dbInput.localizacao = updateData.location;
+        if (updateData.weight !== undefined) dbInput.weight = updateData.weight;
+        if (updateData.height !== undefined) dbInput.height = updateData.height;
+        if (updateData.father_name !== undefined) dbInput.father_name = updateData.father_name;
+        if (updateData.mother_name !== undefined) dbInput.mother_name = updateData.mother_name;
+        if (updateData.observations !== undefined) dbInput.observacoes = updateData.observations;
+        if (updateData.origin_haras !== undefined) dbInput.haras_origem = updateData.origin_haras;
+        if (updateData.service_type !== undefined) dbInput.tipo_servico = updateData.service_type;
+        // Handle images - always include the array even if empty to clear existing images
+        if (updateData.images !== undefined) {
+            dbInput.images = updateData.images;
+            if (updateData.images.length > 0) {
+                dbInput.foto_url = updateData.images[0];
+            }
+        }
+        if (updateData.main_image_url) dbInput.foto_url = updateData.main_image_url;
+
+        // Handle documents - always include the array even if empty to clear existing documents
+        if (updateData.documents !== undefined) {
+            dbInput.documents = updateData.documents;
+        }
+
+        console.log('dbInput completo:', JSON.stringify(dbInput, null, 2));
+        console.log('Images no dbInput:', dbInput.images);
+        console.log('Documents no dbInput:', dbInput.documents);
+
+        console.log('Enviando update para Supabase:', JSON.stringify(dbInput, null, 2));
+
         const { data, error } = await supabase
             .from('animals')
-            .update({ ...updateData, updated_at: new Date().toISOString() })
+            .update(dbInput)
             .eq('id', id)
-            .select()
+            .select('*')
             .single();
 
-        if (error) handleSupabaseError(error);
+        if (error) {
+            console.error('Supabase update error:', error);
+            handleSupabaseError(error);
+        }
 
-        return data as Animal;
+        console.log('Supabase update response:', data);
+
+        return data as unknown as Animal;
     },
 
     /**
-     * Exclui um animal (soft delete - muda status para 'morto')
+     * Exclui um animal (soft delete - muda status para 'Falecido')
      */
     async delete(id: string): Promise<void> {
         const { error } = await supabase
             .from('animals')
-            .update({ status: 'morto', updated_at: new Date().toISOString() })
+            .update({ status: 'Falecido', updated_at: new Date().toISOString() })
             .eq('id', id);
 
         if (error) handleSupabaseError(error);
@@ -127,13 +446,32 @@ export const animalsService = {
     async getOffspring(animalId: string): Promise<Animal[]> {
         const { data, error } = await supabase
             .from('animals')
-            .select('*')
-            .or(`father_id.eq.${animalId},mother_id.eq.${animalId}`)
-            .order('birth_date', { ascending: false });
+            .select(`
+                id, haras_id, nome, registro, chip, marca,
+                sexo, categoria, data_nascimento, pelagem,
+                status, pai_id, mae_id, localizacao,
+                height, weight, foto_url,
+                created_at, updated_at
+            `)
+            .or(`pai_id.eq.${animalId},mae_id.eq.${animalId}`)
+            .order('data_nascimento', { ascending: false });
 
         if (error) handleSupabaseError(error);
 
-        return data as Animal[];
+        // Mapear dados para o formato esperado
+        return (data || []).map((item: any) => ({
+            ...item,
+            name: item.nome,
+            registry_number: item.registro,
+            chip_number: item.chip,
+            brand: item.marca,
+            coat_color: item.pelagem,
+            weight: item.weight,
+            height: item.height,
+            status: STATUS_MAPPING[item.status] || item.status?.toLowerCase(),
+            category: REVERSE_CATEGORY_MAPPING[item.categoria] || item.categoria,
+            main_image_url: item.foto_url,
+        })) as unknown as Animal[];
     },
 
     /**
@@ -142,16 +480,20 @@ export const animalsService = {
     async getStallions(harasId: string): Promise<Animal[]> {
         const { data, error } = await supabase
             .from('animals')
-            .select('id, name, registry_number')
+            .select('id, nome, registro')
             .eq('haras_id', harasId)
-            .eq('sex', 'M')
-            .in('category', ['garanhao'])
-            .eq('status', 'ativo')
-            .order('name');
+            .eq('sexo', 'Macho')
+            .in('categoria', ['Garanhão'])
+            .eq('status', 'Ativo')
+            .order('nome');
 
         if (error) handleSupabaseError(error);
 
-        return data as Animal[];
+        return (data || []).map((item: any) => ({
+            ...item,
+            name: item.nome,
+            registry_number: item.registro,
+        })) as unknown as Animal[];
     },
 
     /**
@@ -160,16 +502,20 @@ export const animalsService = {
     async getMares(harasId: string): Promise<Animal[]> {
         const { data, error } = await supabase
             .from('animals')
-            .select('id, name, registry_number')
+            .select('id, nome, registro')
             .eq('haras_id', harasId)
-            .eq('sex', 'F')
-            .in('category', ['egua'])
-            .eq('status', 'ativo')
-            .order('name');
+            .eq('sexo', 'Fêmea')
+            .in('categoria', ['Égua'])
+            .eq('status', 'Ativo')
+            .order('nome');
 
         if (error) handleSupabaseError(error);
 
-        return data as Animal[];
+        return (data || []).map((item: any) => ({
+            ...item,
+            name: item.nome,
+            registry_number: item.registro,
+        })) as unknown as Animal[];
     },
 
     /**
@@ -184,8 +530,9 @@ export const animalsService = {
         if (error) handleSupabaseError(error);
 
         const counts: Record<string, number> = {};
-        data?.forEach(item => {
-            counts[item.status] = (counts[item.status] || 0) + 1;
+        data?.forEach((item: any) => {
+            const status = STATUS_MAPPING[item.status] || item.status;
+            counts[status] = (counts[status] || 0) + 1;
         });
 
         return counts;
@@ -197,14 +544,14 @@ export const animalsService = {
     async countBySex(harasId: string): Promise<{ males: number; females: number }> {
         const { data, error } = await supabase
             .from('animals')
-            .select('sex')
+            .select('sexo')
             .eq('haras_id', harasId)
-            .eq('status', 'ativo');
+            .eq('status', 'Ativo');
 
         if (error) handleSupabaseError(error);
 
-        const males = data?.filter(a => a.sex === 'M').length || 0;
-        const females = data?.filter(a => a.sex === 'F').length || 0;
+        const males = data?.filter((a: any) => a.sexo === 'Macho').length || 0;
+        const females = data?.filter((a: any) => a.sexo === 'Fêmea').length || 0;
 
         return { males, females };
     }

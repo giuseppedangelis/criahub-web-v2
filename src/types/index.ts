@@ -7,16 +7,25 @@
 // ENUMS
 // ============================================
 
-export type UserRole = 'admin' | 'criador' | 'assessor';
+export type UserRole = 'admin' | 'criador' | 'assessor' | 'acessor';
 
-export type AnimalSex = 'M' | 'F';
+export type AnimalSex = 'Macho' | 'Fêmea';
 
+// Frontend category values (lowercase, no accents)
 export type AnimalCategory =
     | 'potro'
     | 'potra'
     | 'garanhao'
     | 'egua'
     | 'castrado';
+
+// Database category values (as stored in Supabase - with accents)
+export type AnimalCategoryDb =
+    | 'Potro'
+    | 'Potranca'
+    | 'Garanhão'
+    | 'Égua'
+    | 'Castrado';
 
 export type AnimalStatus =
     | 'ativo'
@@ -64,6 +73,10 @@ export type NotificationType =
     | 'financeiro'
     | 'geral'
     | 'sistema';
+
+export type AnimalVideoVisibility = 'Público' | 'Privado';
+
+export type AnimalVideoSource = 'upload' | 'youtube' | 'vimeo' | 'link';
 
 // ============================================
 // ENTIDADES BASE
@@ -126,12 +139,33 @@ export interface Animal {
     observations: string | null;
     main_image_url: string | null;
     images: string[];
+    documents?: string[];
+    weight: number | null;
+    height: number | null;
+    father_name: string | null;
+    mother_name: string | null;
     created_at: string;
     updated_at: string;
     // Relacionamentos (quando carregados)
     father?: Animal | null;
     mother?: Animal | null;
     haras?: Haras | null;
+}
+
+export interface AnimalVideo {
+    id: string;
+    animal_id: string;
+    haras_id: string | null;
+    title: string;
+    url: string;
+    source: AnimalVideoSource;
+    type: string | null;
+    visibility: AnimalVideoVisibility;
+    caption: string | null;
+    duration: string | null;
+    thumbnail_url: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ReproductiveEvent {
@@ -282,7 +316,7 @@ export interface CreateAnimalInput {
     chip_number?: string;
     brand?: string;
     sex: AnimalSex;
-    category: AnimalCategory;
+    category: AnimalCategory | string;
     birth_date?: string;
     coat_color?: string;
     status?: AnimalStatus;
@@ -293,6 +327,31 @@ export interface CreateAnimalInput {
     observations?: string;
     main_image_url?: string;
     images?: string[];
+    documents?: string[];
+    weight?: number;
+    height?: number;
+    father_name?: string;
+    mother_name?: string;
+    management_status?: string;
+    service_type?: string;
+    gait?: string;
+}
+
+export interface CreateAnimalVideoInput {
+    animal_id: string;
+    haras_id?: string;
+    title: string;
+    url: string;
+    source?: AnimalVideoSource;
+    type?: string;
+    visibility?: AnimalVideoVisibility;
+    caption?: string;
+    duration?: string;
+    thumbnail_url?: string;
+}
+
+export interface UpdateAnimalVideoInput extends Partial<CreateAnimalVideoInput> {
+    id: string;
 }
 
 export interface UpdateAnimalInput extends Partial<CreateAnimalInput> {

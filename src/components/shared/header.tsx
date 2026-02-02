@@ -1,6 +1,7 @@
 'use client'
 
-import { Bell, Moon, Sun, Search, Menu } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, Moon, Sun, Search, Menu, User, Settings, LogOut, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -12,9 +13,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useAuth } from '@/contexts/auth-context'
-import { useTheme } from '@/contexts/theme-context'
-import type { UserRole } from '@/types/database.types'
+import { useUser } from '@/contexts/UserContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import type { UserRole as DatabaseUserRole } from '@/types/database.types'
+import type { UserRole } from '@/contexts/UserContext'
 
 interface HeaderProps {
     title?: string
@@ -22,12 +24,18 @@ interface HeaderProps {
 }
 
 export function Header({ title, onMenuClick }: HeaderProps) {
-    const { profile, signOut } = useAuth()
-    const { setTheme, resolvedTheme } = useTheme()
+    const { profile, logout } = useUser()
+    const { theme, toggleTheme } = useTheme()
+    const [isSigningOut, setIsSigningOut] = useState(false)
 
     const handleSignOut = async () => {
-        await signOut()
-        window.location.href = '/login'
+        setIsSigningOut(true)
+        try {
+            await logout()
+            window.location.href = '/login'
+        } catch (error) {
+            setIsSigningOut(false)
+        }
     }
 
     const getInitials = (name: string | null | undefined) => {
@@ -44,6 +52,10 @@ export function Header({ title, onMenuClick }: HeaderProps) {
         switch (role) {
             case 'admin':
                 return 'Administrador'
+            case 'breeder':
+                return 'Criador'
+            case 'advisor':
+                return 'Assessor'
             case 'criador':
                 return 'Criador'
             case 'assessor':
@@ -86,9 +98,9 @@ export function Header({ title, onMenuClick }: HeaderProps) {
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                    onClick={toggleTheme}
                 >
-                    {resolvedTheme === 'dark' ? (
+                    {theme === 'dark' ? (
                         <Sun className="h-5 w-5" />
                     ) : (
                         <Moon className="h-5 w-5" />
@@ -138,14 +150,35 @@ export function Header({ title, onMenuClick }: HeaderProps) {
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>Meu Perfil</DropdownMenuItem>
-                        <DropdownMenuItem>Configurações</DropdownMenuItem>
+                        <DropdownMenuItem 
+                            onClick={() => window.location.href = '/profile'}
+                            className="cursor-pointer"
+                        >
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Meu Perfil</span>
+                            <span className="ml-auto text-xs text-muted-foreground">P</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                            onClick={() => window.location.href = '/settings'}
+                            className="cursor-pointer"
+                        >
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Configurações</span>
+                            <span className="ml-auto text-xs text-muted-foreground">S</span>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
+                            className="text-destructive focus:text-destructive cursor-pointer"
                             onClick={handleSignOut}
+                            disabled={isSigningOut}
                         >
-                            Sair
+                            {isSigningOut ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <LogOut className="mr-2 h-4 w-4" />
+                            )}
+                            <span>{isSigningOut ? 'Saindo...' : 'Sair'}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">⌘Q</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

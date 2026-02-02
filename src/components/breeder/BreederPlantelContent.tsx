@@ -1,5 +1,6 @@
+
 import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
@@ -8,69 +9,91 @@ import { BreederEditarAnimal } from './BreederEditarAnimal';
 import { QuickGenealogyModal } from './QuickGenealogyModal';
 import { AnimalCard } from './AnimalCard';
 import { AdvancedFiltersModal } from './AdvancedFiltersModal';
+import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
+import { supabase } from '@/services/base';
+import { toast } from 'sonner';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {
+  if (!isoDate) return '-';
   const [year, month, day] = isoDate.split('-');
   return `${day}/${month}/${year}`;
 }
 
 // Função auxiliar para obter classes de cor baseado no status
 function getStatusColorClasses(status: string): string {
-  switch (status) {
-    case 'Ativo':
-      return 'bg-green-500 dark:bg-gray-600 text-white dark:text-gray-200';
-    case 'Gestante':
-      return 'bg-pink-500 dark:bg-gray-600 text-white dark:text-gray-200';
-    case 'Em Cobertura':
-      return 'bg-blue-500 dark:bg-gray-600 text-white dark:text-gray-200';
-    case 'Em Crescimento':
-      return 'bg-yellow-500 dark:bg-gray-600 text-white dark:text-gray-200';
-    default:
-      return 'bg-gray-500 dark:bg-gray-600 text-white dark:text-gray-200';
-  }
+  const s = status?.toLowerCase() || '';
+  if (s === 'ativo') return 'bg-green-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'gestante') return 'bg-pink-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'em cobertura') return 'bg-blue-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'em crescimento' || s === 'potro' || s === 'potra') return 'bg-yellow-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'vendido') return 'bg-red-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'morto' || s === 'óbito') return 'bg-gray-800 dark:bg-gray-600 text-white dark:text-gray-200';
+  return 'bg-gray-500 dark:bg-gray-600 text-white dark:text-gray-200';
 }
 
-interface Animal {
-  id: number;
+function calculateAge(birthDate?: string): string {
+  if (!birthDate) return '-';
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  if (age === 0) {
+    // Menos de 1 ano, mostrar meses?
+    const months = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+    return `${months} meses`;
+  }
+  return `${age} anos`;
+}
+
+// Interface local para a UI (compatível com AnimalCard)
+interface PlantelAnimal {
+  id: string | number;
+  haras_id?: string;
   name: string;
   registry: string;
-  chip?: string; // Número do chip RFID
-  marca?: string; // Número da marca/ferro
-  sex?: 'Macho' | 'Fêmea'; // FASE 19: Sexo do animal
-  birthDate?: string; // Data de nascimento (ISO format)
-  harasOrigem?: string; // FASE 19: Haras de origem
+  chip?: string;
+  marca?: string;
+  sex?: 'Macho' | 'Fêmea';
+  birthDate?: string;
+  birth_date?: string;
+  father_id?: string | null;
+  mother_id?: string | null;
+  harasOrigem?: string;
+  origin_haras?: string;
   category: string;
   age: string;
   haras: string;
   status: string;
   statusColor: string;
-  // NOVOS CAMPOS: Gestão de Status no Plantel (Ativo/Inativo)
-  statusAtividade: 'Ativo' | 'Inativo'; // Status no Plantel
-  motivoInativacao?: 'Vendido' | 'Óbito' | 'Doado' | 'Transferido'; // Motivo da inativação
-  dataInativacao?: string; // Data da inativação (ISO format)
-  statusHistorico?: Array<{ // Histórico de mudanças de status
-    data: string;
-    statusAnterior: string;
-    statusNovo: string;
-    motivo?: string;
-    usuario: string;
-  }>;
-  localizacao?: string; // Baia, Pasto, Serviço
-  servicoTipo?: string; // Reprodução, Trabalho, Repouso, Outro
-  filhos?: number; // Contador de descendentes
-  premiacoes?: number; // Contador de prêmios importados
+  // NOVOS CAMPOS: Gestão de Status no Plantel
+  statusAtividade: 'Ativo' | 'Inativo';
+  motivoInativacao?: string;
+  dataInativacao?: string;
+  localizacao?: string;
+  location?: string;
+  servicoTipo?: string;
+  service_type?: string;
+  filhos?: number;
+  premiacoes?: number;
   image: string;
   images: string[];
   imageCaptions?: string[];
-  // FASE 25-27: Campos de Reprodução
-  reproductionType?: 'Doadora' | 'Matriz' | 'Garanhão' | 'Castrado' | 'Receptora';
+  documents?: string[];
+  coat_color?: string;
+  pelagem?: string;
+  gait?: string;
+  father_name?: string;
+  mother_name?: string;
+  observations?: string;
+  weight?: number;
+  height?: number;
+  // Campos de Reprodução
+  reproductionType?: string;
   activeForReproduction?: boolean;
-  coverageCount?: number; // FASE 26: Contador de coberturas
-  lastReproductiveEvent?: { // FASE 27: Último evento reprodutivo
-    type: string;
-    date: string;
-  };
 }
 
 export function BreederPlantelContent() {
@@ -79,14 +102,13 @@ export function BreederPlantelContent() {
   const [showEditarAnimal, setShowEditarAnimal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCadastrarAnimal, setShowCadastrarAnimal] = useState(false);
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
+  const [selectedAnimal, setSelectedAnimal] = useState<PlantelAnimal | null>(null);
   const [initialTab, setInitialTab] = useState<string>('overview');
-  const [showQuickGenealogyModal, setShowQuickGenealogyModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [animalToDelete, setAnimalToDelete] = useState<Animal | null>(null);
+  const [animalToDelete, setAnimalToDelete] = useState<PlantelAnimal | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  
-  // Estados dos filtros (FASES 12, 13, 14, 15)
+
+  // Estados dos filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSexo, setFilterSexo] = useState('todos');
   const [filterStatus, setFilterStatus] = useState('todos');
@@ -94,534 +116,160 @@ export function BreederPlantelContent() {
   const [filterIdade, setFilterIdade] = useState('todos');
   const [filterFilhos, setFilterFilhos] = useState('todos');
   const [filterPremiacoes, setFilterPremiacoes] = useState('todos');
-  
-  // Lista de animais (FASE 18 - Deletar animal)
-  const [animalsList, setAnimalsList] = useState<Animal[]>([
-    // Animais da Genealogia - Pais
-    { 
-      id: 101, 
-      name: 'Ouro', 
-      registry: 'ABCCMM 123456-78',
-      chip: '982000123456789',
-      marca: 'VV-101',
-      sex: 'Macho',
-      birthDate: '2016-05-10',
-      category: 'Reprodutor', 
-      age: '8 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Pasto Norte',
-      filhos: 12,
-      premiacoes: 5,
-      image: 'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1757496798749-a5a9fc0b7c4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwcnVubmluZ3xlbnwxfHx8fDE3NjQxMjA1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1650735900951-f05161d3799c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMGhvcnNlJTIwaGVhZCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Reprodutor Ouro - Retrato oficial 2024',
-        'Em movimento demonstrando marcha picada',
-        'Detalhe da cabeça - Expressão e conformação'
-      ]
-    },
-    { 
-      id: 102, 
-      name: 'Aurora', 
-      registry: 'ABCCMM 654321-89',
-      chip: '982000654321890',
-      marca: 'VV-102',
-      sex: 'Fêmea',
-      birthDate: '2017-09-14',
-      filhos: 8,
-      premiacoes: 3,
-      category: 'Reprodutora', 
-      age: '7 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Baia 3', 
-      image: 'https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Matriz Aurora - Retrato frontal',
-        'Vista lateral - Conformação e estrutura',
-        'No pasto - Alimentação natural'
-      ]
-    },
-    // Animais da Genealogia - Avós
-    { 
-      id: 201, 
-      name: 'Hércules', 
-      registry: 'ABCCMM 111111-11',
-      chip: '982000111111110',
-      marca: 'VV-201',
-      sex: 'Macho',
-      birthDate: '2012-02-18',
-      filhos: 23,
-      premiacoes: 8,
-      category: 'Reprodutor', 
-      age: '12 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Serviço',
-      servicoTipo: 'Reprodução', 
-      image: 'https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Hércules - Patriarca da linhagem',
-        'Vista lateral - 12 anos de idade'
-      ]
-    },
-    { 
-      id: 202, 
-      name: 'Safira', 
-      registry: 'ABCCMM 222222-22',
-      chip: '982000222222220',
-      marca: 'VV-202',
-      sex: 'Fêmea',
-      birthDate: '2013-07-25',
-      filhos: 15,
-      premiacoes: 6,
-      category: 'Reprodutora', 
-      age: '11 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Pasto Sul', 
-      image: 'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Safira - Matriarca de excelência',
-        'Em liberdade no campo'
-      ]
-    },
-    { 
-      id: 203, 
-      name: 'Trovão', 
-      registry: 'ABCCMM 333333-33',
-      chip: '982000333333330',
-      marca: 'VV-203',
-      sex: 'Macho',
-      birthDate: '2014-12-03',
-      filhos: 18,
-      premiacoes: 7,
-      category: 'Reprodutor', 
-      age: '10 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Baia 1', 
-      image: 'https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1757496798749-a5a9fc0b7c4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwcnVubmluZ3xlbnwxfHx8fDE3NjQxMjA1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1650735900951-f05161d3799c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMGhvcnNlJTIwaGVhZCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Trovão - Linhagem de campeões',
-        'Demonstração de andamento',
-        'Perfil característico da raça'
-      ]
-    },
-    { 
-      id: 204, 
-      name: 'Serena', 
-      registry: 'ABCCMM 444444-44',
-      chip: '982000444444440',
-      marca: 'VV-204',
-      sex: 'Fêmea',
-      birthDate: '2015-06-15',
-      filhos: 11,
-      premiacoes: 4,
-      category: 'Reprodutora', 
-      age: '9 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Pasto Oeste', 
-      image: 'https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Serena - Elegância natural',
-        'Pastando tranquilamente'
-      ]
-    },
-    // Animais principais do plantel
-    { 
-      id: 1, 
-      name: 'Estrela Mangalarga', 
-      registry: 'MM-2020-1234',
-      chip: '982000202012340',
-      marca: 'VV-001',
-      sex: 'Fêmea',
-      birthDate: '2020-01-15',
-      harasOrigem: 'Fazenda Santa Maria',
-      filhos: 2,
-      category: 'Reprodutora', 
-      age: '4 anos', 
-      haras: 'Vale Verde', 
-      status: 'Gestante', 
-      statusColor: 'bg-pink-500',
-      statusAtividade: 'Ativo',
-      localizacao: 'Baia 5',
-      reproductionType: 'Doadora',
-      activeForReproduction: true,
-      coverageCount: 5,
-      lastReproductiveEvent: {
-        type: 'Coleta de Embrião',
-        date: '15/11/2024'
-      }, 
-      image: 'https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1610137856583-e71966c4351d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYzNDA4Njk3fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Retrato oficial - Vista frontal para registro',
-        'Vista lateral mostrando conformação',
-        'Pastando no campo - Momento de descanso'
-      ]
-    },
-    { 
-      id: 2, 
-      name: 'Relâmpago Negro', 
-      registry: 'MM-2018-5678',
-      chip: '982000201856780',
-      marca: 'VV-002',
-      sex: 'Macho',
-      birthDate: '2018-03-20',
-      filhos: 1, // FASE 28: Consistência com dados de filhos
-      category: 'Reprodutor', 
-      age: '6 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo',
-      reproductionType: 'Garanhão',
-      activeForReproduction: true,
-      coverageCount: 18,
-      lastReproductiveEvent: {
-        type: 'Cobertura Natural',
-        date: '10/12/2024'
-      }, 
-      image: 'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1757496798749-a5a9fc0b7c4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwcnVubmluZ3xlbnwxfHx8fDE3NjQxMjA1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1650735900951-f05161d3799c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMGhvcnNlJTIwaGVhZCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Garanhão premiado - Campeão regional 2023',
-        'Em movimento demonstrando marcha',
-        'Close da cabeça mostrando características da raça'
-      ]
-    },
-    { 
-      id: 3, 
-      name: 'Lua Dourada', 
-      registry: 'MM-2019-9012',
-      chip: '982000201990120',
-      marca: 'VV-003',
-      sex: 'Fêmea',
-      birthDate: '2019-06-12',
-      category: 'Reprodutora', 
-      age: '5 anos', 
-      haras: 'Vale Verde', 
-      status: 'Em Cobertura', 
-      statusColor: 'bg-blue-500',
-      statusAtividade: 'Ativo', 
-      image: 'https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1657150946362-3aee0bbc8163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWxvbWlubyUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Lua Dourada - Égua palomino de excelência',
-        'Momento de descanso no piquete',
-        'Conformação lateral - Estrutura física'
-      ]
-    },
-    { 
-      id: 4, 
-      name: 'Vento Sul', 
-      registry: 'MM-2023-3456',
-      chip: '982000202334560',
-      marca: 'VV-004',
-      sex: 'Macho',
-      birthDate: '2023-02-28',
-      category: 'Potro', 
-      age: '1 ano', 
-      haras: 'Vale Verde', 
-      status: 'Em Crescimento', 
-      statusColor: 'bg-yellow-500',
-      statusAtividade: 'Ativo', 
-      image: 'https://images.unsplash.com/photo-1648242977013-6f21e5a695f4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMGhvcnNlJTIwZm9hbHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1648242977013-6f21e5a695f4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMGhvcnNlJTIwZm9hbHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Vento Sul - Potro com 1 ano',
-        'Primeira fase de crescimento'
-      ]
-    },
-    { 
-      id: 5, 
-      name: 'Bella Vista', 
-      registry: 'MM-2021-7890',
-      chip: '982000202178900',
-      marca: 'VV-005',
-      sex: 'Fêmea',
-      birthDate: '2021-08-05',
-      category: 'Reprodutora', 
-      age: '3 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo', 
-      image: 'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Bella Vista - Égua castanha jovem',
-        'Vista lateral - Morfologia',
-        'Alimentação no campo'
-      ]
-    },
-    { 
-      id: 6, 
-      name: 'Trovão Branco', 
-      registry: 'MM-2019-2468',
-      chip: '982000201924680',
-      marca: 'VV-006',
-      sex: 'Macho',
-      birthDate: '2019-11-18',
-      category: 'Reprodutor', 
-      age: '5 anos', 
-      haras: 'Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      statusAtividade: 'Ativo', 
-      image: 'https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1724783483178-79f7ef970c6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3aGl0ZSUyMGhvcnNlJTIwbWFyZXxlbnwxfHx8fDE3NjM1MDAxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1685510543155-0ae0498a8c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwc2lkZSUyMHZpZXd8ZW58MXx8fHwxNzY0MTIwNTUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1757496798749-a5a9fc0b7c4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwcnVubmluZ3xlbnwxfHx8fDE3NjQxMjA1NTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Trovão Branco - Reprodutor branco',
-        'Conformação lateral',
-        'Em movimento livre'
-      ]
-    },
-    { 
-      id: 7, 
-      name: 'Noite Estrelada', 
-      registry: 'MM-2022-1357',
-      chip: '982000202213570',
-      marca: 'VV-007',
-      sex: 'Fêmea',
-      birthDate: '2022-04-22',
-      category: 'Potra', 
-      age: '2 anos', 
-      haras: 'Vale Verde', 
-      status: 'Em Crescimento', 
-      statusColor: 'bg-yellow-500',
-      statusAtividade: 'Ativo', 
-      image: 'https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1751715773655-2140695a3a9b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmV5JTIwaG9yc2UlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-        'https://images.unsplash.com/photo-1608710665474-ad5b01e0ebf2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxicm93biUyMGhvcnNlJTIwZ3JhemluZyUyMGZpZWxkfGVufDF8fHx8MTc2NDEyMDU1NHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ],
-      imageCaptions: [
-        'Noite Estrelada - Potra em desenvolvimento',
-        'Fase juvenil - 2 anos'
-      ]
-    },
-    { 
-      id: 8, 
-      name: 'Sol Nascente', 
-      registry: 'MM-2020-9876',
-      chip: '982000202098760',
-      marca: 'VV-008',
-      birthDate: '2020-07-30',
-      category: 'Reprodutora', 
-      age: '4 anos', 
-      haras: 'Vale Verde', 
-      status: 'Gestante', 
-      statusColor: 'bg-pink-500', 
-      statusAtividade: 'Ativo',
-      image: 'https://images.unsplash.com/photo-1748212550010-74453d20e3ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXklMjBob3JzZSUyMHJ1bm5pbmd8ZW58MXx8fHwxNzYzNTAwMTE0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1748212550010-74453d20e3ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXklMjBob3JzZSUyMHJ1bm5pbmd8ZW58MXx8fHwxNzYzNTAwMTE0fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ] 
-    },
-    // ANIMAIS INATIVOS - Exemplos de vendas
-    { 
-      id: 9, 
-      name: 'Estrela da Manhã', 
-      registry: 'MM-2018-5432',
-      chip: '982000201854320',
-      marca: 'VV-009',
-      sex: 'Fêmea',
-      birthDate: '2018-06-15',
-      category: 'Reprodutora', 
-      age: '6 anos', 
-      haras: 'Vale Verde', 
-      status: 'Inativo', 
-      statusColor: 'bg-gray-500',
-      statusAtividade: 'Inativo',
-      motivoInativacao: 'Vendido',
-      dataInativacao: '2024-11-20',
-      statusHistorico: [
-        {
-          data: '2024-11-20',
-          statusAnterior: 'Ativo',
-          statusNovo: 'Inativo',
-          motivo: 'Vendido',
-          usuario: 'João Silva (Criador)'
-        }
-      ],
-      filhos: 4,
-      image: 'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral'
-      ] 
-    },
-    { 
-      id: 10, 
-      name: 'Trovão Negro', 
-      registry: 'MM-2017-3210',
-      chip: '982000201732100',
-      marca: 'VV-010',
-      sex: 'Macho',
-      birthDate: '2017-03-10',
-      category: 'Reprodutor', 
-      age: '7 anos', 
-      haras: 'Vale Verde', 
-      status: 'Inativo', 
-      statusColor: 'bg-gray-500',
-      statusAtividade: 'Inativo',
-      motivoInativacao: 'Vendido',
-      dataInativacao: '2024-10-05',
-      statusHistorico: [
-        {
-          data: '2024-10-05',
-          statusAnterior: 'Ativo',
-          statusNovo: 'Inativo',
-          motivo: 'Vendido',
-          usuario: 'João Silva (Criador)'
-        }
-      ],
-      filhos: 8,
-      image: 'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral', 
-      images: [
-        'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      ] 
-    },
-  ]);
 
-  // FASE 11: Lógica de filtro de busca
-  // FASES 12-15: Lógica de filtros (idade, categoria, filhos, premiações)
-  const filteredAnimals = animalsList.filter((animal) => {
-    // Filtro de busca (FASE 11)
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = searchTerm === '' || 
-      animal.name.toLowerCase().includes(searchLower) ||
-      animal.registry.toLowerCase().includes(searchLower) ||
-      (animal.chip && animal.chip.toLowerCase().includes(searchLower)) ||
-      animal.haras.toLowerCase().includes(searchLower);
+  // Buscar Haras ID do usuário
+  const [harasId, setHarasId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from('profiles').select('haras_id').eq('id', user.id).single().then(({ data }) => {
+          if (data?.haras_id) setHarasId(data.haras_id);
+        });
+      }
+    });
+  }, []);
 
-    // Filtro de sexo
-    const matchesSexo = filterSexo === 'todos' || 
-      (filterSexo === 'machos' && animal.sex === 'Macho') ||
-      (filterSexo === 'femeas' && animal.sex === 'Fêmea');
+  // Hook de Animais
+  const { data: animalsData, isLoading, refetch } = useAnimals(
+    { haras_id: harasId },
+    { page: 1, limit: 1000 } // Buscando 1000 para permitir filtro client-side de idade/filhos
+  );
 
-    // Filtro de Status no Plantel (Ativos/Inativos)
-    const matchesStatus = filterStatus === 'todos' || 
-      (filterStatus === 'ativos' && (animal.statusAtividade === 'Ativo' || !animal.statusAtividade)) ||
-      (filterStatus === 'inativos' && animal.statusAtividade === 'Inativo');
+  const { mutateAsync: deleteAnimal } = useDeleteAnimal();
 
-    // Filtro de categoria (FASE 13)
-    const matchesCategoria = filterCategoria === 'todos' || 
-      animal.category.toLowerCase().includes(filterCategoria.toLowerCase());
+  // Mapeamento dos dados da API para o formato da UI
+  const animalsList: PlantelAnimal[] = useMemo(() => {
+    if (!animalsData?.data) return [];
 
-    // Filtro de idade (FASE 12)
-    let matchesIdade = true;
-    if (filterIdade !== 'todos' && animal.birthDate) {
-      const birthYear = parseInt(animal.birthDate.split('-')[0]);
-      const currentYear = new Date().getFullYear();
-      const age = currentYear - birthYear;
+    return animalsData.data.map(animal => {
+      const status = animal.status || 'Ativo';
+      const isInactive = status.toLowerCase() === 'vendido' || status.toLowerCase() === 'morto' || status.toLowerCase() === 'óbito';
 
-      if (filterIdade === 'menos_1') matchesIdade = age < 1;
-      else if (filterIdade === '1_3') matchesIdade = age >= 1 && age <= 3;
-      else if (filterIdade === '3_5') matchesIdade = age >= 3 && age <= 5;
-      else if (filterIdade === 'mais_5') matchesIdade = age > 5;
-    }
+      return {
+        id: animal.id, // Agora string, AnimalCard atualizado aceita string | number
+        haras_id: animal.haras_id,
+        name: animal.name,
+        registry: animal.registry_number || '-',
+        chip: animal.chip_number || undefined,
+        marca: animal.brand || undefined,
+        sex: animal.sex,
+        birthDate: animal.birth_date || (animal as any).data_nascimento || undefined,
+        birth_date: animal.birth_date || (animal as any).data_nascimento || undefined,
+        father_id: animal.father_id || (animal as any).pai_id || null,
+        mother_id: animal.mother_id || (animal as any).mae_id || null,
+        harasOrigem: animal.origin_haras || undefined,
+        origin_haras: animal.origin_haras || (animal as any).haras_origem || undefined,
+        category: animal.category,
+        age: calculateAge(animal.birth_date || undefined),
+        haras: 'Meu Haras', // Poderíamos buscar o nome do haras se necessário
+        status: status,
+        statusColor: getStatusColorClasses(status),
+        statusAtividade: isInactive ? 'Inativo' : 'Ativo',
+        localizacao: animal.location || (animal as any).localizacao || undefined,
+        location: animal.location || (animal as any).localizacao || undefined,
+        servicoTipo: animal.service_type || (animal as any).tipo_servico || undefined,
+        service_type: animal.service_type || (animal as any).tipo_servico || undefined,
+        coat_color: animal.coat_color || (animal as any).pelagem || undefined,
+        pelagem: animal.coat_color || (animal as any).pelagem || undefined,
+        gait: animal.gait || (animal as any).andamento || undefined,
+        father_name: animal.father_name || undefined,
+        mother_name: animal.mother_name || undefined,
+        observations: animal.observations || (animal as any).observacoes || undefined,
+        weight: animal.weight || undefined,
+        height: animal.height || undefined,
+        filhos: 0, // TODO: Buscar count de filhos via API ou include
+        premiacoes: 0, // TODO: Buscar count de premiações
+        image: animal.main_image_url || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80', // Placeholder
+        images: animal.images && animal.images.length > 0 ? animal.images : (animal.main_image_url ? [animal.main_image_url] : ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80']),
+        documents: animal.documents || [],
+      };
+    });
+  }, [animalsData]);
 
-    // Filtro de filhos (FASE 14)
-    let matchesFilhos = true;
-    if (filterFilhos === 'com_filhos') matchesFilhos = (animal.filhos || 0) > 0;
-    else if (filterFilhos === 'sem_filhos') matchesFilhos = (animal.filhos || 0) === 0;
+  // Lógica de filtros
+  const filteredAnimals = useMemo(() => {
+    return animalsList.filter((animal) => {
+      // Busca
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = searchTerm === '' ||
+        animal.name.toLowerCase().includes(searchLower) ||
+        animal.registry.toLowerCase().includes(searchLower) ||
+        (animal.chip && animal.chip.toLowerCase().includes(searchLower)) ||
+        animal.haras.toLowerCase().includes(searchLower);
 
-    // Filtro de premiações (FASE 15)
-    let matchesPremiacoes = true;
-    if (filterPremiacoes === 'com_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) > 0;
-    else if (filterPremiacoes === 'sem_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) === 0;
+      // Sexo
+      const matchesSexo = filterSexo === 'todos' ||
+        (filterSexo === 'machos' && animal.sex === 'Macho') ||
+        (filterSexo === 'femeas' && animal.sex === 'Fêmea');
 
-    return matchesSearch && matchesSexo && matchesStatus && matchesCategoria && 
-           matchesIdade && matchesFilhos && matchesPremiacoes;
-  });
+      // Status
+      const matchesStatus = filterStatus === 'todos' ||
+        (filterStatus === 'ativos' && animal.statusAtividade === 'Ativo') ||
+        (filterStatus === 'inativos' && animal.statusAtividade === 'Inativo');
 
-  // FASE 18: Função para deletar animal
-  const handleDeleteAnimal = (animal: Animal) => {
+      // Categoria
+      const matchesCategoria = filterCategoria === 'todos' ||
+        animal.category.toLowerCase().includes(filterCategoria.toLowerCase());
+
+      // Idade
+      let matchesIdade = true;
+      if (filterIdade !== 'todos' && animal.birthDate) {
+        const birthYear = parseInt(animal.birthDate.split('-')[0]);
+        const currentYear = new Date().getFullYear();
+        const age = currentYear - birthYear;
+
+        if (filterIdade === 'menos_1') matchesIdade = age < 1;
+        else if (filterIdade === '1_3') matchesIdade = age >= 1 && age <= 3;
+        else if (filterIdade === '3_5') matchesIdade = age >= 3 && age <= 5;
+        else if (filterIdade === 'mais_5') matchesIdade = age > 5;
+      }
+
+      // Filhos & Premiações (TODO: conectar dados reais)
+      let matchesFilhos = true;
+      if (filterFilhos === 'com_filhos') matchesFilhos = (animal.filhos || 0) > 0;
+      else if (filterFilhos === 'sem_filhos') matchesFilhos = (animal.filhos || 0) === 0;
+
+      let matchesPremiacoes = true;
+      if (filterPremiacoes === 'com_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) > 0;
+      else if (filterPremiacoes === 'sem_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) === 0;
+
+      return matchesSearch && matchesSexo && matchesStatus && matchesCategoria &&
+        matchesIdade && matchesFilhos && matchesPremiacoes;
+    });
+  }, [animalsList, searchTerm, filterSexo, filterStatus, filterCategoria, filterIdade, filterFilhos, filterPremiacoes]);
+
+  const handleDeleteAnimal = (animal: PlantelAnimal) => {
     setAnimalToDelete(animal);
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (animalToDelete) {
-      setAnimalsList(animalsList.filter(a => a.id !== animalToDelete.id));
-      setShowDeleteModal(false);
-      setAnimalToDelete(null);
+      try {
+        await deleteAnimal(String(animalToDelete.id)); // Ensure ID is string
+        toast.success('Animal excluído com sucesso');
+        setShowDeleteModal(false);
+        setAnimalToDelete(null);
+        refetch(); // Refresh list
+      } catch (error) {
+        console.error(error);
+        toast.error('Erro ao excluir animal');
+      }
     }
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+  }
 
   return (
     <div className="space-y-6">
       {showCadastrarAnimal ? (
-        <BreederCadastrarAnimal onBack={() => setShowCadastrarAnimal(false)} />
+        <BreederCadastrarAnimal onBack={() => { setShowCadastrarAnimal(false); refetch(); }} />
       ) : showAnimalDetails && selectedAnimal ? (
         <BreederAnimalDetails
           key={selectedAnimal.id}
-          animal={selectedAnimal}
+          animal={selectedAnimal as any} // Type assertion needed until Details is fully updated
           onBack={() => {
             setShowAnimalDetails(false);
             setSelectedAnimal(null);
@@ -632,42 +280,37 @@ export function BreederPlantelContent() {
             setShowEditarAnimal(true);
           }}
           onViewAnimal={(animalId) => {
-            // Simula carregar dados do animal da genealogia
-            // Em produção, isso faria uma busca no banco de dados
             console.log('Navegando para animal ID:', animalId);
-            const mockAnimal = animalsList.find(a => a.id === animalId);
-            console.log('Animal encontrado:', mockAnimal);
+            // Simulação de navegação na árvore - TODO integrar busca por ID real
+            const mockAnimal = animalsList.find(a => String(a.id) === String(animalId));
             if (mockAnimal) {
               setSelectedAnimal(mockAnimal);
               setInitialTab('overview');
               setShowAnimalDetails(true);
-              // Força uma re-renderização com o novo animal selecionado
-            } else {
-              console.warn('Animal não encontrado na lista. ID:', animalId);
             }
           }}
           initialTab={initialTab}
         />
       ) : showEditarAnimal && selectedAnimal ? (
         <BreederEditarAnimal
-          animal={selectedAnimal}
+          animal={selectedAnimal as any}
           onBack={() => {
             setShowEditarAnimal(false);
             setSelectedAnimal(null);
           }}
           onSave={() => {
-            // Simula o salvamento
-            console.log('Animal atualizado:', selectedAnimal);
+            refetch();
+            setShowEditarAnimal(false);
           }}
         />
       ) : (
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <SummaryCard title="Total" value="122" />
-            <SummaryCard title="Machos" value="74" />
-            <SummaryCard title="Fêmeas" value="48" />
-            <SummaryCard title="Ativos" value="34" />
+            <SummaryCard title="Total" value={String(animalsList.length)} />
+            <SummaryCard title="Machos" value={String(animalsList.filter(a => a.sex === 'Macho').length)} />
+            <SummaryCard title="Fêmeas" value={String(animalsList.filter(a => a.sex === 'Fêmea').length)} />
+            <SummaryCard title="Ativos" value={String(animalsList.filter(a => a.statusAtividade === 'Ativo').length)} />
           </div>
 
           {/* Actions and Filters */}
@@ -733,21 +376,19 @@ export function BreederPlantelContent() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-3 h-12 rounded-xl transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-primary dark:bg-white text-white dark:text-black'
-                      : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white border border-border dark:border-[#3a3a3a]'
-                  }`}
+                  className={`p-3 h-12 rounded-xl transition-colors ${viewMode === 'grid'
+                    ? 'bg-primary dark:bg-white text-white dark:text-black'
+                    : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white border border-border dark:border-[#3a3a3a]'
+                    }`}
                 >
                   <Grid className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-3 h-12 rounded-xl transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-primary dark:bg-white text-white dark:text-black'
-                      : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white border border-border dark:border-[#3a3a3a]'
-                  }`}
+                  className={`p-3 h-12 rounded-xl transition-colors ${viewMode === 'list'
+                    ? 'bg-primary dark:bg-white text-white dark:text-black'
+                    : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white border border-border dark:border-[#3a3a3a]'
+                    }`}
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -760,7 +401,7 @@ export function BreederPlantelContent() {
                 {filteredAnimals.map((animal) => (
                   <AnimalCard
                     key={animal.id}
-                    animal={animal}
+                    animal={animal as any}
                     onClick={() => {
                       setSelectedAnimal(animal);
                       setInitialTab('overview');
@@ -813,6 +454,12 @@ export function BreederPlantelContent() {
                 ))}
               </div>
             )}
+
+            {filteredAnimals.length === 0 && (
+              <div className="flex flex-col items-center justify-center p-10 text-muted-foreground">
+                <p>Nenhum animal encontrado.</p>
+              </div>
+            )}
           </div>
 
           {/* Import Modal */}
@@ -837,7 +484,7 @@ export function BreederPlantelContent() {
             />
           )}
 
-          {/* FASE 18: Delete Confirmation Modal */}
+          {/* Delete Confirmation Modal */}
           {showDeleteModal && animalToDelete && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 max-w-md w-full border border-border dark:border-[rgba(255,255,255,0.1)]">
@@ -937,7 +584,6 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
       <span className={`px-3 py-1 ${getStatusColorClasses(animal.status)} text-xs rounded-full flex-shrink-0`}>
         {animal.status}
       </span>
-      {/* FASE 17: Botão Ver Vídeos */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -948,7 +594,6 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
       >
         <Video className="w-4 h-4" />
       </button>
-      {/* FASE 10: Botão Ver Genealogia */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -969,7 +614,6 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
       >
         <Edit className="w-4 h-4" />
       </button>
-      {/* FASE 18: Botão Deletar */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -1007,7 +651,6 @@ function ImportModal({ onClose }: any) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border dark:border-[#3a3a3a]">
-        {/* Header */}
         <div className="p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
           <div className="flex items-start justify-between">
             <div>
@@ -1022,10 +665,8 @@ function ImportModal({ onClose }: any) {
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
-            {/* Instruções */}
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-yellow-500 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-white dark:text-gray-200" />
@@ -1033,7 +674,6 @@ function ImportModal({ onClose }: any) {
               <h4 className="text-xl text-foreground dark:text-white">Instruções para Importação</h4>
             </div>
 
-            {/* Formato do Arquivo */}
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Formato do Arquivo aceito</label>
               <div className="bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-lg px-4 py-2.5">
@@ -1041,7 +681,6 @@ function ImportModal({ onClose }: any) {
               </div>
             </div>
 
-            {/* Colunas Recomendadas */}
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Colunas Recomendadas</label>
               <div className="bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-lg px-4 py-3">
@@ -1061,7 +700,6 @@ function ImportModal({ onClose }: any) {
               </div>
             </div>
 
-            {/* Limitações do Plano Free */}
             <div className="border border-border dark:border-[#616161] rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Info className="w-4 h-4 text-muted-foreground dark:text-[#6b6b6b]" />
@@ -1074,7 +712,6 @@ function ImportModal({ onClose }: any) {
               </ul>
             </div>
 
-            {/* Selecionar Arquivo */}
             <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Selecionar Arquivo</label>
               <div
@@ -1101,7 +738,6 @@ function ImportModal({ onClose }: any) {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)] flex gap-3 justify-end">
           <button
             onClick={onClose}

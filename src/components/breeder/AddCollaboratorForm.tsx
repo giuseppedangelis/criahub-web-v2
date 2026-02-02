@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Shield, AlertTriangle, X } from 'lucide-react';
+import { Shield, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
+import { collaboratorsService } from '@/services/collaborators';
+import { supabase } from '@/services/base';
 
 interface AddCollaboratorFormProps {
   onClose: () => void;
@@ -11,8 +13,11 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    password: '',
     role: '',
   });
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const [permissions, setPermissions] = useState({
     plantel: {
@@ -34,16 +39,55 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.fullName || !formData.email || !formData.role) {
+
+    if (!formData.fullName || !formData.email || !formData.password || !formData.role) {
       toast.error('Preencha todos os campos obrigatórios!');
       return;
     }
 
-    toast.success('Colaborador adicionado com sucesso!');
-    onClose();
+    // Buscar haras_id do usuário logado
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('haras_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.haras_id) {
+      toast.error('Haras não vinculado ao usuário');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await collaboratorsService.createCollaborator({
+        full_name: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role as 'acessor' | 'veterinario' | 'peao',
+        haras_id: profile.haras_id,
+        permissions
+      });
+
+      toast.success('Colaborador adicionado com sucesso!');
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao criar colaborador:', error);
+      if (error.message?.includes('already registered')) {
+        toast.error('Email já cadastrado no sistema');
+      } else {
+        toast.error('Erro ao adicionar colaborador. Tente novamente.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const togglePermission = (module: keyof typeof permissions, permission: string) => {
@@ -79,7 +123,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
           {/* Informações Básicas */}
           <div className="space-y-3">
             <h3 className="text-lg text-foreground dark:text-white">Informações Básicas</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm text-foreground dark:text-white">Nome Completo *</label>
@@ -102,6 +146,17 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                   className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-foreground dark:text-white">Senha *</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Digite a senha"
+                  className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -112,11 +167,9 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                 className="w-full h-10 px-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
               >
                 <option value="">Selecione a função</option>
-                <option value="Gerente">Gerente</option>
-                <option value="Tratador">Tratador</option>
-                <option value="Veterinário">Veterinário</option>
-                <option value="Assistente">Assistente</option>
-                <option value="Estagiário">Estagiário</option>
+                <option value="acessor">Acessor</option>
+                <option value="veterinario">Veterinário</option>
+                <option value="peao">Peão</option>
               </NativeSelect>
             </div>
           </div>
@@ -146,7 +199,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                     />
                     <span className="text-sm text-foreground dark:text-white">Visualizar animais</span>
                   </label>
-                  
+
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -156,7 +209,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                     />
                     <span className="text-sm text-foreground dark:text-white">Editar informações dos animais</span>
                   </label>
-                  
+
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -182,7 +235,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                     />
                     <span className="text-sm text-foreground dark:text-white">Visualizar dados reprodutivos</span>
                   </label>
-                  
+
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -208,7 +261,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                     />
                     <span className="text-sm text-foreground dark:text-white">Visualizar agenda</span>
                   </label>
-                  
+
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -234,7 +287,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
                     />
                     <span className="text-sm text-foreground dark:text-white">Visualizar relatórios</span>
                   </label>
-                  
+
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -260,9 +313,11 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
             </button>
             <button
               type="submit"
-              className="px-12 py-3 bg-primary dark:bg-white text-white dark:text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity"
+              disabled={isLoading}
+              className="px-12 py-3 bg-primary dark:bg-white text-white dark:text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Salvar
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isLoading ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </form>

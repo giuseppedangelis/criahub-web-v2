@@ -38,9 +38,32 @@ export function formatPaginatedResponse<T>(
 }
 
 /**
+ * Verifica se o erro é um AbortError (cancelamento do cliente)
+ */
+function isAbortError(error: any): boolean {
+    return (
+        error?.name === 'AbortError' ||
+        error instanceof DOMException && error.name === 'AbortError' ||
+        error?.message?.includes('signal is aborted') ||
+        error?.message?.includes('The operation was aborted') ||
+        error?.message?.includes('The user aborted a request')
+    );
+}
+
+/**
  * Trata erros do Supabase
  */
 export function handleSupabaseError(error: any): never {
+    // Ignorar AbortErrors - são cancelamentos do cliente (ex: componente desmontou)
+    if (isAbortError(error)) {
+        // Log silencioso em desenvolvimento, não lançar como erro de banco
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Supabase request cancelled (AbortError):', error.message);
+        }
+        // Re-lançar como AbortError para que TanStack Query possa tratá-lo corretamente
+        throw error;
+    }
+
     console.error('Supabase Error:', error);
     throw new Error(error.message || 'Erro ao acessar o banco de dados');
 }

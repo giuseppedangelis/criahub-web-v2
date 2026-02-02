@@ -5,6 +5,7 @@ import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings, Moon, 
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
+import { UserDropdown } from './shared/UserDropdown';
 import { AdminSubscriptionsContent } from './admin/AdminSubscriptionsContent';
 import { AdminPlatformUsageContent } from './admin/AdminPlatformUsageContent';
 import { AdminCriticalAlertsContent } from './admin/AdminCriticalAlertsContent';
@@ -25,6 +26,7 @@ export function AdminDashboard() {
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: 'Nova assinatura', message: 'Haras do Sol contratou plano Premium', time: '5 min atrás', unread: true },
     { id: 2, title: 'Pagamento recebido', message: 'R$ 499 - Haras Vale Verde', time: '1 hora atrás', unread: true },
@@ -66,7 +68,12 @@ export function AdminDashboard() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -281,54 +288,19 @@ export function AdminDashboard() {
 
               {/* User Dropdown */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] md:w-64 max-w-sm bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] z-50">
-                  <div className="p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary dark:bg-white rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-white dark:text-black" />
-                      </div>
-                      <div>
-                        <p className="text-foreground dark:text-white">{userName || 'Admin'}</p>
-                        <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                          {userEmail || ''}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('settings');
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                    >
-                      <UserCog className="w-4 h-4" />
-                      Configurações da Conta
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('help');
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      Central de Ajuda
-                    </button>
-                    <div className="border-t border-border dark:border-[rgba(255,255,255,0.1)] my-2"></div>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-red-500 dark:text-red-400 flex items-center gap-3"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sair
-                    </button>
-                  </div>
-                </div>
+                <UserDropdown
+                  userName={userName}
+                  userEmail={userEmail}
+                  userRole={userRole}
+                  isLoggingOut={isLoggingOut}
+                  onProfileClick={() => setActiveTab('profile')}
+                  onSettingsClick={() => setActiveTab('settings')}
+                  onHelpClick={() => setActiveTab('help')}
+                  onLogout={handleLogout}
+                  onClose={() => setShowUserMenu(false)}
+                  showProfile={true}
+                  showHelp={true}
+                />
               )}
             </div>
           </div>

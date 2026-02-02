@@ -26,10 +26,9 @@ interface VeterinaryProcedure {
 
 interface HealthTabProps {
   animalId: number;
-  onRegisterProcedure: () => void;
 }
 
-export function HealthTab({ animalId, onRegisterProcedure }: HealthTabProps) {
+export function HealthTab({ animalId }: HealthTabProps) {
   const [selectedType, setSelectedType] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
   const [expandedProcedure, setExpandedProcedure] = useState<string | null>(null);
@@ -236,13 +235,6 @@ export function HealthTab({ animalId, onRegisterProcedure }: HealthTabProps) {
             {filteredProcedures.length} {filteredProcedures.length === 1 ? 'procedimento' : 'procedimentos'}
           </p>
         </div>
-        <button
-          onClick={onRegisterProcedure}
-          className="w-full lg:w-auto px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Registrar Procedimento
-        </button>
       </div>
 
       {/* Filtros */}
@@ -302,16 +294,9 @@ export function HealthTab({ animalId, onRegisterProcedure }: HealthTabProps) {
           <h4 className="text-lg text-foreground dark:text-white mb-2">
             Nenhum procedimento encontrado
           </h4>
-          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-6">
+          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
             Não há procedimentos veterinários registrados com os filtros aplicados.
           </p>
-          <button
-            onClick={onRegisterProcedure}
-            className="px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Registrar Primeiro Procedimento
-          </button>
         </div>
       )}
     </div>

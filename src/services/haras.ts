@@ -120,9 +120,9 @@ export const harasService = {
         // Contar animais
         const { data: animals, error: animalsError } = await supabase
             .from('animals')
-            .select('sex')
+            .select('sexo')
             .eq('haras_id', harasId)
-            .eq('status', 'ativo');
+            .eq('status', 'Ativo');
 
         if (animalsError) handleSupabaseError(animalsError);
 
@@ -184,8 +184,8 @@ export const harasService = {
 
         return {
             totalAnimals: animals?.length || 0,
-            totalMales: animals?.filter(a => a.sex === 'M').length || 0,
-            totalFemales: animals?.filter(a => a.sex === 'F').length || 0,
+            totalMales: animals?.filter(a => a.sexo === 'Macho').length || 0,
+            totalFemales: animals?.filter(a => a.sexo === 'Fêmea').length || 0,
             activeGestations: gestationsCount || 0,
             pendingServices: servicesCount || 0,
             monthlyRevenue,

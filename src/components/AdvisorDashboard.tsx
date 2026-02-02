@@ -1,7 +1,7 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, LogOut, UserCircle, Menu, X, Check, Trash2, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, User, Menu, X, Check, Trash2, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
@@ -15,6 +15,7 @@ import { AdvisorCalendarContent } from './advisor/AdvisorCalendarContent';
 import { AdvisorDocumentsContent } from './advisor/AdvisorDocumentsContent';
 import { AdvisorSettingsContent } from './advisor/AdvisorSettingsContent';
 import { AdvisorHelpContent } from './advisor/AdvisorHelpContent';
+import { UserDropdown } from './shared/UserDropdown';
 import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
 
@@ -27,6 +28,7 @@ export function AdvisorDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [notifications, setNotifications] = useState([
     {
@@ -98,7 +100,12 @@ export function AdvisorDashboard() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      setIsLoggingOut(false);
+    }
   };
 
   // Fecha a sidebar quando mudar de mobile para desktop
@@ -339,52 +346,24 @@ export function AdvisorDashboard() {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
                 >
-                  <UserCircle className="w-5 h-5 text-foreground dark:text-white" />
+                  <User className="w-5 h-5 text-foreground dark:text-white" />
                 </button>
 
                 {/* User Dropdown */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] md:w-64 max-w-sm bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] z-50">
-                    <div className="p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
-                      <p className="text-foreground dark:text-white">{userName || 'Usuário'}</p>
-                      <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                        {userEmail || ''}
-                      </p>
-                    </div>
-                    <div className="p-2">
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveMenu('profile');
-                        }}
-                        className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                      >
-                        <UserCircle className="w-4 h-4" />
-                        Meu Perfil
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setActiveMenu('settings');
-                        }}
-                        className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Configurações
-                      </button>
-                      <div className="border-t border-border dark:border-[rgba(255,255,255,0.1)] my-2"></div>
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          handleLogout();
-                        }}
-                        className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-red-500 dark:text-red-400 flex items-center gap-3"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sair
-                      </button>
-                    </div>
-                  </div>
+                  <UserDropdown
+                    userName={userName}
+                    userEmail={userEmail}
+                    userRole={userRole}
+                    isLoggingOut={isLoggingOut}
+                    onProfileClick={() => setActiveMenu('profile')}
+                    onSettingsClick={() => setActiveMenu('settings')}
+                    onHelpClick={() => setActiveMenu('help')}
+                    onLogout={handleLogout}
+                    onClose={() => setShowUserMenu(false)}
+                    showProfile={true}
+                    showHelp={true}
+                  />
                 )}
               </div>
             )}

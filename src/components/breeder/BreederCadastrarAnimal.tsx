@@ -1,31 +1,138 @@
-import { ArrowLeft, Upload, Camera, X, Video } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Upload, Camera, X, Video, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { NativeSelect } from '../ui/native-select';
+import { useCreateAnimal } from '@/hooks/useAnimals';
+import { toast } from 'sonner';
+import { supabase } from '@/services/base';
+import type { CreateAnimalInput, AnimalSex, AnimalCategory } from '@/types';
 
 interface BreederCadastrarAnimalProps {
   onBack: () => void;
 }
 
 export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) {
-  const [formData, setFormData] = useState({
+  // Tipos de Entrada
+  type EntryType = 'nascimento' | 'compra' | 'hospedagem' | 'genealogia';
+  const [entryType, setEntryType] = useState<EntryType>('nascimento');
+
+  const [formData, setFormData] = useState<{
+    nome: string;
+    registro: string;
+    chip: string;
+    marca: string;
+    dataNascimento: string;
+    sexo: string;
+    categoria: string;
+    statusManejo: string;
+    localizacao: string;
+    servicoTipo: string;
+    harasOrigem: string;
+    pelagem: string;
+    altura: string;
+    peso: string;
+    pai: string;
+    pai_id: string;
+    mae: string;
+    mae_id: string;
+    observacoes: string;
+  }>({
     nome: '',
     registro: '',
-    chip: '',  // Novo campo
-    marca: '',  // Novo campo
+    chip: '',
+    marca: '',
     dataNascimento: '',
     sexo: '',
-    categoria: '',  // Categoria do animal (Reprodutora, Potro, etc)
+    categoria: '',
     statusManejo: '',
-    localizacao: 'Baia',  // Novo campo
-    servicoTipo: 'Reprodução',  // Novo campo
-    harasOrigem: '',  // Haras de origem
+    localizacao: 'Baia',
+    servicoTipo: 'Reprodução',
+    harasOrigem: '',
     pelagem: '',
     altura: '',
     peso: '',
     pai: '',
+    pai_id: '',
     mae: '',
+    mae_id: '',
     observacoes: '',
   });
+
+  const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
+  const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
+  const [userHarasName, setUserHarasName] = useState('');
+
+  useEffect(() => {
+    async function loadInitialData() {
+      // Buscar haras_id do usuário logado
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('haras_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.haras_id) {
+        // Buscar nome do Haras separadamente
+        const { data: harasData } = await supabase
+          .from('haras')
+          .select('nome')
+          .eq('id', profile.haras_id)
+          .single();
+
+        const harasName = harasData?.nome || '';
+        setUserHarasName(harasName);
+
+        // Se for nascimento, preencher haras de origem
+        if (entryType === 'nascimento') {
+          setFormData(prev => ({ ...prev, harasOrigem: harasName }));
+        }
+
+        import('@/services/animals').then(async ({ animalsService }) => {
+          const [stallionsData, maresData] = await Promise.all([
+            animalsService.getStallions(profile.haras_id!),
+            animalsService.getMares(profile.haras_id!)
+          ]);
+          setStallions(stallionsData);
+          setMares(maresData);
+        });
+      }
+    }
+    loadInitialData();
+  }, [entryType]);
+
+  // Atualizar campos ao trocar tipo de entrada
+  useEffect(() => {
+    if (entryType === 'nascimento') {
+      setFormData(prev => ({
+        ...prev,
+        harasOrigem: userHarasName,
+        statusManejo: 'Ao pé da mãe',
+        localizacao: 'Pasto Maternidade'
+      }));
+    } else if (entryType === 'hospedagem') {
+      setFormData(prev => ({
+        ...prev,
+        harasOrigem: '',
+        statusManejo: 'Em observação',
+        servicoTipo: 'Hospedagem'
+      }));
+    } else if (entryType === 'genealogia') {
+      setFormData(prev => ({
+        ...prev,
+        statusManejo: 'Histórico',
+        localizacao: 'Externo'
+      }));
+    } else {
+      // Compra (resetar defaults se necessário)
+      setFormData(prev => ({
+        ...prev,
+        harasOrigem: '',
+        statusManejo: '',
+      }));
+    }
+  }, [entryType, userHarasName]);
 
   const [selectedImages, setSelectedImages] = useState<{ file: File; caption: string; type: 'image' | 'video' }[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
@@ -33,10 +140,10 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const filesArray = Array.from(event.target.files);
-      const newImages = filesArray.map(file => ({ 
-        file, 
-        caption: '', 
-        type: file.type.startsWith('video/') ? 'video' as const : 'image' as const 
+      const newImages = filesArray.map(file => ({
+        file,
+        caption: '',
+        type: file.type.startsWith('video/') ? 'video' as const : 'image' as const
       }));
       setSelectedImages([...selectedImages, ...newImages]);
     }
@@ -69,10 +176,92 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     setSelectedDocuments(selectedDocuments.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const createAnimalMutation = useCreateAnimal();
+
+  // Helpers para visibilidade de campos
+  const isGenealogy = entryType === 'genealogia';
+  const isBirth = entryType === 'nascimento';
+  const isHosting = entryType === 'hospedagem';
+
+  const showPhysicalInfo = !isGenealogy;
+  const showLocationInfo = !isGenealogy;
+  const isBirthDateRequired = !isGenealogy;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Lógica de salvamento
-    console.log('Salvando animal:', formData);
+
+    // Validar Mãe para Nascimento
+    if (isBirth && !formData.mae_id) {
+      toast.error('O cadastro de nascimento exige a seleção de uma mãe cadastrada.');
+      return;
+    }
+
+    // Buscar haras_id do usuário logado
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('haras_id')
+      .eq('id', user.id)
+      .single() as { data: { haras_id: string } | null, error: any };
+
+    if (!profile) {
+      toast.error('Erro ao carregar perfil');
+      return;
+    }
+
+    if (!profile?.haras_id) {
+      toast.error('Haras não vinculado ao usuário');
+      return;
+    }
+
+    // Validar campos obrigatórios
+    if (!formData.nome || (isBirthDateRequired && !formData.dataNascimento) || !formData.sexo) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    let statusFinal = 'ativo';
+    if (isHosting) statusFinal = 'em_servico';
+    if (isGenealogy) statusFinal = 'vendido'; // Considerar 'morto' ou 'vendido' como Inativo/Histórico
+
+    // Mapear campos para CreateAnimalInput
+    const animalInput: CreateAnimalInput = {
+      haras_id: profile.haras_id,
+      name: formData.nome,
+      sex: formData.sexo as AnimalSex,
+      birth_date: formData.dataNascimento || undefined,
+      category: (formData.categoria as AnimalCategory) || 'potro',
+      registry_number: formData.registro || undefined,
+      chip_number: formData.chip || undefined,
+      brand: formData.marca || undefined,
+      coat_color: formData.pelagem || undefined,
+      location: formData.localizacao || undefined,
+      origin_haras: formData.harasOrigem || undefined,
+      observations: formData.observacoes || undefined,
+      status: statusFinal as any,
+      weight: formData.peso ? parseFloat(formData.peso) : undefined,
+      height: formData.altura ? parseFloat(formData.altura) : undefined,
+      father_name: formData.pai || undefined,
+      mother_name: formData.mae || undefined,
+      father_id: formData.pai_id && formData.pai_id !== 'external' ? formData.pai_id : undefined,
+      mother_id: formData.mae_id && formData.mae_id !== 'external' ? formData.mae_id : undefined,
+      management_status: formData.statusManejo || undefined,
+      service_type: formData.servicoTipo || undefined,
+    };
+
+    try {
+      await createAnimalMutation.mutateAsync(animalInput);
+      toast.success('Animal cadastrado com sucesso!');
+      onBack();
+    } catch (error) {
+      console.error('Erro ao cadastrar animal:', error);
+      toast.error('Erro ao cadastrar animal. Tente novamente.');
+    }
   };
 
   return (
@@ -100,12 +289,70 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         <h1 className="text-2xl text-foreground dark:text-white">Cadastrar Animal</h1>
       </div>
 
+      {/* Seleção de Tipo de Entrada */}
+      <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
+        <h2 className="text-xl text-foreground dark:text-white mb-6">Tipo de Cadastro</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <button
+            type="button"
+            onClick={() => setEntryType('nascimento')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'nascimento'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
+              }`}
+          >
+            <span className="text-2xl">🐣</span>
+            <span className="font-medium">Nascimento</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryType('compra')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'compra'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
+              }`}
+          >
+            <span className="text-2xl">🚚</span>
+            <span className="font-medium">Compra</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryType('hospedagem')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'hospedagem'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
+              }`}
+          >
+            <span className="text-2xl">🤝</span>
+            <span className="font-medium">Hospedagem</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryType('genealogia')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'genealogia'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
+              }`}
+          >
+            <span className="text-2xl">📜</span>
+            <span className="font-medium">Genealogia</span>
+          </button>
+        </div>
+
+        <div className="mt-4 p-4 bg-muted/50 dark:bg-[#111] rounded-lg text-sm text-muted-foreground">
+          {entryType === 'nascimento' && 'Cadastro de animal nascido no haras. O haras de origem será preenchido automaticamente, e é necessário selecionar a mãe.'}
+          {entryType === 'compra' && 'Cadastro de animal adquirido de outro haras. Sêmen ou animal comprado.'}
+          {entryType === 'hospedagem' && 'Animal de terceiro hospedado no haras. O proprietário será identificado.'}
+          {entryType === 'genealogia' && 'Cadastro para fins de árvore genealógica. O animal não será listado no plantel ativo.'}
+        </div>
+      </div>
+
       {/* Formulário */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Informações Básicas */}
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Informações Básicas</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Nome do Animal */}
             <div>
@@ -136,42 +383,46 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               />
             </div>
 
-            {/* Chip */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Chip
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: 1234567890"
-                value={formData.chip}
-                onChange={(e) => setFormData({ ...formData, chip: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {/* Chip - Hidden for Genealogy */}
+            {showPhysicalInfo && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Chip
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 1234567890"
+                  value={formData.chip}
+                  onChange={(e) => setFormData({ ...formData, chip: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
-            {/* Marca */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Marca
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Marca do Chip"
-                value={formData.marca}
-                onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {/* Marca - Hidden for Genealogy */}
+            {showPhysicalInfo && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Marca
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Marca do Chip"
+                  value={formData.marca}
+                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
             {/* Data de Nascimento */}
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Data de Nascimento <span className="text-red-500">*</span>
+                Data de Nascimento {isBirthDateRequired && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="date"
-                required
+                required={isBirthDateRequired}
                 value={formData.dataNascimento}
                 onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
                 className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
@@ -199,81 +450,95 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               <label className="block text-sm text-foreground dark:text-white mb-2">
                 Categoria
               </label>
-              <input
-                type="text"
-                placeholder="Ex: Reprodutora, Potro"
+              <NativeSelect
                 value={formData.categoria}
                 onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
+                required
+              >
+                <option value="">Selecione a categoria</option>
+                <option value="potro">Potro</option>
+                <option value="potra">Potranca</option>
+                <option value="garanhao">Garanhão</option>
+                <option value="egua">Égua</option>
+                <option value="castrado">Castrado</option>
+              </NativeSelect>
             </div>
 
-            {/* Status de Manejo */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Status de Manejo
-              </label>
-              <input
-                type="text"
-                list="status-suggestions"
-                placeholder="Descreva o status"
-                value={formData.statusManejo}
-                onChange={(e) => setFormData({ ...formData, statusManejo: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-              <datalist id="status-suggestions">
-                <option value="Treinamento para pista" />
-                <option value="Baia para tratamento" />
-                <option value="Trato em baia" />
-                <option value="Pasto" />
-                <option value="Serviço" />
-                <option value="Reprodução" />
-                <option value="Repouso" />
-                <option value="Em observação" />
-              </datalist>
-            </div>
+            {/* Status de Manejo - Hidden for Genealogy */}
+            {showLocationInfo && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Status de Manejo
+                </label>
+                <input
+                  type="text"
+                  list="status-suggestions"
+                  placeholder="Descreva o status"
+                  value={formData.statusManejo}
+                  onChange={(e) => setFormData({ ...formData, statusManejo: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+                <datalist id="status-suggestions">
+                  <option value="Treinamento para pista" />
+                  <option value="Baia para tratamento" />
+                  <option value="Trato em baia" />
+                  <option value="Pasto" />
+                  <option value="Serviço" />
+                  <option value="Reprodução" />
+                  <option value="Repouso" />
+                  <option value="Em observação" />
+                </datalist>
+              </div>
+            )}
 
-            {/* Localização */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Localização
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Baia"
-                value={formData.localizacao}
-                onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {/* Localização - Hidden for Genealogy */}
+            {showLocationInfo && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Localização
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Baia"
+                  value={formData.localizacao}
+                  onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
-            {/* Tipo de Serviço */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Tipo de Serviço
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Reprodução"
-                value={formData.servicoTipo}
-                onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {/* Tipo de Serviço - Hidden for Genealogy */}
+            {showLocationInfo && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Tipo de Serviço
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Reprodução"
+                  value={formData.servicoTipo}
+                  onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
-            {/* Haras de Origem */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Haras de Origem
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Haras ABC"
-                value={formData.harasOrigem}
-                onChange={(e) => setFormData({ ...formData, harasOrigem: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {/* Haras de Origem / Proprietário */}
+            {(entryType !== 'genealogia' || formData.harasOrigem) && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  {isHosting ? 'Proprietário' : 'Haras de Origem'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={isHosting ? "Nome do Proprietário" : "Ex: Haras ABC"}
+                  value={formData.harasOrigem}
+                  readOnly={isBirth}
+                  onChange={(e) => setFormData({ ...formData, harasOrigem: e.target.value })}
+                  className={`w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20 ${isBirth ? 'opacity-50 cursor-not-allowed' : ''}`}
+                />
+              </div>
+            )}
 
             {/* Pelagem */}
             <div>
@@ -291,58 +556,103 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
           </div>
         </div>
 
-        {/* Características Físicas */}
-        <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
-          <h2 className="text-xl text-foreground dark:text-white mb-6">Características Físicas</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Altura */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Altura (cm)
-              </label>
-              <input
-                type="number"
-                placeholder="Ex: 150"
-                value={formData.altura}
-                onChange={(e) => setFormData({ ...formData, altura: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+        {/* Características Físicas - Hidden for Genealogy */}
+        {showPhysicalInfo && (
+          <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
+            <h2 className="text-xl text-foreground dark:text-white mb-6">Características Físicas</h2>
 
-            {/* Peso */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Peso (kg)
-              </label>
-              <input
-                type="number"
-                placeholder="Ex: 450"
-                value={formData.peso}
-                onChange={(e) => setFormData({ ...formData, peso: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Altura */}
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Altura (cm)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ex: 150"
+                  value={formData.altura}
+                  onChange={(e) => setFormData({ ...formData, altura: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+
+              {/* Peso */}
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Peso (kg)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ex: 450"
+                  value={formData.peso}
+                  onChange={(e) => setFormData({ ...formData, peso: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Genealogia */}
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Genealogia</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Pai */}
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
                 Pai
               </label>
-              <input
-                type="text"
-                placeholder="Nome do pai"
-                value={formData.pai}
-                onChange={(e) => setFormData({ ...formData, pai: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
+              <div className="flex gap-2">
+                  <NativeSelect
+                    value={formData.pai_id || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selectedAnimal = stallions.find(a => a.id === selectedId);
+                      if (!selectedId) {
+                        setFormData({
+                          ...formData,
+                          pai_id: '',
+                          pai: ''
+                        });
+                        return;
+                      }
+
+                      if (selectedId === 'external') {
+                        setFormData({
+                          ...formData,
+                          pai_id: 'external',
+                          pai: formData.pai || ''
+                        });
+                        return;
+                      }
+
+                      setFormData({
+                        ...formData,
+                        pai_id: selectedId,
+                        pai: selectedAnimal ? selectedAnimal.name : ''
+                      });
+                    }}
+                    className="flex-1"
+                  >
+                  <option value="">Selecione ou deixe em branco</option>
+                  {stallions.map((stallion) => (
+                    <option key={stallion.id} value={stallion.id}>
+                      {stallion.name} {stallion.registry_number ? `(${stallion.registry_number})` : ''}
+                    </option>
+                  ))}
+                  <option value="external">Outro (Externo/Não cadastrado)</option>
+                </NativeSelect>
+              </div>
+              {formData.pai_id === 'external' && (
+                <input
+                  type="text"
+                  placeholder="Nome do pai"
+                  value={formData.pai}
+                  onChange={(e) => setFormData({ ...formData, pai: e.target.value })}
+                  className="w-full h-10 px-4 mt-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              )}
             </div>
 
             {/* Mãe */}
@@ -350,13 +660,56 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               <label className="block text-sm text-foreground dark:text-white mb-2">
                 Mãe
               </label>
-              <input
-                type="text"
-                placeholder="Nome da mãe"
-                value={formData.mae}
-                onChange={(e) => setFormData({ ...formData, mae: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
+              <div className="flex gap-2">
+                  <NativeSelect
+                    value={formData.mae_id || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selectedAnimal = mares.find(a => a.id === selectedId);
+                      if (!selectedId) {
+                        setFormData({
+                          ...formData,
+                          mae_id: '',
+                          mae: ''
+                        });
+                        return;
+                      }
+
+                      if (selectedId === 'external') {
+                        setFormData({
+                          ...formData,
+                          mae_id: 'external',
+                          mae: formData.mae || ''
+                        });
+                        return;
+                      }
+
+                      setFormData({
+                        ...formData,
+                        mae_id: selectedId,
+                        mae: selectedAnimal ? selectedAnimal.name : ''
+                      });
+                    }}
+                    className="flex-1"
+                  >
+                  <option value="">Selecione ou deixe em branco</option>
+                  {mares.map((mare) => (
+                    <option key={mare.id} value={mare.id}>
+                      {mare.name} {mare.registry_number ? `(${mare.registry_number})` : ''}
+                    </option>
+                  ))}
+                  <option value="external">Outro (Externo/Não cadastrado)</option>
+                </NativeSelect>
+              </div>
+              {formData.mae_id === 'external' && (
+                <input
+                  type="text"
+                  placeholder="Nome da mãe"
+                  value={formData.mae}
+                  onChange={(e) => setFormData({ ...formData, mae: e.target.value })}
+                  className="w-full h-10 px-4 mt-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -364,7 +717,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         {/* Documentos */}
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Documentos</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -417,7 +770,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         {/* Fotos */}
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Fotos e Vídeos</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -508,7 +861,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         {/* Observações */}
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Observações</h2>
-          
+
           <div>
             <label className="block text-sm text-foreground dark:text-white mb-2">
               Observações Gerais
@@ -535,9 +888,11 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
             </button>
             <button
               type="submit"
-              className="px-8 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+              disabled={createAnimalMutation.isPending}
+              className="px-8 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Salvar
+              {createAnimalMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {createAnimalMutation.isPending ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>

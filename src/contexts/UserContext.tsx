@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
 // Roles mantidos conforme o banco: admin, criador, assessor
-export type UserRole = 'admin' | 'criador' | 'assessor' | 'breeder' | 'advisor' | 'employee';
+export type UserRole = 'admin' | 'criador' | 'assessor' | 'acessor' | 'breeder' | 'advisor' | 'employee';
 
 interface UserProfile {
   id: string;

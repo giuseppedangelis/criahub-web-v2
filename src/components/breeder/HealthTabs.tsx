@@ -8,12 +8,11 @@ import { NativeSelect } from '../ui/native-select';
 interface HealthTabsProps {
   animalId: number;
   animalName: string;
-  onRegisterProcedure: () => void;
   onRegisterVaccine: () => void;
   onRegisterExam: () => void;
 }
 
-export function HealthTabs({ animalId, animalName, onRegisterProcedure, onRegisterVaccine, onRegisterExam }: HealthTabsProps) {
+export function HealthTabs({ animalId, animalName, onRegisterVaccine, onRegisterExam }: HealthTabsProps) {
   const [activeSubTab, setActiveSubTab] = useState('dashboard');
 
   const subTabs = [
@@ -66,10 +65,7 @@ export function HealthTabs({ animalId, animalName, onRegisterProcedure, onRegist
         )}
 
         {activeSubTab === 'procedures' && (
-          <HealthTab 
-            animalId={animalId} 
-            onRegisterProcedure={onRegisterProcedure}
-          />
+          <HealthTab animalId={animalId} />
         )}
 
         {activeSubTab === 'vaccines' && (

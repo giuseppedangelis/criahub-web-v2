@@ -1,10 +1,11 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, Users as HorseIcon, Heart, DollarSign, Calendar, HelpCircle, Settings, Moon, Sun, Bell, User, LogOut, UserCog, UserCircle, Plus, Menu, X, FileText } from 'lucide-react';
+import { LayoutDashboard, Users as HorseIcon, Heart, DollarSign, Calendar, Settings, Moon, Sun, Bell, User, Menu, X, FileText, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
+import { UserDropdown } from './shared/UserDropdown';
 import { BreederDashboardContent } from './breeder/BreederDashboardContent';
 import { BreederPlantelContent } from './breeder/BreederPlantelContent';
 import { BreederReproductionContent } from './breeder/BreederReproductionContent';
@@ -35,6 +36,7 @@ export function BreederDashboard() {
   const [showFinancialReportModal, setShowFinancialReportModal] = useState(false);
   const [showHealthReportModal, setShowHealthReportModal] = useState(false);
   const [showNotificationsCenter, setShowNotificationsCenter] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [notifications, setNotifications] = useState([
     { id: 1, title: 'Nova cobertura registrada', message: 'Estrela Mangalarga x Vento Sul', time: '2 min atrás', unread: true },
@@ -92,7 +94,12 @@ export function BreederDashboard() {
   };
 
   const handleLogout = async () => {
-    await logout();
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -307,64 +314,19 @@ export function BreederDashboard() {
 
               {/* User Dropdown */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] md:w-64 max-w-sm bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] z-50">
-                  <div className="p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary dark:bg-white rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-white dark:text-black" />
-                      </div>
-                      <div>
-                        <p className="text-foreground dark:text-white">{userName || 'Usuário'}</p>
-                        <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                          {userEmail || ''}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('profile');
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                    >
-                      <UserCircle className="w-4 h-4" />
-                      Meu Perfil
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('settings');
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                    >
-                      <UserCog className="w-4 h-4" />
-                      Configurações da Conta
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setActiveTab('help');
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      Central de Ajuda
-                    </button>
-                    <div className="border-t border-border dark:border-[rgba(255,255,255,0.1)] my-2"></div>
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-red-500 dark:text-red-400 flex items-center gap-3"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sair
-                    </button>
-                  </div>
-                </div>
+                <UserDropdown
+                  userName={userName}
+                  userEmail={userEmail}
+                  userRole={userRole}
+                  isLoggingOut={isLoggingOut}
+                  onProfileClick={() => setActiveTab('profile')}
+                  onSettingsClick={() => setActiveTab('settings')}
+                  onHelpClick={() => setActiveTab('help')}
+                  onLogout={handleLogout}
+                  onClose={() => setShowUserMenu(false)}
+                  showProfile={true}
+                  showHelp={true}
+                />
               )}
             </div>
           </div>

@@ -25,13 +25,16 @@ interface AwardsDetailModalProps {
 export function AwardsDetailModal({ awards, animalName, onClose }: AwardsDetailModalProps) {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   
+  // Garantir que awards é sempre um array
+  const safeAwards = awards || [];
+  
   // Calcular estatísticas
-  const totalAwards = awards.length;
-  const totalPoints = awards.reduce((sum, award) => sum + (award.points || 0), 0);
+  const totalAwards = safeAwards.length;
+  const totalPoints = safeAwards.reduce((sum, award) => sum + (award.points || 0), 0);
   const averagePoints = totalPoints > 0 ? (totalPoints / totalAwards).toFixed(1) : '0';
   
   // Contar por tipo de colocação
-  const placementCounts = awards.reduce((acc, award) => {
+  const placementCounts = safeAwards.reduce((acc, award) => {
     acc[award.placementType] = (acc[award.placementType] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -170,7 +173,7 @@ export function AwardsDetailModal({ awards, animalName, onClose }: AwardsDetailM
                 </tr>
               </thead>
               <tbody>
-                {awards.map((award) => {
+                {safeAwards.map((award) => {
                   const [year, month, day] = award.date.split('-');
                   const formattedDate = `${day}/${month}/${year}`;
                   
