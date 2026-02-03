@@ -450,6 +450,10 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
         return 'Transferência de Embrião';
       case 'ovulacao':
         return 'Ovulação';
+      case 'diagnostico_gestacao':
+        return 'Diagnóstico de Gestação';
+      case 'aplicacao_p4':
+        return 'Aplicação P4';
       default:
         return 'Evento Reprodutivo';
     }

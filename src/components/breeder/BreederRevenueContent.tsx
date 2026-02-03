@@ -1,55 +1,76 @@
-import { Calendar, Trash2, Edit, ArrowLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { Edit, ArrowLeft, ChevronRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
-
-interface Revenue {
-  id: number;
-  data: string;
-  descricao: string;
-  animal: string;
-  tipo: string;
-  valor: string;
-}
+import { useCreateTransaction, useTransactions } from '@/hooks/useFinancial';
+import type { Animal, TransactionCategory, TransactionType } from '@/types';
+import { formatCurrency, formatCurrencyInput, formatDate, getCategoryLabel, parseCurrencyToNumber, transactionCategoryOptions } from './financialUtils';
+import { toast } from 'sonner';
 
 interface BreederRevenueContentProps {
   onBack: () => void;
+  harasId: string;
+  animals: Animal[];
 }
 
-export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
+export function BreederRevenueContent({ onBack, harasId, animals }: BreederRevenueContentProps) {
   const [formData, setFormData] = useState({
     valor: '',
     data: '',
-    animal: '',
+    animalId: '',
     tipoReceita: '',
     descricao: '',
   });
 
-  const revenues: Revenue[] = [
-    {
-      id: 1,
-      data: '01/01/2024',
-      descricao: 'Venda de potro',
-      animal: 'Relâmpago',
-      tipo: 'Venda de Cavalo',
-      valor: 'R$ 10.000,00',
-    },
-    {
-      id: 2,
-      data: '15/01/2024',
-      descricao: 'Cobertura',
-      animal: 'Trovão',
-      tipo: 'Serviço de Cobertura',
-      valor: 'R$ 3.500,00',
-    },
-    {
-      id: 3,
-      data: '20/01/2024',
-      descricao: 'Venda de embrião',
-      animal: 'Estrela',
-      tipo: 'Venda de Embrião',
-      valor: 'R$ 5.000,00',
-    },
-  ];
+  const { data: transactionsResponse } = useTransactions(
+    { haras_id: harasId, type: 'receita' as TransactionType },
+    { page: 1, limit: 100 },
+    !!harasId
+  );
+  const { mutateAsync: createTransaction, isPending: isCreating } = useCreateTransaction();
+
+  const revenues = useMemo(() => transactionsResponse?.data || [], [transactionsResponse]);
+
+  const handleCreate = async () => {
+    if (!harasId) {
+      toast.error('Haras não identificado');
+      return;
+    }
+
+    if (!formData.valor || !formData.data || !formData.tipoReceita || !formData.descricao) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    const amount = parseCurrencyToNumber(formData.valor);
+    if (!amount || amount <= 0) {
+      toast.error('Informe um valor válido');
+      return;
+    }
+
+    try {
+      await createTransaction({
+        haras_id: harasId,
+        type: 'receita',
+        category: formData.tipoReceita as TransactionCategory,
+        amount,
+        description: formData.descricao,
+        date: formData.data,
+        animal_id: formData.animalId || undefined,
+      });
+
+      toast.success('Receita adicionada com sucesso!');
+      setFormData({
+        valor: '',
+        data: '',
+        animalId: '',
+        tipoReceita: '',
+        descricao: '',
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar receita:', error);
+      toast.error('Erro ao adicionar receita');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -89,7 +110,7 @@ export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
               <input
                 type="text"
                 value={formData.valor}
-                onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, valor: formatCurrencyInput(e.target.value) })}
                 placeholder="0,00"
                 className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
               />
@@ -111,15 +132,16 @@ export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
             <div className="flex-1">
               <label className="block text-sm text-foreground dark:text-white mb-2">Animal Vinculado</label>
               <NativeSelect
-                value={formData.animal}
-                onChange={(e) => setFormData({ ...formData, animal: e.target.value })}
+                value={formData.animalId}
+                onChange={(e) => setFormData({ ...formData, animalId: e.target.value })}
                 className="w-full h-10 bg-[#3a3a3a] border-0 text-white rounded-lg"
               >
                 <option value="">Selecione</option>
-                <option value="trovao">Trovão</option>
-                <option value="estrela">Estrela</option>
-                <option value="relampago">Relâmpago</option>
-                <option value="lua">Lua</option>
+                {animals.map((animal) => (
+                  <option key={animal.id} value={animal.id}>
+                    {animal.name}
+                  </option>
+                ))}
               </NativeSelect>
             </div>
 
@@ -131,11 +153,11 @@ export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
                 className="w-full h-10 bg-[#3a3a3a] border-0 text-white rounded-lg"
               >
                 <option value="">Selecione</option>
-                <option value="venda">Venda de Cavalo</option>
-                <option value="cobertura">Serviço de Cobertura</option>
-                <option value="embriao">Venda de Embrião</option>
-                <option value="pensao">Pensão</option>
-                <option value="outro">Outro</option>
+                {transactionCategoryOptions.receita.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </NativeSelect>
             </div>
           </div>
@@ -155,11 +177,18 @@ export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
 
         {/* Botões */}
         <div className="flex items-center justify-end gap-4 mt-6 pt-4">
-          <button className="px-12 py-2 bg-transparent border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
+          <button
+            className="px-12 py-2 bg-transparent border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
+            onClick={() => setFormData({ valor: '', data: '', animalId: '', tipoReceita: '', descricao: '' })}
+          >
             Cancelar
           </button>
-          <button className="px-12 py-2 bg-white text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity">
-            Adicionar Receita
+          <button
+            onClick={handleCreate}
+            disabled={isCreating}
+            className="px-12 py-2 bg-white text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isCreating ? 'Salvando...' : 'Adicionar Receita'}
           </button>
         </div>
       </div>
@@ -180,23 +209,29 @@ export function BreederRevenueContent({ onBack }: BreederRevenueContentProps) {
 
         {/* Linhas da Tabela */}
         <div className="space-y-4">
-          {revenues.map((revenue) => (
+          {revenues.length > 0 ? (
+            revenues.map((revenue) => (
             <div
               key={revenue.id}
               className="grid grid-cols-[200px_200px_250px_200px_200px_76px] gap-4 items-center bg-muted dark:bg-[#3a3a3a] rounded-lg px-4 py-2"
             >
-              <p className="text-sm text-foreground dark:text-white">{revenue.data}</p>
-              <p className="text-sm text-foreground dark:text-white">{revenue.descricao}</p>
-              <p className="text-sm text-foreground dark:text-white">{revenue.animal}</p>
-              <p className="text-sm text-foreground dark:text-white">{revenue.tipo}</p>
-              <p className="text-sm text-foreground dark:text-white">{revenue.valor}</p>
+              <p className="text-sm text-foreground dark:text-white">{formatDate(revenue.date)}</p>
+              <p className="text-sm text-foreground dark:text-white">{revenue.description}</p>
+              <p className="text-sm text-foreground dark:text-white">{revenue.animal?.name || '-'}</p>
+              <p className="text-sm text-foreground dark:text-white">{getCategoryLabel(revenue.category)}</p>
+              <p className="text-sm text-foreground dark:text-white">{formatCurrency(revenue.amount)}</p>
               <div className="flex justify-center">
                 <button className="text-foreground dark:text-white hover:opacity-70 transition-opacity">
                   <Edit className="w-6 h-6" />
                 </button>
               </div>
             </div>
-          ))}
+          ))
+          ) : (
+            <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+              Nenhuma receita cadastrada.
+            </p>
+          )}
         </div>
       </div>
     </div>

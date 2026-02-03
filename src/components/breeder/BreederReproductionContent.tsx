@@ -2,7 +2,7 @@ import { Eye, Plus, Upload, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { Heart, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
-import { CoberturaDetailsModal, OvuloDetailsModal, EmbriaoDetailsModal, GestacaoDetailsModal, DocumentoViewModal } from './ReproductionModals';
+import { CoberturaDetailsModal, OvuloDetailsModal, EmbriaoDetailsModal, DocumentoViewModal } from './ReproductionModals';
 import { ReproductionAutomationTab } from './ReproductionAutomationTab';
 import { CustomProtocolsTab } from './CustomProtocolsTab';
 import { GestationsTab } from './GestationsTab';
@@ -32,6 +32,7 @@ import {
   useDeleteReproductionProtocol,
   useApplyReproductionProtocol,
   useReproductionProtocolApplications,
+  useCreateReproductiveEvent,
 } from '@/hooks/useReproduction';
 import type { Gestation } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -47,6 +48,10 @@ interface Cobertura {
   data: string;
   veterinario: string;
   status: 'positivo' | 'aguardando' | 'negativo';
+  semenType?: string | null;
+  confirmationDate?: string | null;
+  expectedBirthDate?: string | null;
+  observacoes?: string | null;
 }
 
 interface Ovulo {
@@ -57,6 +62,9 @@ interface Ovulo {
   status: string;
   disponiveis: number;
   qualidade: 'excelente' | 'boa' | 'regular';
+  veterinario?: string | null;
+  metodo?: string | null;
+  observacoes?: string | null;
 }
 
 interface Embriao {
@@ -69,6 +77,9 @@ interface Embriao {
   disponiveis: number;
   grau: 'A' | 'B' | 'C';
   tipo: 'Fresco' | 'Congelado';
+  veterinario?: string | null;
+  metodo?: string | null;
+  observacoes?: string | null;
 }
 
 interface Documento {
@@ -77,6 +88,9 @@ interface Documento {
   tipo: string;
   data: string;
   tamanho: string;
+  url?: string | null;
+  fileType?: string | null;
+  fileName?: string | null;
 }
 
 interface BreederReproductionContentProps {
@@ -96,12 +110,10 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
   const [showCoberturaDetails, setShowCoberturaDetails] = useState(false);
   const [showOvuloDetails, setShowOvuloDetails] = useState(false);
   const [showEmbriaoDetails, setShowEmbriaoDetails] = useState(false);
-  const [showGestacaoDetails, setShowGestacaoDetails] = useState(false);
   const [showDocumentoModal, setShowDocumentoModal] = useState(false);
   const [selectedCobertura, setSelectedCobertura] = useState<Cobertura | null>(null);
   const [selectedOvulo, setSelectedOvulo] = useState<Ovulo | null>(null);
   const [selectedEmbriao, setSelectedEmbriao] = useState<Embriao | null>(null);
-  const [selectedGestacao, setSelectedGestacao] = useState<Cobertura | null>(null);
   const [selectedDocumento, setSelectedDocumento] = useState<Documento | null>(null);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [selectedDeadline, setSelectedDeadline] = useState<any>(null);
@@ -125,7 +137,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
   const { data: ovulesResponse } = useOvules(harasId, { page: 1, limit: 50 }, shouldLoadOvules);
   const { data: embryosResponse } = useEmbryos(harasId, { page: 1, limit: 50 }, shouldLoadEmbryos);
   const { data: documentsData } = useReproductionDocuments(harasId, shouldLoadDocuments);
-  const { data: protocolsData } = useReproductionProtocols(harasId, shouldLoadProtocols);
+  const { data: protocolsData, isLoading: isLoadingProtocols } = useReproductionProtocols(harasId, shouldLoadProtocols);
   const { data: protocolApplications } = useReproductionProtocolApplications(harasId, shouldLoadProtocols);
 
   const { mutateAsync: createCovering } = useCreateCovering();
@@ -138,6 +150,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
   const { mutateAsync: replaceProtocolSteps } = useReplaceReproductionProtocolSteps(harasId);
   const { mutateAsync: deleteProtocol } = useDeleteReproductionProtocol(harasId);
   const { mutateAsync: applyProtocol } = useApplyReproductionProtocol();
+  const { mutateAsync: createReproductiveEvent } = useCreateReproductiveEvent();
 
   const coverings = coveringsResponse?.data || [];
   const reproductiveEvents = eventsResponse?.data || [];
@@ -196,6 +209,10 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
         data: formatDate(covering.event_date),
         veterinario: covering.veterinarian || '-',
         status: coverageStatusFromGestation(gestation),
+        semenType: covering.semen_type ?? null,
+        confirmationDate: gestation?.confirmation_date || null,
+        expectedBirthDate: gestation?.expected_birth_date || null,
+        observacoes: covering.observations ?? null,
       };
     });
   }, [coverings, gestationsByCovering]);
@@ -209,6 +226,9 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       status: ovule.status || 'Congelado',
       disponiveis: ovule.available,
       qualidade: ovule.quality || 'regular',
+      veterinario: ovule.veterinarian ?? null,
+      metodo: ovule.method ?? null,
+      observacoes: ovule.observations ?? null,
     }));
   }, [ovules]);
 
@@ -223,6 +243,9 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       disponiveis: embryo.available,
       grau: embryo.grade || 'C',
       tipo: embryo.storage_type || 'Congelado',
+      veterinario: embryo.veterinarian ?? null,
+      metodo: embryo.method ?? null,
+      observacoes: embryo.observations ?? null,
     }));
   }, [embryos]);
 
@@ -233,6 +256,9 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       tipo: doc.document_type,
       data: formatDate(doc.created_at),
       tamanho: formatFileSize(typeof doc.file_size === 'string' ? Number(doc.file_size) : doc.file_size),
+      url: doc.file_url,
+      fileType: doc.file_type,
+      fileName: doc.file_name,
     }));
   }, [documentsData]);
 
@@ -492,6 +518,52 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
     }
   };
 
+  const createAgendaEventForCovering = async (data: {
+    mareId: string;
+    stallionId: string;
+    date: string;
+    tipo: string;
+    veterinario?: string;
+  }) => {
+    if (!harasId) return;
+
+    const mareName = maresData?.find((mare) => mare.id === data.mareId)?.name || 'Égua';
+    const stallionName = stallionsData?.find((stallion) => stallion.id === data.stallionId)?.name || 'Garanhão';
+    const title = `Cobertura - ${mareName} x ${stallionName}`;
+    const description = `${data.tipo}${data.veterinario ? ` • Vet: ${data.veterinario}` : ''}`;
+    const startDate = `${data.date}T09:00:00`;
+
+    try {
+      const details = {
+        category: 'cobertura',
+        categoryLabel: 'Cobertura',
+        categoryColor: 'bg-red-500',
+        time: '09:00',
+        veterinarian: data.veterinario || undefined,
+        relatedAnimalIds: [data.mareId, data.stallionId].filter(Boolean),
+      };
+
+      const { error } = await supabase.from('events').insert({
+        haras_id: harasId,
+        titulo: title,
+        tipo: 'Serviço',
+        data_inicio: startDate,
+        descricao: description,
+        animal_id: data.mareId,
+        status: 'Pendente',
+        auto_gerado: true,
+        origem: 'reproducao',
+        observacoes: JSON.stringify(details),
+      });
+
+      if (error) {
+        console.error('Erro ao criar evento na agenda:', error);
+      }
+    } catch (agendaError) {
+      console.error('Erro ao criar evento na agenda:', agendaError);
+    }
+  };
+
   const sanitizeFileName = (value: string) =>
     value
       .trim()
@@ -676,15 +748,23 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       {/* Content */}
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
         {/* FASE 42: Tab Sequência Automática */}
-        {activeTab === 'automacao' && (
-          <ReproductionAutomationTab onNavigateToAgenda={onNavigateToAgenda} events={reproductiveEvents} />
-        )}
+          {activeTab === 'automacao' && (
+            <ReproductionAutomationTab
+              onNavigateToAgenda={onNavigateToAgenda}
+              events={reproductiveEvents}
+              harasId={harasId}
+              mares={maresData || []}
+              onCreateEvent={createReproductiveEvent}
+              onConfirmGestation={handleConfirmGestation}
+            />
+          )}
 
         {activeTab === 'protocolos' && (
           <CustomProtocolsTab
             protocols={protocolsData || []}
             applications={protocolApplications || []}
             animals={protocolAnimals}
+            isLoading={isLoadingProtocols}
             onCreateProtocol={handleCreateProtocol}
             onUpdateProtocol={handleUpdateProtocol}
             onDeleteProtocol={handleDeleteProtocol}
@@ -877,16 +957,6 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
         />
       )}
 
-      {showGestacaoDetails && selectedGestacao && (
-        <GestacaoDetailsModal 
-          gestacao={selectedGestacao} 
-          onClose={() => {
-            setShowGestacaoDetails(false);
-            setSelectedGestacao(null);
-          }} 
-        />
-      )}
-
       {showDocumentoModal && selectedDocumento && (
         <DocumentoViewModal 
           documento={selectedDocumento} 
@@ -928,6 +998,13 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
                 type: data.tipo,
                 veterinarian: data.veterinario,
                 observations: data.observacoes,
+              });
+              await createAgendaEventForCovering({
+                mareId: data.mareId,
+                stallionId: data.stallionId,
+                date: data.data,
+                tipo: data.tipo,
+                veterinario: data.veterinario,
               });
               toast.success('Cobertura registrada com sucesso!');
               setShowRegisterCoberturaModal(false);

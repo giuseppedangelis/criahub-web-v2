@@ -16,6 +16,7 @@ export const healthKeys = {
     vaccinesByAnimal: (animalId: string) => [...healthKeys.vaccines(), { animalId }] as const,
     exams: () => [...healthKeys.all, 'exams'] as const,
     examsByAnimal: (animalId: string) => [...healthKeys.exams(), { animalId }] as const,
+    summary: (harasId: string) => [...healthKeys.all, 'summary', harasId] as const,
 }
 
 export function useAnimalHealthRecords(animalId: string) {
@@ -72,5 +73,13 @@ export function useCreateExam() {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: healthKeys.examsByAnimal(data.animal_id) })
         },
+    })
+}
+
+export function useHealthSummary(harasId: string) {
+    return useQuery({
+        queryKey: healthKeys.summary(harasId),
+        queryFn: () => healthService.getHealthSummary(harasId),
+        enabled: !!harasId,
     })
 }

@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { X, ChevronLeft, MapPin, Link as LinkIcon, Trophy, Calendar, Clock, Plus, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal, CreateAgendaEventInput } from '@/types';
+import { eventCategories, resolveAgendaType } from './agendaUtils';
 
 interface AddPublicEventModalProps {
   onClose: () => void;
   onBack?: () => void;
+  onCreate: (input: CreateAgendaEventInput) => Promise<void> | void;
+  harasId: string;
+  animals: Animal[];
+  isSaving?: boolean;
 }
 
-export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProps) {
+export function AddPublicEventModal({ onClose, onBack, onCreate, harasId, animals, isSaving = false }: AddPublicEventModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -27,31 +33,13 @@ export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProp
   const [selectedAnimals, setSelectedAnimals] = useState<string[]>([]);
   const [reminders, setReminders] = useState<string[]>(['1 dia antes']);
 
-  const eventCategories = [
-    { value: 'pista', label: 'Pista/Prova de Marcha', color: 'bg-blue-500' },
-    { value: 'exposicao', label: 'Exposição', color: 'bg-purple-500' },
-    { value: 'leilao', label: 'Leilão', color: 'bg-green-500' },
-    { value: 'copa', label: 'Copa', color: 'bg-yellow-500' },
-    { value: 'torneio', label: 'Torneio', color: 'bg-red-500' },
-    { value: 'feira', label: 'Feira Agropecuária', color: 'bg-orange-500' },
-    { value: 'outro', label: 'Outro', color: 'bg-gray-500' },
-  ];
-
-  const availableAnimals = [
-    { id: '1', name: 'Trovão', registry: 'ABCCMM 1234567-01' },
-    { id: '2', name: 'Ventania', registry: 'ABCCMM 1234567-02' },
-    { id: '3', name: 'Estrela', registry: 'ABCCMM 1234567-03' },
-    { id: '4', name: 'Relâmpago Negro', registry: 'ABCCMM 1234567-10' },
-    { id: '5', name: 'Estrela Dourada', registry: 'ABCCMM 1234567-11' },
-  ];
-
   const brazilianStates = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
     'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
     'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.title || !formData.category || !formData.date || !formData.time) {
@@ -59,8 +47,48 @@ export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProp
       return;
     }
 
-    toast.success('Evento público cadastrado com sucesso!');
-    onClose();
+    const category = eventCategories.find((item) => item.value === formData.category);
+    const startDate = `${formData.date}T${formData.time}:00`;
+    const resolvedEndDate = formData.endDate || (formData.endTime ? formData.date : '');
+    const endDate = resolvedEndDate
+      ? `${resolvedEndDate}T${formData.endTime || formData.time}:00`
+      : undefined;
+    const primaryAnimalId = selectedAnimals[0];
+
+    const payload: CreateAgendaEventInput = {
+      haras_id: harasId,
+      title: formData.title,
+      type: resolveAgendaType('events'),
+      start_date: startDate,
+      end_date: endDate,
+      description: formData.description,
+      location: formData.location || undefined,
+      status: 'Pendente',
+      animal_id: primaryAnimalId,
+      responsible: formData.organizer || undefined,
+      details: {
+        category: formData.category,
+        categoryLabel: category?.label,
+        categoryColor: category?.color,
+        time: formData.time,
+        endTime: formData.endTime || undefined,
+        city: formData.city || undefined,
+        state: formData.state || undefined,
+        organizer: formData.organizer || undefined,
+        link: formData.link || undefined,
+        reminders,
+        relatedAnimalIds: selectedAnimals,
+      },
+    };
+
+    try {
+      await onCreate(payload);
+      toast.success('Evento público cadastrado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao criar evento público:', error);
+      toast.error('Erro ao cadastrar evento público');
+    }
   };
 
   const toggleAnimal = (animalId: string) => {
@@ -290,7 +318,7 @@ export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProp
           <div className="space-y-4">
             <h3 className="text-foreground dark:text-white">Animais Participantes</h3>
             <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-4 max-h-60 overflow-y-auto">
-              {availableAnimals.map(animal => (
+              {animals.map(animal => (
                 <label
                   key={animal.id}
                   className="flex items-center gap-3 p-3 hover:bg-muted dark:hover:bg-[#1a1a1a] rounded-lg cursor-pointer transition-colors"
@@ -303,7 +331,7 @@ export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProp
                   />
                   <div>
                     <p className="text-foreground dark:text-white">{animal.name}</p>
-                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{animal.registry}</p>
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{animal.registry_number}</p>
                   </div>
                 </label>
               ))}
@@ -369,9 +397,10 @@ export function AddPublicEventModal({ onClose, onBack }: AddPublicEventModalProp
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+              disabled={isSaving}
+              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Cadastrar Evento
+              {isSaving ? 'Salvando...' : 'Cadastrar Evento'}
             </button>
           </div>
         </form>

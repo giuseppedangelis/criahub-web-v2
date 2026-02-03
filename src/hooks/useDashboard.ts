@@ -21,7 +21,13 @@ interface UseDashboardReturn {
     refetch: () => Promise<void>;
 }
 
-export function useDashboard(harasId?: string): UseDashboardReturn {
+interface DashboardOptions {
+    months?: number;
+    eventsLimit?: number;
+    activitiesLimit?: number;
+}
+
+export function useDashboard(harasId?: string, options: DashboardOptions = {}): UseDashboardReturn {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
     const [pelagemDistribution, setPelagemDistribution] = useState<PelagemDistribution[]>([]);
@@ -76,6 +82,10 @@ export function useDashboard(harasId?: string): UseDashboardReturn {
         fetchHarasId();
     }, [harasId]);
 
+    const months = Math.max(1, options.months ?? 6);
+    const eventsLimit = options.eventsLimit ?? 5;
+    const activitiesLimit = options.activitiesLimit ?? 5;
+
     const fetchData = useCallback(async () => {
         if (!currentHarasId) {
             setIsLoading(false);
@@ -98,10 +108,10 @@ export function useDashboard(harasId?: string): UseDashboardReturn {
                 dashboardService.getStats(currentHarasId),
                 dashboardService.getCategoryDistribution(currentHarasId),
                 dashboardService.getPelagemDistribution(currentHarasId),
-                dashboardService.getGrowthData(currentHarasId, 6),
+                dashboardService.getGrowthData(currentHarasId, months),
                 dashboardService.getAgeDistribution(currentHarasId),
-                dashboardService.getUpcomingEvents(currentHarasId, 5),
-                dashboardService.getRecentActivities(currentHarasId, 5)
+                dashboardService.getUpcomingEvents(currentHarasId, eventsLimit),
+                dashboardService.getRecentActivities(currentHarasId, activitiesLimit)
             ]);
 
             setStats(statsData);
@@ -117,7 +127,7 @@ export function useDashboard(harasId?: string): UseDashboardReturn {
         } finally {
             setIsLoading(false);
         }
-    }, [currentHarasId]);
+    }, [currentHarasId, months, eventsLimit, activitiesLimit]);
 
     useEffect(() => {
         if (currentHarasId) {

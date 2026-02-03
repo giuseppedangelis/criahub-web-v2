@@ -1,12 +1,33 @@
-import { useState } from 'react';
-import { Heart, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Heart, Search, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { NativeSelect } from '../ui/native-select';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useCreateAgendaEvent } from '@/hooks/useEvents';
+import type { AgendaEventDetails, AgendaEventType } from '@/types';
 
 interface AddEventFormProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export function AddEventForm({ onClose }: AddEventFormProps) {
+const EVENT_TYPES: AgendaEventType[] = [
+  'Serviço',
+  'Evento',
+  'Veterinário',
+  'Casqueamento',
+  'Dentista',
+  'Aplicação P4',
+  'Coleta Embrião',
+  'Diagnóstico Gestação',
+  'Outro',
+];
+
+export function AddEventForm({ onClose, onSuccess }: AddEventFormProps) {
+  const { data: currentHaras } = useCurrentHaras();
+  const harasId = currentHaras?.id || '';
+  const { mutateAsync: createEvent, isPending: isSubmitting } = useCreateAgendaEvent();
   const [formData, setFormData] = useState({
     title: '',
     type: '',
@@ -18,21 +39,33 @@ export function AddEventForm({ onClose }: AddEventFormProps) {
   });
 
   const [searchAnimal, setSearchAnimal] = useState('');
-  const [selectedAnimals, setSelectedAnimals] = useState<Array<{ id: number; name: string; registration: string }>>([]);
+  const [selectedAnimals, setSelectedAnimals] = useState<Array<{ id: string; name: string; registration: string }>>([]);
 
-  // Animais mockados
-  const mockAnimals = [
-    { id: 1, name: 'Relâmpago', registration: 'ABCCMM 1234567-89' },
-    { id: 2, name: 'Estrela', registration: 'ABCCMM 1234567-89' },
-    { id: 3, name: 'Trovão', registration: 'ABCCMM 1234567-90' },
-    { id: 4, name: 'Lua', registration: 'ABCCMM 1234567-91' },
-  ];
-
-  const filteredAnimals = mockAnimals.filter(animal => 
-    animal.name.toLowerCase().includes(searchAnimal.toLowerCase())
+  const { data: animalsPage, isLoading: isLoadingAnimals } = useAnimals(
+    { haras_id: harasId || undefined, search: searchAnimal || undefined },
+    { page: 1, limit: 20 },
+    !!harasId
   );
 
-  const toggleAnimal = (animal: typeof mockAnimals[0]) => {
+  const filteredAnimals = useMemo(() => {
+    const animals = animalsPage?.data ?? [];
+    return animals
+      .filter((animal) => {
+        if (!searchAnimal) return true;
+        const query = searchAnimal.toLowerCase();
+        return (
+          animal.name?.toLowerCase().includes(query) ||
+          animal.registry_number?.toLowerCase().includes(query)
+        );
+      })
+      .map((animal) => ({
+        id: animal.id,
+        name: animal.name || 'Sem nome',
+        registration: animal.registry_number || 'Sem registro',
+      }));
+  }, [animalsPage?.data, searchAnimal]);
+
+  const toggleAnimal = (animal: { id: string; name: string; registration: string }) => {
     if (selectedAnimals.find(a => a.id === animal.id)) {
       setSelectedAnimals(selectedAnimals.filter(a => a.id !== animal.id));
     } else {
@@ -40,16 +73,68 @@ export function AddEventForm({ onClose }: AddEventFormProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.type || !formData.date || !formData.time) {
       toast.error('Preencha todos os campos obrigatórios!');
       return;
     }
+    if (!harasId) {
+      toast.error('Haras não encontrado.');
+      return;
+    }
+    if (!EVENT_TYPES.includes(formData.type as AgendaEventType)) {
+      toast.error('Selecione um tipo de evento válido.');
+      return;
+    }
 
-    toast.success('Evento cadastrado com sucesso!');
-    onClose();
+    const startDate = new Date(`${formData.date}T${formData.time}`);
+    if (Number.isNaN(startDate.getTime())) {
+      toast.error('Data ou hora inválida.');
+      return;
+    }
+
+    const details: AgendaEventDetails = {};
+    if (selectedAnimals.length > 0) {
+      details.relatedAnimalIds = selectedAnimals.map((animal) => animal.id);
+    }
+    if (formData.notifyPartners) {
+      (details as any).notifyPartners = true;
+    }
+
+    const payloadBase = {
+      haras_id: harasId,
+      title: formData.title,
+      type: formData.type as AgendaEventType,
+      start_date: startDate.toISOString(),
+      status: 'Pendente' as const,
+      responsible: formData.responsible || undefined,
+      observations: formData.observations || undefined,
+      details: Object.keys(details).length > 0 ? details : undefined,
+    };
+
+    try {
+      if (selectedAnimals.length > 0) {
+        await Promise.all(
+          selectedAnimals.map((animal) =>
+            createEvent({
+              ...payloadBase,
+              animal_id: animal.id,
+            })
+          )
+        );
+      } else {
+        await createEvent(payloadBase);
+      }
+
+      toast.success('Evento cadastrado com sucesso!');
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao cadastrar evento:', error);
+      toast.error(error.message || 'Erro ao cadastrar evento.');
+    }
   };
 
   return (
@@ -87,13 +172,16 @@ export function AddEventForm({ onClose }: AddEventFormProps) {
 
               <div className="space-y-2">
                 <label className="text-sm text-foreground dark:text-white">Tipo de Evento</label>
-                <input
-                  type="text"
+                <NativeSelect
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  placeholder="Tipo de Evento"
-                  className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-                />
+                  className="w-full h-10 px-4 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#6b6b6b] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                >
+                  <option value="">Selecione o tipo</option>
+                  {EVENT_TYPES.map((eventType) => (
+                    <option key={eventType} value={eventType}>{eventType}</option>
+                  ))}
+                </NativeSelect>
               </div>
             </div>
 
@@ -157,7 +245,18 @@ export function AddEventForm({ onClose }: AddEventFormProps) {
 
             {/* Lista de Animais */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredAnimals.slice(0, 2).map((animal) => (
+              {isLoadingAnimals && (
+                <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground dark:text-[#99a1af]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Carregando animais...
+                </div>
+              )}
+              {!isLoadingAnimals && filteredAnimals.length === 0 && (
+                <p className="col-span-full text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Nenhum animal encontrado.
+                </p>
+              )}
+              {!isLoadingAnimals && filteredAnimals.slice(0, 4).map((animal) => (
                 <div
                   key={animal.id}
                   onClick={() => toggleAnimal(animal)}
@@ -213,9 +312,11 @@ export function AddEventForm({ onClose }: AddEventFormProps) {
             </button>
             <button
               type="submit"
-              className="px-12 py-3 bg-primary dark:bg-white text-white dark:text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity"
+              disabled={isSubmitting}
+              className="px-12 py-3 bg-primary dark:bg-white text-white dark:text-[#1a1a1a] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Salvar
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </form>

@@ -13,6 +13,14 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
   const [showCadastrarAnimal, setShowCadastrarAnimal] = useState(false);
   const [timeRange, setTimeRange] = useState('6months');
 
+  const rangeMonths = timeRange === '3months'
+    ? 3
+    : timeRange === '12months'
+      ? 12
+      : timeRange === 'all'
+        ? 24
+        : 6;
+
   // Hook para buscar dados reais do dashboard
   const {
     stats,
@@ -23,8 +31,9 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
     upcomingEvents,
     recentActivities,
     isLoading,
-    hasNoHaras
-  } = useDashboard();
+    hasNoHaras,
+    refetch,
+  } = useDashboard(undefined, { months: rangeMonths });
 
   // Dados de fallback para quando não há dados reais
   const defaultCategoryData = [
@@ -54,6 +63,21 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
     { month: 'Nov/24', total: 0, machos: 0, femeas: 0 },
     { month: 'Dez/24', total: 0, machos: 0, femeas: 0 },
   ];
+
+  const latestGrowth = plantelGrowthData[plantelGrowthData.length - 1]?.total ?? 0;
+  const previousGrowth = plantelGrowthData[plantelGrowthData.length - 2]?.total ?? 0;
+  const growthDelta = previousGrowth > 0 ? ((latestGrowth - previousGrowth) / previousGrowth) * 100 : 0;
+  const animalChangeLabel = previousGrowth > 0
+    ? `${growthDelta >= 0 ? '+' : ''}${growthDelta.toFixed(1)}%`
+    : '0%';
+
+  const hasFinancials = (stats?.monthlyRevenue ?? 0) > 0 || (stats?.monthlyExpenses ?? 0) > 0;
+  const revenueTrend = hasFinancials && (stats?.monthlyRevenue ?? 0) < (stats?.monthlyExpenses ?? 0) ? 'down' : 'up';
+  const revenueChangeLabel = hasFinancials
+    ? (stats?.monthlyRevenue ?? 0) >= (stats?.monthlyExpenses ?? 0)
+      ? 'Positivo'
+      : 'Negativo'
+    : '0%';
 
   if (showCadastrarAnimal) {
     return <BreederCadastrarAnimal onBack={() => setShowCadastrarAnimal(false)} />;
@@ -130,8 +154,8 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
             <KPICard
               label="Total de Animais"
               value={stats?.totalAnimals?.toString() || '0'}
-              change={stats?.totalAnimals && stats.totalAnimals > 0 ? '+3.2%' : '0%'}
-              trend="up"
+              change={animalChangeLabel}
+              trend={growthDelta < 0 ? 'down' : 'up'}
               icon={Users}
               color="text-primary dark:text-white"
               bgColor="bg-primary/10 dark:bg-white/10"
@@ -140,8 +164,8 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
             <KPICard
               label="Receita Mensal"
               value={`R$ ${(stats?.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
-              change={stats?.monthlyRevenue && stats.monthlyRevenue > 0 ? '+5.1%' : '0%'}
-              trend="up"
+              change={revenueChangeLabel}
+              trend={revenueTrend}
               icon={DollarSign}
               color="text-green-600 dark:text-green-400"
               bgColor="bg-green-500/10"
@@ -476,11 +500,23 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
 
       {/* Modals */}
       {showAddCollaboratorModal && (
-        <AddCollaboratorForm onClose={() => setShowAddCollaboratorModal(false)} />
+        <AddCollaboratorForm
+          onClose={() => setShowAddCollaboratorModal(false)}
+          onSuccess={() => {
+            setShowAddCollaboratorModal(false);
+            refetch();
+          }}
+        />
       )}
 
       {showNewEventModal && (
-        <AddEventForm onClose={() => setShowNewEventModal(false)} />
+        <AddEventForm
+          onClose={() => setShowNewEventModal(false)}
+          onSuccess={() => {
+            setShowNewEventModal(false);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

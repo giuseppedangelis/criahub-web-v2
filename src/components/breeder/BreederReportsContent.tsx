@@ -1,5 +1,8 @@
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { useMemo } from 'react';
+import { useFinancialSummary, useMonthlyFinancialData, useTransactions } from '@/hooks/useFinancial';
+import { formatCurrency, getCategoryLabel } from './financialUtils';
 
 interface AnimalReport {
   animal: string;
@@ -10,35 +13,74 @@ interface AnimalReport {
 
 interface BreederReportsContentProps {
   onBack: () => void;
+  harasId: string;
 }
 
-export function BreederReportsContent({ onBack }: BreederReportsContentProps) {
-  const animalReports: AnimalReport[] = [
-    { animal: 'Relâmpago', receita: 'R$ 15.000,00', custo: 'R$ 8.000,00', lucro: 'R$ 7.000,00' },
-    { animal: 'Trovão', receita: 'R$ 12.500,00', custo: 'R$ 6.500,00', lucro: 'R$ 6.000,00' },
-    { animal: 'Estrela', receita: 'R$ 10.000,00', custo: 'R$ 5.000,00', lucro: 'R$ 5.000,00' },
-    { animal: 'Lua', receita: 'R$ 8.000,00', custo: 'R$ 4.200,00', lucro: 'R$ 3.800,00' },
-    { animal: 'Íris', receita: 'R$ 9.500,00', custo: 'R$ 4.800,00', lucro: 'R$ 4.700,00' },
-    { animal: 'Sol', receita: 'R$ 11.200,00', custo: 'R$ 5.500,00', lucro: 'R$ 5.700,00' },
-  ];
+export function BreederReportsContent({ onBack, harasId }: BreederReportsContentProps) {
+  const { data: summary } = useFinancialSummary(harasId);
+  const currentYear = new Date().getFullYear();
+  const { data: monthlyData } = useMonthlyFinancialData(harasId, currentYear);
+  const { data: transactionsResponse } = useTransactions(
+    { haras_id: harasId },
+    { page: 1, limit: 500 },
+    !!harasId
+  );
 
-  const categoryData = [
-    { name: 'Alimentação', valor: 12 },
-    { name: 'Veterinário', valor: 15 },
-    { name: 'Medicamentos', valor: 13 },
-    { name: 'Folha de Pagamento', valor: 10 },
-    { name: 'Serviços', valor: 13 },
-    { name: 'Manutenção', valor: 16 },
-  ];
+  const animalReports: AnimalReport[] = useMemo(() => {
+    const transactions = transactionsResponse?.data || [];
+    const grouped: Record<string, { revenue: number; expenses: number }> = {};
 
-  const cashFlowData = [
-    { name: 'Jan', valor: 5 },
-    { name: 'Fev', valor: 12 },
-    { name: 'Mar', valor: 8 },
-    { name: 'Abr', valor: 15 },
-    { name: 'Mai', valor: 7 },
-    { name: 'Jun', valor: 18 },
-  ];
+    transactions.forEach((transaction) => {
+      const animalName = transaction.animal?.name;
+      if (!animalName) return;
+      if (!grouped[animalName]) grouped[animalName] = { revenue: 0, expenses: 0 };
+
+      if (transaction.type === 'receita') {
+        grouped[animalName].revenue += transaction.amount;
+      } else {
+        grouped[animalName].expenses += transaction.amount;
+      }
+    });
+
+    return Object.entries(grouped)
+      .map(([animal, values]) => ({
+        animal,
+        revenue: values.revenue,
+        expenses: values.expenses,
+        net: values.revenue - values.expenses,
+      }))
+      .sort((a, b) => b.net - a.net)
+      .slice(0, 8)
+      .map((entry) => ({
+        animal: entry.animal,
+        receita: formatCurrency(entry.revenue),
+        custo: formatCurrency(entry.expenses),
+        lucro: formatCurrency(entry.net),
+      }));
+  }, [transactionsResponse]);
+
+  const categoryData = useMemo(() => {
+    const expenses = summary?.expensesByCategory || {};
+    return Object.entries(expenses)
+      .map(([category, amount]) => ({
+        name: getCategoryLabel(category),
+        valor: Number(amount) || 0,
+      }))
+      .filter((item) => item.valor > 0);
+  }, [summary]);
+
+  const cashFlowData = useMemo(() => {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return months.map((label, index) => {
+      const entry = monthlyData?.find((item) => item.month === index + 1);
+      const revenue = entry?.revenue || 0;
+      const expenses = entry?.expenses || 0;
+      return {
+        name: label,
+        valor: revenue - expenses,
+      };
+    });
+  }, [monthlyData]);
 
   return (
     <div className="space-y-6">
@@ -81,17 +123,23 @@ export function BreederReportsContent({ onBack }: BreederReportsContentProps) {
 
           {/* Linhas da Tabela */}
           <div className="space-y-4">
-            {animalReports.map((report, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-4 gap-4 items-center bg-muted dark:bg-[#3a3a3a] rounded-lg px-4 py-2"
-              >
-                <p className="text-sm text-foreground dark:text-white">{report.animal}</p>
-                <p className="text-sm text-foreground dark:text-white">{report.receita}</p>
-                <p className="text-sm text-foreground dark:text-white">{report.custo}</p>
-                <p className="text-sm text-foreground dark:text-white">{report.lucro}</p>
-              </div>
-            ))}
+            {animalReports.length > 0 ? (
+              animalReports.map((report, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-4 gap-4 items-center bg-muted dark:bg-[#3a3a3a] rounded-lg px-4 py-2"
+                >
+                  <p className="text-sm text-foreground dark:text-white">{report.animal}</p>
+                  <p className="text-sm text-foreground dark:text-white">{report.receita}</p>
+                  <p className="text-sm text-foreground dark:text-white">{report.custo}</p>
+                  <p className="text-sm text-foreground dark:text-white">{report.lucro}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                Nenhum dado financeiro por animal.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -126,6 +174,11 @@ export function BreederReportsContent({ onBack }: BreederReportsContentProps) {
               <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          {categoryData.length === 0 && (
+            <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-4">
+              Nenhuma despesa registrada.
+            </p>
+          )}
         </div>
       </div>
 

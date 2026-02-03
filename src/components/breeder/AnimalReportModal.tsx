@@ -1,13 +1,24 @@
-import { useState } from 'react';
-import { X, FileText, Download, Printer, Check } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { X, FileText, Download, Check } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
+import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useHaras } from '@/hooks/useHaras';
+import { useCreateReport } from '@/hooks/useReports';
+import type { ReportFormat, ReportType } from '@/types';
+import { uploadReportFile } from '@/services/reportFiles';
 
 interface AnimalReportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  reportType?: ReportType;
 }
 
-export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
+export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: AnimalReportModalProps) {
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+  const { data: haras } = useHaras(harasId);
   const [selectedAnimal, setSelectedAnimal] = useState('');
   const [reportSections, setReportSections] = useState({
     dadosBasicos: true,
@@ -25,14 +36,25 @@ export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
   const [includeImages, setIncludeImages] = useState(true);
   const [pageOrientation, setPageOrientation] = useState('portrait');
 
-  // Lista de animais mock
-  const animals = [
-    { id: 1, name: 'Ventania da Serra', registry: 'MM-12345' },
-    { id: 2, name: 'Relâmpago Dourado', registry: 'MM-23456' },
-    { id: 3, name: 'Estrela do Vale', registry: 'MM-34567' },
-    { id: 4, name: 'Trovão da Mata', registry: 'MM-45678' },
-    { id: 5, name: 'Aurora Campeira', registry: 'MM-56789' },
-  ];
+  const { data: animalsResponse, isLoading: isLoadingAnimals } = useAnimals(
+    { haras_id: harasId },
+    { page: 1, limit: 200 },
+    !!harasId
+  );
+  const animals = animalsResponse?.data || [];
+  const { mutateAsync: createReport, isPending: isCreating } = useCreateReport();
+
+  const selectedAnimalData = useMemo(
+    () => animals.find((animal) => animal.id === selectedAnimal),
+    [animals, selectedAnimal]
+  );
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleDateString('pt-BR');
+  };
 
   const handleToggleSection = (section: keyof typeof reportSections) => {
     setReportSections(prev => ({
@@ -50,14 +72,117 @@ export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
     setReportSections(newState);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedAnimal) {
-      alert('Por favor, selecione um animal');
+      toast.error('Por favor, selecione um animal');
       return;
     }
-    // Aqui seria a lógica de geração do relatório
-    console.log('Gerando relatório:', { selectedAnimal, reportSections, reportFormat });
-    onClose();
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    const baseName = reportType === 'premiacoes'
+      ? 'Relatório de Premiações'
+      : 'Relatório Individual';
+    const reportName = selectedAnimalData
+      ? `${baseName} - ${selectedAnimalData.name}`
+      : baseName;
+
+    try {
+      const selectedSections = sections
+        .filter((section) => reportSections[section.key as keyof typeof reportSections])
+        .map((section) => section.label);
+
+      const reportPayload = {
+        reportType,
+        meta: {
+          title: reportName,
+          subtitle: reportType === 'premiacoes'
+            ? 'Histórico completo de conquistas e premiações'
+            : 'Ficha completa do animal com dados principais',
+          harasName: haras?.name || 'Haras',
+          harasLocation: [haras?.city, haras?.state].filter(Boolean).join(' • '),
+          author: profile?.full_name || profile?.email || 'Equipe CriaHub',
+          generatedAt: new Date().toISOString(),
+          periodLabel: 'Atual',
+          orientation: pageOrientation === 'landscape' ? 'landscape' : 'portrait',
+        },
+        heroImageUrl: includeImages ? selectedAnimalData?.main_image_url || undefined : undefined,
+        tags: [
+          reportType === 'premiacoes' ? 'Premiações' : 'Animal',
+          selectedAnimalData?.status || '',
+          selectedAnimalData?.category || '',
+        ].filter(Boolean),
+        summary: [
+          { label: 'Animal', value: selectedAnimalData?.name || '-' },
+          { label: 'Registro', value: selectedAnimalData?.registry_number || '-' },
+          { label: 'Sexo', value: selectedAnimalData?.sex || '-' },
+          { label: 'Categoria', value: selectedAnimalData?.category || '-' },
+          { label: 'Nascimento', value: formatDate(selectedAnimalData?.birth_date) },
+          { label: 'Status', value: selectedAnimalData?.status || '-', tone: selectedAnimalData?.status === 'ativo' ? 'success' : 'warning' },
+        ],
+        sections: [
+          {
+            title: 'Ficha do Animal',
+            description: 'Dados principais do animal registrado no sistema.',
+            table: {
+              headers: ['Campo', 'Valor'],
+              rows: [
+                ['Nome', selectedAnimalData?.name || '-'],
+                ['Registro', selectedAnimalData?.registry_number || '-'],
+                ['Sexo', selectedAnimalData?.sex || '-'],
+                ['Categoria', selectedAnimalData?.category || '-'],
+                ['Nascimento', formatDate(selectedAnimalData?.birth_date)],
+                ['Pelagem', selectedAnimalData?.coat_color || '-'],
+                ['Localização', selectedAnimalData?.location || '-'],
+                ['Status', selectedAnimalData?.status || '-'],
+              ],
+            },
+          },
+          {
+            title: 'Seções selecionadas',
+            description: 'Conteúdos que serão incluídos no relatório detalhado.',
+            bullets: selectedSections,
+          },
+          {
+            title: 'Configurações',
+            bullets: [
+              `Imagens em alta qualidade: ${includeImages ? 'Sim' : 'Não'}`,
+              `Orientação: ${pageOrientation === 'landscape' ? 'Paisagem' : 'Retrato'}`,
+            ],
+          },
+        ],
+      };
+
+      const { fileUrl, sizeBytes, storedFormat, notice } = await uploadReportFile({
+        harasId,
+        reportName,
+        format: reportFormat as ReportFormat,
+        payload: reportPayload,
+        reportType,
+      });
+
+      if (notice) {
+        toast.message(notice);
+      }
+
+      await createReport({
+        haras_id: harasId,
+        name: reportName,
+        type: reportType,
+        format: storedFormat,
+        created_by: profile?.id,
+        file_url: fileUrl,
+        size_bytes: sizeBytes,
+        parameters: reportPayload,
+      });
+      toast.success('Relatório solicitado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast.error('Erro ao gerar relatório.');
+    }
   };
 
   const sections = [
@@ -83,9 +208,13 @@ export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)] sticky top-0 bg-card dark:bg-[#1a1a1a] z-10">
           <div>
-            <h3 className="text-xl text-foreground dark:text-white">Relatório Individual de Animal</h3>
+            <h3 className="text-xl text-foreground dark:text-white">
+              {reportType === 'premiacoes' ? 'Relatório de Premiações' : 'Relatório Individual de Animal'}
+            </h3>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-              Gere um relatório completo de um animal específico
+              {reportType === 'premiacoes'
+                ? 'Gere um relatório de conquistas e premiações por animal'
+                : 'Gere um relatório completo de um animal específico'}
             </p>
           </div>
           <button
@@ -109,9 +238,12 @@ export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
               className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
             >
               <option value="">Selecione um animal</option>
+              {isLoadingAnimals && (
+                <option value="" disabled>Carregando animais...</option>
+              )}
               {animals.map(animal => (
                 <option key={animal.id} value={animal.id}>
-                  {animal.name} - {animal.registry}
+                  {animal.name} - {animal.registry_number || '-'}
                 </option>
               ))}
             </NativeSelect>
@@ -258,11 +390,11 @@ export function AnimalReportModal({ isOpen, onClose }: AnimalReportModalProps) {
           </button>
           <button
             onClick={handleGenerate}
-            disabled={!selectedAnimal || selectedCount === 0}
+            disabled={!selectedAnimal || selectedCount === 0 || isCreating}
             className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Gerar Relatório
+            {isCreating ? 'Gerando...' : 'Gerar Relatório'}
           </button>
         </div>
       </div>

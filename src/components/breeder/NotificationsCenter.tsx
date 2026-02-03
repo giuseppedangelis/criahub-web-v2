@@ -1,109 +1,80 @@
 import { Bell, Check, CheckCheck, Filter, Search, Trash2, X, AlertTriangle, Heart, DollarSign, Calendar, Info, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
-
-interface Notification {
-  id: number;
-  category: 'saude' | 'financeiro' | 'servicos' | 'reproducao' | 'geral';
-  priority: 'critica' | 'alta' | 'normal' | 'baixa';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  link?: string;
-  animalName?: string;
-}
+import { useMemo, useState } from 'react';
+import type { Notification, NotificationType } from '@/types';
 
 interface NotificationsCenterProps {
   isOpen: boolean;
   onClose: () => void;
+  notifications: Notification[];
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+  onDelete: (id: string) => void;
 }
 
-export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      category: 'saude',
-      priority: 'critica',
-      title: 'Vacina Antirrábica Vencendo',
-      message: 'A vacina antirrábica de Estrela Dourada vence em 3 dias',
-      timestamp: '2024-12-12T10:30:00',
-      read: false,
-      animalName: 'Estrela Dourada',
-    },
-    {
-      id: 2,
-      category: 'servicos',
-      priority: 'alta',
-      title: 'Serviço de Ferrageamento Agendado',
-      message: 'Ferrageamento agendado para amanhã às 14h com João Silva',
-      timestamp: '2024-12-12T09:15:00',
-      read: false,
-    },
-    {
-      id: 3,
-      category: 'financeiro',
-      priority: 'normal',
-      title: 'Nova Receita Registrada',
-      message: 'Venda de animal registrada: R$ 45.000,00',
-      timestamp: '2024-12-11T16:45:00',
-      read: true,
-    },
-    {
-      id: 4,
-      category: 'reproducao',
-      priority: 'alta',
-      title: 'Égua em Trabalho de Parto',
-      message: 'Aurora Campeira apresenta sinais de trabalho de parto',
-      timestamp: '2024-12-11T14:20:00',
-      read: false,
-      animalName: 'Aurora Campeira',
-    },
-    {
-      id: 5,
-      category: 'saude',
-      priority: 'normal',
-      title: 'Exame Realizado',
-      message: 'Hemograma completo de Relâmpago Dourado - Resultado: Normal',
-      timestamp: '2024-12-11T11:00:00',
-      read: true,
-      animalName: 'Relâmpago Dourado',
-    },
-    {
-      id: 6,
-      category: 'geral',
-      priority: 'baixa',
-      title: 'Novo Animal Cadastrado',
-      message: 'Diamante da Estrela foi adicionado ao plantel',
-      timestamp: '2024-12-10T15:30:00',
-      read: true,
-      animalName: 'Diamante da Estrela',
-    },
-    {
-      id: 7,
-      category: 'financeiro',
-      priority: 'critica',
-      title: 'Despesa Vencida',
-      message: 'Pagamento de ração está atrasado há 5 dias',
-      timestamp: '2024-12-10T08:00:00',
-      read: false,
-    },
-    {
-      id: 8,
-      category: 'servicos',
-      priority: 'normal',
-      title: 'Limpeza de Baias Concluída',
-      message: 'Todas as 12 baias foram limpas hoje',
-      timestamp: '2024-12-09T17:00:00',
-      read: true,
-    },
-  ]);
+type NotificationCategory = 'saude' | 'financeiro' | 'servicos' | 'reproducao' | 'geral';
+type NotificationPriority = 'critica' | 'alta' | 'normal' | 'baixa';
+
+const CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
+  saude: 'saude',
+  financeiro: 'financeiro',
+  reproducao: 'reproducao',
+  geral: 'geral',
+  sistema: 'geral',
+};
+
+const PRIORITY_VALUES: NotificationPriority[] = ['critica', 'alta', 'normal', 'baixa'];
+
+const isCategory = (value: unknown): value is NotificationCategory => {
+  return value === 'saude' || value === 'financeiro' || value === 'servicos' || value === 'reproducao' || value === 'geral';
+};
+
+const isPriority = (value: unknown): value is NotificationPriority => {
+  return PRIORITY_VALUES.includes(value as NotificationPriority);
+};
+
+export function NotificationsCenter({
+  isOpen,
+  onClose,
+  notifications,
+  onMarkAsRead,
+  onMarkAllAsRead,
+  onDelete,
+}: NotificationsCenterProps) {
 
   const [filterCategory, setFilterCategory] = useState<string>('todas');
   const [filterStatus, setFilterStatus] = useState<'todas' | 'nao-lidas' | 'lidas'>('todas');
   const [filterPriority, setFilterPriority] = useState<string>('todas');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const getCategoryIcon = (category: Notification['category']) => {
+  const mappedNotifications = useMemo(() => {
+    return notifications.map((notification) => {
+      const data = (notification.data || {}) as Record<string, unknown>;
+      const categoryValue = data.category;
+      const priorityValue = data.priority;
+      const category: NotificationCategory = isCategory(categoryValue)
+        ? categoryValue
+        : CATEGORY_BY_TYPE[notification.type] || 'geral';
+      const priority: NotificationPriority = isPriority(priorityValue)
+        ? priorityValue
+        : category === 'saude' || category === 'reproducao'
+          ? 'alta'
+          : 'normal';
+
+      return {
+        id: notification.id,
+        category,
+        priority,
+        title: notification.title,
+        message: notification.message,
+        timestamp: notification.created_at,
+        read: notification.read,
+        link: typeof data.link === 'string' ? data.link : undefined,
+        animalName: typeof data.animalName === 'string' ? data.animalName : undefined,
+      };
+    });
+  }, [notifications]);
+
+  const getCategoryIcon = (category: NotificationCategory) => {
     const icons = {
       saude: <Heart className="w-5 h-5" />,
       financeiro: <DollarSign className="w-5 h-5" />,
@@ -114,7 +85,7 @@ export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProp
     return icons[category];
   };
 
-  const getCategoryColor = (category: Notification['category']) => {
+  const getCategoryColor = (category: NotificationCategory) => {
     const colors = {
       saude: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
       financeiro: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
@@ -125,7 +96,7 @@ export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProp
     return colors[category];
   };
 
-  const getPriorityBadge = (priority: Notification['priority']) => {
+  const getPriorityBadge = (priority: NotificationPriority) => {
     const badges = {
       critica: { label: 'Crítica', color: 'bg-red-500 text-white' },
       alta: { label: 'Alta', color: 'bg-orange-500 text-white' },
@@ -149,21 +120,19 @@ export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProp
     return date.toLocaleDateString('pt-BR');
   };
 
-  const handleMarkAsRead = (id: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const handleMarkAsRead = (id: string) => {
+    onMarkAsRead(id);
   };
 
   const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    onMarkAllAsRead();
   };
 
-  const handleDelete = (id: number) => {
-    setNotifications(notifications.filter(n => n.id !== id));
+  const handleDelete = (id: string) => {
+    onDelete(id);
   };
 
-  const filteredNotifications = notifications
+  const filteredNotifications = mappedNotifications
     .filter(n => {
       if (filterCategory !== 'todas' && n.category !== filterCategory) return false;
       if (filterStatus === 'nao-lidas' && n.read) return false;
@@ -182,7 +151,7 @@ export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProp
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = mappedNotifications.filter(n => !n.read).length;
 
   if (!isOpen) return null;
 
@@ -362,7 +331,7 @@ export function NotificationsCenter({ isOpen, onClose }: NotificationsCenterProp
         {/* Footer */}
         <div className="p-4 border-t border-border dark:border-[rgba(255,255,255,0.1)] bg-muted/50 dark:bg-[#0d0d0d]/50">
           <p className="text-sm text-center text-muted-foreground dark:text-[#99a1af]">
-            Mostrando {filteredNotifications.length} de {notifications.length} notificações
+            Mostrando {filteredNotifications.length} de {mappedNotifications.length} notificações
           </p>
         </div>
       </div>

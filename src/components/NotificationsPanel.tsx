@@ -1,21 +1,31 @@
 import { X, Check, Trash2, CheckCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import type { Notification } from '@/types';
 
-interface Notification {
-  id: number;
-  title: string;
-  message: string;
-  time: string;
-  unread: boolean;
-}
+const formatNotificationTime = (dateValue?: string | null) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Agora';
+  if (diffMins < 60) return `${diffMins} min atrás`;
+  if (diffHours < 24) return `${diffHours}h atrás`;
+  if (diffDays === 1) return '1 dia atrás';
+  return `${diffDays} dias atrás`;
+};
 
 interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   notifications: Notification[];
-  onMarkAsRead: (ids: number[]) => void;
-  onDelete: (ids: number[]) => void;
+  onMarkAsRead: (ids: string[]) => void | Promise<void>;
+  onDelete: (ids: string[]) => void | Promise<void>;
 }
 
 export function NotificationsPanel({ 
@@ -25,19 +35,26 @@ export function NotificationsPanel({
   onMarkAsRead,
   onDelete
 }: NotificationsPanelProps) {
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const notificationsWithTime = useMemo(() => {
+    return notifications.map((notif) => ({
+      ...notif,
+      time: formatNotificationTime(notif.created_at),
+      unread: !notif.read,
+    }));
+  }, [notifications]);
 
   if (!isOpen) return null;
 
   const handleSelectAll = () => {
-    if (selectedIds.length === notifications.length) {
+    if (selectedIds.length === notificationsWithTime.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(notifications.map(n => n.id));
+      setSelectedIds(notificationsWithTime.map(n => n.id));
     }
   };
 
-  const handleToggleSelect = (id: number) => {
+  const handleToggleSelect = (id: string) => {
     if (selectedIds.includes(id)) {
       setSelectedIds(selectedIds.filter(sid => sid !== id));
     } else {
@@ -45,22 +62,32 @@ export function NotificationsPanel({
     }
   };
 
-  const handleMarkAsRead = () => {
+  const handleMarkAsRead = async () => {
     if (selectedIds.length === 0) {
       toast.error('Selecione ao menos uma notificação');
       return;
     }
-    onMarkAsRead(selectedIds);
+    try {
+      await Promise.resolve(onMarkAsRead(selectedIds));
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao marcar notificações.');
+      return;
+    }
     setSelectedIds([]);
     toast.success(`${selectedIds.length} notificação(ões) marcada(s) como lida(s)`);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedIds.length === 0) {
       toast.error('Selecione ao menos uma notificação');
       return;
     }
-    onDelete(selectedIds);
+    try {
+      await Promise.resolve(onDelete(selectedIds));
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao excluir notificações.');
+      return;
+    }
     setSelectedIds([]);
     toast.success(`${selectedIds.length} notificação(ões) excluída(s)`);
   };
@@ -80,7 +107,7 @@ export function NotificationsPanel({
           <div>
             <h2 className="text-xl text-foreground dark:text-white">Todas as Notificações</h2>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-              {notifications.length} notificações
+              {notificationsWithTime.length} notificações
             </p>
           </div>
           <button
@@ -101,7 +128,7 @@ export function NotificationsPanel({
             >
               <CheckCheck className="w-4 h-4 text-foreground dark:text-white" />
               <span className="text-foreground dark:text-white">
-                {selectedIds.length === notifications.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                {selectedIds.length === notificationsWithTime.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
               </span>
             </button>
           </div>
@@ -134,7 +161,7 @@ export function NotificationsPanel({
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {notificationsWithTime.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-6">
               <div className="w-16 h-16 bg-muted dark:bg-[#0d0d0d] rounded-full flex items-center justify-center mb-4">
                 <Check className="w-8 h-8 text-muted-foreground dark:text-[#99a1af]" />
@@ -146,7 +173,7 @@ export function NotificationsPanel({
             </div>
           ) : (
             <div>
-              {notifications.map((notif) => {
+              {notificationsWithTime.map((notif) => {
                 const isSelected = selectedIds.includes(notif.id);
 
                 return (

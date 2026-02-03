@@ -13,6 +13,24 @@ import { AdminSettingsContent } from './admin/AdminSettingsContent';
 import { AdminHelpContent } from './admin/AdminHelpContent';
 import { NotificationsPanel } from './NotificationsPanel';
 import { toast } from 'sonner';
+import type { Notification } from '@/types';
+
+const formatNotificationTime = (dateValue?: string | null) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Agora';
+  if (diffMins < 60) return `${diffMins} min atrás`;
+  if (diffHours < 24) return `${diffHours}h atrás`;
+  if (diffDays === 1) return '1 dia atrás';
+  return `${diffDays} dias atrás`;
+};
 
 // SVG Chart Path
 const revenueChartPath = "M4.91813e-08 57.7594C17.774 57.7594 17.774 11.9184 35.5481 11.9184C53.3221 11.9184 53.3221 22.3368 71.0962 22.3368C88.8703 22.3368 88.8703 49.4247 106.644 49.4247C124.418 49.4247 124.418 18.1695 142.193 18.1695C159.967 18.1695 159.967 53.5921 177.74 53.5921C195.514 53.5921 195.514 32.7552 213.289 32.7552C231.063 32.7552 231.063 24.4205 248.837 24.4205C266.611 24.4205 266.611 64.0105 284.385 64.0105C302.159 64.0105 302.159 78.5962 319.933 78.5962C337.707 78.5962 337.707 1.5 355.481 1.5C373.255 1.5 373.255 43.1736 391.03 43.1736C408.803 43.1736 408.803 68.1778 426.577 68.1778C444.351 68.1778 444.351 14.0021 462.126 14.0021";
@@ -27,15 +45,60 @@ export function AdminDashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Nova assinatura', message: 'Haras do Sol contratou plano Premium', time: '5 min atrás', unread: true },
-    { id: 2, title: 'Pagamento recebido', message: 'R$ 499 - Haras Vale Verde', time: '1 hora atrás', unread: true },
-    { id: 3, title: 'Alerta de uso', message: 'Servidor atingiu 80% de capacidade', time: '2 horas atrás', unread: true },
-    { id: 4, title: 'Sistema atualizado', message: 'Versão 2.1.0 implantada com sucesso', time: '1 dia atrás', unread: false },
-    { id: 5, title: 'Novo feedback de usuário', message: 'Haras Boa Vista deixou uma avaliação', time: '2 dias atrás', unread: false },
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: '1',
+      user_id: '',
+      type: 'geral',
+      title: 'Nova assinatura',
+      message: 'Haras do Sol contratou plano Premium',
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    },
+    {
+      id: '2',
+      user_id: '',
+      type: 'financeiro',
+      title: 'Pagamento recebido',
+      message: 'R$ 499 - Haras Vale Verde',
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: '3',
+      user_id: '',
+      type: 'sistema',
+      title: 'Alerta de uso',
+      message: 'Servidor atingiu 80% de capacidade',
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: '4',
+      user_id: '',
+      type: 'sistema',
+      title: 'Sistema atualizado',
+      message: 'Versão 2.1.0 implantada com sucesso',
+      read: true,
+      data: null,
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: '5',
+      user_id: '',
+      type: 'geral',
+      title: 'Novo feedback de usuário',
+      message: 'Haras Boa Vista deixou uma avaliação',
+      read: true,
+      data: null,
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
   ]);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
@@ -54,16 +117,16 @@ export function AdminDashboard() {
   ];
 
   const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
-  const handleMarkAsRead = (ids: number[]) => {
+  const handleMarkAsRead = (ids: string[]) => {
     setNotifications(notifications.map(n =>
-      ids.includes(n.id) ? { ...n, unread: false } : n
+      ids.includes(n.id) ? { ...n, read: true } : n
     ));
   };
 
-  const handleDelete = (ids: number[]) => {
+  const handleDelete = (ids: string[]) => {
     setNotifications(notifications.filter(n => !ids.includes(n.id)));
   };
 
@@ -238,11 +301,11 @@ export function AdminDashboard() {
                     {notifications.map((notif) => (
                       <div
                         key={notif.id}
-                        className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${notif.unread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                        className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${!notif.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                           }`}
                       >
                         <div className="flex items-start gap-3">
-                          {notif.unread && (
+                          {!notif.read && (
                             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                           )}
                           <div className="flex-1">
@@ -251,7 +314,7 @@ export function AdminDashboard() {
                               {notif.message}
                             </p>
                             <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                              {notif.time}
+                              {formatNotificationTime(notif.created_at)}
                             </p>
                           </div>
                         </div>

@@ -39,7 +39,9 @@ export type ReproductiveEventType =
     | 'inseminacao'
     | 'coleta_ovulos'
     | 'transferencia_embriao'
-    | 'ovulacao';
+    | 'ovulacao'
+    | 'diagnostico_gestacao'
+    | 'aplicacao_p4';
 
 export type GestationStatus =
     | 'confirmada'
@@ -75,6 +77,19 @@ export type NotificationType =
     | 'geral'
     | 'sistema';
 
+export type AgendaEventType =
+    | 'Serviço'
+    | 'Evento'
+    | 'Veterinário'
+    | 'Casqueamento'
+    | 'Dentista'
+    | 'Aplicação P4'
+    | 'Coleta Embrião'
+    | 'Diagnóstico Gestação'
+    | 'Outro';
+
+export type AgendaEventStatus = 'Pendente' | 'Concluído' | 'Cancelado';
+
 export type AnimalVideoVisibility = 'Público' | 'Privado';
 
 export type AnimalVideoSource = 'upload' | 'youtube' | 'vimeo' | 'link';
@@ -82,6 +97,18 @@ export type AnimalVideoSource = 'upload' | 'youtube' | 'vimeo' | 'link';
 export type AnimalLocationType = 'Baia' | 'Pasto' | 'Servico';
 
 export type AnimalServiceType = 'Reproducao' | 'Trabalho' | 'Repouso' | 'Outro';
+
+export type ReportType =
+    | 'animal'
+    | 'plantel'
+    | 'financeiro'
+    | 'saude'
+    | 'premiacoes'
+    | 'reproducao';
+
+export type ReportStatus = 'Gerado' | 'Agendado' | 'Processando' | 'Erro';
+
+export type ReportFormat = 'pdf' | 'excel' | 'csv' | 'docx' | 'html';
 
 // ============================================
 // ENTIDADES BASE
@@ -112,6 +139,9 @@ export interface Haras {
     logo_url: string | null;
     subscription_plan: string;
     subscription_status: string;
+    subscription_due_date?: string | null;
+    subscription_value?: string | number | null;
+    subscription_start_date?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -307,10 +337,12 @@ export interface Transaction {
     description: string;
     date: string;
     animal_id: string | null;
-    reference_id: string | null;
-    created_by: string;
-    created_at: string;
-    updated_at: string;
+    reference_id?: string | null;
+    created_by?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    observations?: string | null;
+    payment_method?: string | null;
     // Relacionamentos
     animal?: Animal | null;
     created_by_profile?: Profile | null;
@@ -344,6 +376,62 @@ export interface Notification {
     read: boolean;
     data: Record<string, unknown> | null;
     created_at: string;
+}
+
+export interface AgendaEventDetails {
+    category?: string;
+    categoryLabel?: string;
+    categoryColor?: string;
+    time?: string;
+    endTime?: string;
+    city?: string;
+    state?: string;
+    organizer?: string;
+    link?: string;
+    reminders?: string[];
+    veterinarian?: string;
+    veterinarianId?: string;
+    relatedAnimalIds?: string[];
+}
+
+export interface AgendaEvent {
+    id: string;
+    haras_id: string;
+    title: string;
+    type: AgendaEventType;
+    start_date: string;
+    end_date?: string | null;
+    description?: string | null;
+    location?: string | null;
+    status?: AgendaEventStatus | null;
+    animal_id?: string | null;
+    auto_generated?: boolean | null;
+    origin?: string | null;
+    origin_id?: string | null;
+    observations?: string | null;
+    responsible?: string | null;
+    details?: AgendaEventDetails | null;
+    animal?: {
+        id: string;
+        name?: string;
+        registry_number?: string | null;
+    } | null;
+}
+
+export interface Report {
+    id: string;
+    haras_id: string;
+    name: string;
+    type: ReportType;
+    format: ReportFormat;
+    status: ReportStatus;
+    parameters?: Record<string, unknown> | null;
+    file_url?: string | null;
+    size_bytes?: number | null;
+    scheduled_for?: string | null;
+    created_by?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 export interface VeterinaryProcedure {
@@ -507,6 +595,39 @@ export interface CreateTransactionInput {
     date: string;
     animal_id?: string;
     reference_id?: string;
+    observations?: string;
+    payment_method?: string;
+}
+
+export interface CreateAgendaEventInput {
+    haras_id: string;
+    title: string;
+    type: AgendaEventType;
+    start_date: string;
+    end_date?: string;
+    description?: string;
+    location?: string;
+    status?: AgendaEventStatus;
+    animal_id?: string;
+    auto_generated?: boolean;
+    origin?: string;
+    origin_id?: string;
+    observations?: string;
+    responsible?: string;
+    details?: AgendaEventDetails;
+}
+
+export interface CreateReportInput {
+    haras_id: string;
+    name: string;
+    type: ReportType;
+    format: ReportFormat;
+    status?: ReportStatus;
+    parameters?: Record<string, unknown>;
+    file_url?: string;
+    size_bytes?: number;
+    scheduled_for?: string;
+    created_by?: string;
 }
 
 export interface CreateReproductiveEventInput {
@@ -561,6 +682,23 @@ export interface TransactionFilters {
     start_date?: string;
     end_date?: string;
     animal_id?: string;
+}
+
+export interface AgendaEventFilters {
+    haras_id?: string;
+    type?: AgendaEventType | AgendaEventType[];
+    status?: AgendaEventStatus;
+    start_date?: string;
+    end_date?: string;
+    animal_id?: string;
+}
+
+export interface ReportFilters {
+    haras_id?: string;
+    type?: ReportType;
+    status?: ReportStatus;
+    start_date?: string;
+    end_date?: string;
 }
 
 export interface GestationFilters {

@@ -1,25 +1,35 @@
-import { useState, useRef } from 'react';
-import { User, Shield, Wrench, Save, Upload, Bell, Lock, Globe } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { User, Shield, Wrench, Save, Upload, Bell, Lock, Globe, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useResponsive } from '../../hooks/useResponsive';
 import { NativeSelect } from '../ui/native-select';
 import { Toggle } from '../ui/toggle';
+import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/contexts/UserContext';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { useProfileSettings, useUpdateProfileSettings } from '@/hooks/useProfileSettings';
+import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
+import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
 
 type SettingsTab = 'profile' | 'security' | 'general';
 
 export function AdvisorSettingsContent() {
-  const { isMobile } = useResponsive();
+  const supabase = createClient();
+  const { user, profile, refreshProfile } = useUser();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [profileHydrated, setProfileHydrated] = useState(false);
 
   // Estados do Perfil
   const [profileData, setProfileData] = useState({
-    name: 'Patrícia Almeida',
-    email: 'patricia@harasvaleverde.com',
-    phone: '(11) 98888-8888',
-    role: 'Assessora Administrativa',
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
     avatar: '',
-    harasName: 'Haras Vale Verde',
+    harasName: '',
   });
 
   // Estados de Segurança
@@ -53,21 +63,212 @@ export function AdvisorSettingsContent() {
     { id: 'general' as SettingsTab, name: 'Geral', icon: Wrench },
   ];
 
+  const { data: currentHaras } = useCurrentHaras();
+  const { data: profileSettings } = useProfileSettings(user?.id || '');
+  const updateProfileSettings = useUpdateProfileSettings();
+  const { data: sessionsData, isLoading: isLoadingSessions, isError: isSessionsError } = useUserSessions();
+  const revokeSession = useRevokeSession();
+
+  const ROLE_LABELS: Record<string, string> = {
+    assessor: 'Assessor Administrativo',
+    acessor: 'Assessor Administrativo',
+    advisor: 'Assessor Administrativo',
+    criador: 'Criador/Dono de Haras',
+    breeder: 'Criador/Dono de Haras',
+    veterinario: 'Veterinário',
+    peao: 'Funcionário de Campo',
+    admin: 'Administrador',
+  };
+
+  const normalizeRole = (role?: string | null) =>
+    (role || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+
+  const formatPhone = (value: string): string => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers.length ? `(${numbers}` : '';
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  };
+
+  const formatSessionDate = (value?: string | null) => {
+    if (!value) return 'Sem registro';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  };
+
+  const formatUserAgent = (userAgent?: string | null) => {
+    if (!userAgent) return 'Dispositivo desconhecido';
+    const ua = userAgent.toLowerCase();
+    const device = ua.includes('android')
+      ? 'Android'
+      : ua.includes('iphone') || ua.includes('ipad')
+        ? 'iOS'
+        : ua.includes('windows')
+          ? 'Windows'
+          : ua.includes('mac')
+            ? 'MacOS'
+            : ua.includes('linux')
+              ? 'Linux'
+              : '';
+    const browser = ua.includes('edg')
+      ? 'Edge'
+      : ua.includes('chrome')
+        ? 'Chrome'
+        : ua.includes('firefox')
+          ? 'Firefox'
+          : ua.includes('safari')
+            ? 'Safari'
+            : '';
+    const label = [browser, device].filter(Boolean).join(' • ');
+    return label || userAgent;
+  };
+
+  const sessions = (sessionsData || []).slice().sort((a, b) => {
+    const aValue = a.refreshed_at || a.updated_at || a.created_at;
+    const bValue = b.refreshed_at || b.updated_at || b.created_at;
+    const aDate = aValue ? new Date(aValue) : null;
+    const bDate = bValue ? new Date(bValue) : null;
+    const aTime = aDate && !Number.isNaN(aDate.getTime()) ? aDate.getTime() : 0;
+    const bTime = bDate && !Number.isNaN(bDate.getTime()) ? bDate.getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value);
+    setProfileData({ ...profileData, phone: formatted });
+  };
+
+  useEffect(() => {
+    if (!profile || profileHydrated) return;
+    const roleLabel = ROLE_LABELS[normalizeRole(profile.role)] || profile.role || '';
+    setProfileData((prev) => ({
+      ...prev,
+      name: profile.full_name || '',
+      email: profile.email || '',
+      phone: formatPhone(profile.phone || ''),
+      role: roleLabel,
+      avatar: profile.avatar_url || '',
+    }));
+    setProfileHydrated(true);
+  }, [profile, profileHydrated]);
+
+  useEffect(() => {
+    setProfileHydrated(false);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!currentHaras) return;
+    setProfileData((prev) => ({
+      ...prev,
+      harasName: currentHaras.name || prev.harasName,
+    }));
+  }, [currentHaras]);
+
+  useEffect(() => {
+    if (!profileSettings) return;
+    setNotificationSettings(profileSettings.notification_settings);
+    setPrivacySettings(profileSettings.privacy_settings);
+  }, [profileSettings]);
+
   // Handlers
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadToStorage = async (file: File, pathPrefix: string) => {
+    const ext = file.name.split('.').pop();
+    const filePath = `${pathPrefix}/${Date.now()}_${Math.random().toString(36).slice(2)}${ext ? `.${ext}` : ''}`;
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData({ ...profileData, avatar: reader.result as string });
-        toast.success('Foto de perfil atualizada!');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!user?.id) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const publicUrl = await uploadToStorage(file, `users/${user.id}/avatar`);
+      const { error } = await (supabase as any)
+        .from('profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfileData((prev) => ({ ...prev, avatar: publicUrl }));
+      await refreshProfile();
+      toast.success('Foto de perfil atualizada!');
+    } catch (err: any) {
+      console.error('Erro ao enviar avatar:', err);
+      toast.error(err.message || 'Erro ao enviar foto de perfil.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
-  const handleSaveProfile = () => {
-    toast.success('Perfil atualizado com sucesso!');
+  const handleSaveProfile = async () => {
+    if (!user?.id) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+    if (profileData.phone && !isValidPhone(profileData.phone)) {
+      toast.error('Telefone inválido.');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      let emailUpdated = false;
+      const updateData: Record<string, any> = {
+        full_name: profileData.name,
+        phone: profileData.phone.replace(/\D/g, ''),
+        avatar_url: profileData.avatar,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (profileData.email && profileData.email !== profile?.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: profileData.email,
+        });
+        if (authError) throw authError;
+        updateData.email = profileData.email;
+        emailUpdated = true;
+      }
+
+      const { error } = await (supabase as any)
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      toast.success('Perfil atualizado com sucesso!');
+      if (emailUpdated) {
+        toast.message('Confirme o novo e-mail para concluir a alteração.');
+      }
+    } catch (err: any) {
+      console.error('Erro ao salvar perfil:', err);
+      toast.error(err.message || 'Erro ao salvar perfil.');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleChangePassword = () => {
@@ -79,18 +280,28 @@ export function AdvisorSettingsContent() {
       toast.error('As senhas não coincidem.');
       return;
     }
-    if (securityData.newPassword.length < 8) {
-      toast.error('A senha deve ter no mínimo 8 caracteres.');
+    const passwordErrors = validatePasswordStrength(securityData.newPassword);
+    if (passwordErrors.length > 0) {
+      toast.error(passwordErrors[0]);
       return;
     }
 
     setConfirmAction({
       title: 'Alterar Senha',
       message: 'Tem certeza que deseja alterar sua senha? Você será desconectado de todos os dispositivos.',
-      action: () => {
-        setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        toast.success('Senha alterada com sucesso!');
-        setShowConfirmModal(false);
+      action: async () => {
+        try {
+          const { error } = await supabase.auth.updateUser({
+            password: securityData.newPassword,
+          });
+          if (error) throw error;
+          setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          toast.success('Senha alterada com sucesso!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao alterar senha:', err);
+          toast.error(err.message || 'Erro ao alterar senha.');
+        }
       }
     });
     setShowConfirmModal(true);
@@ -100,16 +311,61 @@ export function AdvisorSettingsContent() {
     setConfirmAction({
       title: 'Encerrar Todas as Sessões',
       message: 'Tem certeza que deseja encerrar todas as sessões ativas? Você precisará fazer login novamente em todos os dispositivos.',
-      action: () => {
-        toast.success('Logout realizado em todos os dispositivos!');
-        setShowConfirmModal(false);
+      action: async () => {
+        try {
+          const { error } = await supabase.auth.signOut({ scope: 'global' });
+          if (error) throw error;
+          toast.success('Logout realizado em todos os dispositivos!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao encerrar sessões:', err);
+          toast.error(err.message || 'Erro ao encerrar sessões.');
+        }
       }
     });
     setShowConfirmModal(true);
   };
 
-  const handleSaveGeneralSettings = () => {
-    toast.success('Configurações salvas com sucesso!');
+  const handleRevokeSession = (sessionId: string) => {
+    setConfirmAction({
+      title: 'Encerrar Sessão',
+      message: 'Tem certeza que deseja encerrar esta sessão?',
+      action: async () => {
+        try {
+          await revokeSession.mutateAsync(sessionId);
+          toast.success('Sessão encerrada com sucesso!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao encerrar sessão:', err);
+          toast.error(err.message || 'Erro ao encerrar sessão.');
+        }
+      },
+    });
+    setShowConfirmModal(true);
+  };
+
+  const handleSaveGeneralSettings = async () => {
+    if (!user?.id) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+
+    setIsSavingGeneral(true);
+    try {
+      await updateProfileSettings.mutateAsync({
+        userId: user.id,
+        input: {
+          notification_settings: notificationSettings,
+          privacy_settings: privacySettings,
+        },
+      });
+      toast.success('Configurações salvas com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao salvar configurações:', err);
+      toast.error(err.message || 'Erro ao salvar configurações.');
+    } finally {
+      setIsSavingGeneral(false);
+    }
   };
 
   return (
@@ -169,9 +425,14 @@ export function AdvisorSettingsContent() {
                   </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 p-2 bg-primary dark:bg-white text-white dark:text-black rounded-full hover:opacity-90 transition-opacity"
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 p-2 bg-primary dark:bg-white text-white dark:text-black rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
                   >
-                    <Upload className="w-4 h-4" />
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -218,7 +479,7 @@ export function AdvisorSettingsContent() {
                   <input
                     type="tel"
                     value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    onChange={handlePhoneChange}
                     className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
                   />
                 </div>
@@ -248,10 +509,15 @@ export function AdvisorSettingsContent() {
 
               <button
                 onClick={handleSaveProfile}
-                className="flex items-center gap-2 px-6 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSavingProfile}
+                className="flex items-center gap-2 px-6 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
               >
-                <Save className="w-5 h-5" />
-                Salvar Alterações
+                {isSavingProfile ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
           )}
@@ -316,26 +582,75 @@ export function AdvisorSettingsContent() {
 
               {/* Sessões Ativas */}
               <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-6">
-                <h3 className="text-lg text-foreground dark:text-white mb-4">
+                <h3 className="text-lg text-foreground dark:text-white mb-2">
                   Sessões Ativas
                 </h3>
+                <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-4">
+                  Acompanhe os logins ativos e encerre sessões que você não reconhece.
+                </p>
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between gap-4 p-4 bg-muted dark:bg-[#1a1a1a] rounded-lg">
-                    <div className="flex-1">
-                      <p className="text-foreground dark:text-white mb-1">Desktop - Windows</p>
-                      <p className="text-sm text-muted-foreground dark:text-[#99a1af]">São Paulo, Brasil</p>
-                      <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">Ativo agora</p>
+                  {isLoadingSessions && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-[#99a1af]">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando sessões...
                     </div>
-                    <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs rounded">
-                      Atual
-                    </span>
+                  )}
+                  {!isLoadingSessions && isSessionsError && (
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      Não foi possível carregar as sessões.
+                    </p>
+                  )}
+                  {!isLoadingSessions && !isSessionsError && sessions.length === 0 && (
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Nenhuma sessão ativa encontrada.
+                    </p>
+                  )}
+                  {!isLoadingSessions && !isSessionsError && sessions.length > 0 && (
+                    <div className="space-y-3">
+                      {sessions.map((session) => {
+                        const lastActive = session.refreshed_at || session.updated_at || session.created_at;
+                        return (
+                          <div
+                            key={session.id}
+                            className="flex flex-col gap-3 rounded-xl border border-border dark:border-[#2a2a2a] bg-muted/10 dark:bg-white/5 p-4"
+                          >
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="space-y-1">
+                                <p className="text-sm text-foreground dark:text-white">
+                                  {formatUserAgent(session.user_agent)}
+                                </p>
+                                <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                                  Última atividade: {formatSessionDate(lastActive)}
+                                </p>
+                                {session.ip && (
+                                  <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                                    IP: {session.ip}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleRevokeSession(session.id)}
+                                disabled={revokeSession.isPending}
+                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-border dark:border-[#3a3a3a] text-sm text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                              >
+                                {revokeSession.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
+                                Encerrar sessão
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="pt-4 border-t border-border dark:border-[#2a2a2a]">
+                    <button
+                      onClick={handleLogoutAllDevices}
+                      className="flex items-center gap-2 px-6 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
+                    >
+                      <AlertCircle className="w-5 h-5" />
+                      Encerrar Todas as Sessões
+                    </button>
                   </div>
-                  <button
-                    onClick={handleLogoutAllDevices}
-                    className="w-full px-4 py-2 border border-red-600 dark:border-red-400 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
-                  >
-                    Encerrar Todas as Sessões
-                  </button>
                 </div>
               </div>
             </div>
@@ -456,6 +771,21 @@ export function AdvisorSettingsContent() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSaveGeneralSettings}
+                  disabled={isSavingGeneral}
+                  className="flex items-center gap-2 px-6 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {isSavingGeneral ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {isSavingGeneral ? 'Salvando...' : 'Salvar configurações'}
+                </button>
               </div>
             </div>
           )}

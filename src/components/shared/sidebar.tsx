@@ -23,7 +23,9 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/contexts/auth-context'
-import type { UserRole } from '@/types/database.types'
+import type { Database } from '@/types/database.types'
+
+type UserRole = Database['public']['Tables']['profiles']['Row']['role']
 
 interface SidebarProps {
     role: UserRole

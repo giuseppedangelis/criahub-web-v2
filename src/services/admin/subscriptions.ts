@@ -4,7 +4,6 @@
 // ============================================
 
 import { supabase } from '../base';
-import type { Haras } from '@/types/database.types';
 
 // Interface para dados reais do banco
 interface HarasData {

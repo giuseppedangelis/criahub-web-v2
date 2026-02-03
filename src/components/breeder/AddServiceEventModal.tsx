@@ -2,21 +2,44 @@ import { Wrench, Trophy, X } from 'lucide-react';
 import { useState } from 'react';
 import { AddServiceModal } from './AddServiceModal';
 import { AddPublicEventModal } from './AddPublicEventModal';
+import type { Animal, CreateAgendaEventInput } from '@/types';
 
 interface AddServiceEventModalProps {
   onClose: () => void;
   initialType?: 'service' | 'event';
+  onCreate: (input: CreateAgendaEventInput) => Promise<void> | void;
+  harasId: string;
+  animals: Animal[];
+  isSaving?: boolean;
 }
 
-export function AddServiceEventModal({ onClose, initialType }: AddServiceEventModalProps) {
+export function AddServiceEventModal({ onClose, initialType, onCreate, harasId, animals, isSaving = false }: AddServiceEventModalProps) {
   const [selectedType, setSelectedType] = useState<'service' | 'event' | null>(initialType || null);
 
   if (selectedType === 'service') {
-    return <AddServiceModal onClose={onClose} onBack={() => setSelectedType(null)} />;
+    return (
+      <AddServiceModal
+        onClose={onClose}
+        onBack={() => setSelectedType(null)}
+        onCreate={onCreate}
+        harasId={harasId}
+        animals={animals}
+        isSaving={isSaving}
+      />
+    );
   }
 
   if (selectedType === 'event') {
-    return <AddPublicEventModal onClose={onClose} onBack={() => setSelectedType(null)} />;
+    return (
+      <AddPublicEventModal
+        onClose={onClose}
+        onBack={() => setSelectedType(null)}
+        onCreate={onCreate}
+        harasId={harasId}
+        animals={animals}
+        isSaving={isSaving}
+      />
+    );
   }
 
   return (

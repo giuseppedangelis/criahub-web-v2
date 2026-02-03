@@ -1,163 +1,131 @@
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, MapPin, Clock, Edit, Trash2, X, Heart, Bell, Paperclip, Upload, Search, FileText, Trophy, Gavel, DollarSign, Wrench, User } from 'lucide-react';
-import { useState } from 'react';
-import { NativeSelect } from '../ui/native-select';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, MapPin, Clock, Edit, Trash2, X, Heart, Bell, Paperclip, FileText, Trophy, Wrench, User } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { AwardsHistoryTab } from './AwardsHistoryTab';
 import { AddServiceEventModal } from './AddServiceEventModal';
 import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useAgendaEvents, useCreateAgendaEvent, useDeleteAgendaEvent } from '@/hooks/useEvents';
+import type { AgendaEventType, CreateAgendaEventInput } from '@/types';
+import { getCategoryConfig } from './agendaUtils';
 
 type AgendaTab = 'services' | 'events' | 'awards';
 
 export function BreederAgendaContent() {
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+  const today = new Date();
   const [activeTab, setActiveTab] = useState<AgendaTab>('services');
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 10, 18)); // Nov 18, 2024
-  const [selectedDate, setSelectedDate] = useState(18);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(today.getDate());
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const { data: animalsResponse } = useAnimals(
+    { haras_id: harasId },
+    { page: 1, limit: 200 },
+    !!harasId
+  );
+  const animals = animalsResponse?.data || [];
+  const animalsById = useMemo(() => {
+    return animals.reduce((acc, animal) => {
+      acc[animal.id] = animal;
+      return acc;
+    }, {} as Record<string, typeof animals[number]>);
+  }, [animals]);
 
-  // SERVIÇOS INTERNOS - Operações do haras
-  const internalServices = [
-    {
-      id: 1,
-      type: 'service',
-      title: 'Vacinação - Plantel Completo',
-      category: 'Saúde',
-      categoryColor: 'bg-green-500',
-      date: 18,
-      time: '14:00',
-      animal: '15 animais',
-      location: 'Piquete Central',
-      description: 'Aplicação de vacina antirrábica em todo o plantel',
-      relatedAnimals: [
-        { name: 'Trovão', registry: 'ABCCMM 1234567-01', image: null },
-        { name: 'Ventania', registry: 'ABCCMM 1234567-02', image: null },
-        { name: 'Estrela', registry: 'ABCCMM 1234567-03', image: null },
-      ],
-      veterinarian: 'Dr. João Silva',
-      reminders: ['30 minutos antes'],
-      attachments: [
-        { name: 'Plano_Vacinacao.pdf', type: 'PDF', size: '2.1 MB' },
-      ],
-    },
-    {
-      id: 2,
-      type: 'service',
-      title: 'Exame Gestacional',
-      category: 'Consulta',
-      categoryColor: 'bg-blue-500',
-      date: 23,
-      time: '09:00',
-      animal: 'Estrela Mangalarga',
-      location: 'Baia 12',
-      description: 'Exame gestacional de rotina - 45 dias de gestação',
-      relatedAnimals: [
-        { name: 'Estrela Mangalarga', registry: 'ABCCMM 1234567-89', image: null },
-      ],
-      veterinarian: 'Dr. Pedro Costa',
-      reminders: ['1 dia antes', '30 minutos antes'],
-      attachments: [],
-    },
-    {
-      id: 3,
-      type: 'service',
-      title: 'Cobertura - Estrela Dourada',
-      category: 'Cobertura',
-      categoryColor: 'bg-red-500',
-      date: 25,
-      time: '10:00',
-      animal: 'Estrela Dourada x Relâmpago Negro',
-      location: 'Piquete 1',
-      description: 'Cobertura da égua Estrela Dourada com o garanhão Relâmpago Negro. Primeira tentativa do ciclo reprodutivo.',
-      relatedAnimals: [
-        { name: 'Relâmpago Negro', registry: 'ABCCMM 1234567-10', image: null },
-        { name: 'Estrela Dourada', registry: 'ABCCMM 1234567-11', image: null },
-      ],
-      veterinarian: 'Dr. Pedro Costa',
-      reminders: ['30 minutos antes'],
-      attachments: [
-        { name: 'Plano_Cobertura_Estrela.pdf', type: 'PDF', size: '2.1 MB' },
-        { name: 'Historico_Reprodutivo.xlsx', type: 'Excel', size: '1.8 MB' },
-      ],
-    },
-    {
-      id: 4,
-      type: 'service',
-      title: 'Casqueamento - Lote de Potros',
-      category: 'Manejo',
-      categoryColor: 'bg-yellow-500',
-      date: 28,
-      time: '15:00',
-      animal: '8 animais',
-      location: 'Tronco de Contenção',
-      description: 'Manutenção preventiva de cascos do lote de potros de 2023',
-      relatedAnimals: [
-        { name: 'Potro 1', registry: 'ABCCMM 1234567-20', image: null },
-        { name: 'Potro 2', registry: 'ABCCMM 1234567-21', image: null },
-        { name: 'Potro 3', registry: 'ABCCMM 1234567-22', image: null },
-        { name: 'Potro 4', registry: 'ABCCMM 1234567-23', image: null },
-      ],
-      veterinarian: '',
-      reminders: ['1 dia antes'],
-      attachments: [],
-    },
-  ];
+  const monthStart = useMemo(() => new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), [currentDate]);
+  const monthEnd = useMemo(
+    () => new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59),
+    [currentDate]
+  );
 
-  // EVENTOS PÚBLICOS - Atividades externas
-  const publicEvents = [
-    {
-      id: 101,
-      type: 'event',
-      title: '45ª Exposição Nacional do Mangalarga Marchador',
-      category: 'Exposição',
-      categoryColor: 'bg-purple-500',
-      date: 20,
-      time: '08:00',
-      endDate: 23,
-      endTime: '18:00',
-      location: 'Parque Fernando Costa',
-      city: 'Belo Horizonte',
-      state: 'MG',
-      description: 'Principal exposição nacional da raça, com participação de criadores de todo o país',
-      relatedAnimals: [
-        { name: 'Trovão', registry: 'ABCCMM 1234567-01', image: null },
-        { name: 'Ventania', registry: 'ABCCMM 1234567-02', image: null },
-      ],
-      organizer: 'ABCCMM',
-      link: 'https://www.abccmm.org.br/exposicao',
-      reminders: ['1 semana antes', '1 dia antes'],
-      attachments: [
-        { name: 'Regulamento_Exposicao.pdf', type: 'PDF', size: '1.5 MB' },
-      ],
-    },
-    {
-      id: 102,
-      type: 'event',
-      title: 'Copa Regional de Marcha',
-      category: 'Pista',
-      categoryColor: 'bg-blue-500',
-      date: 27,
-      time: '14:00',
-      endDate: 27,
-      endTime: '19:00',
-      location: 'Haras Vale do Sol',
-      city: 'Sete Lagoas',
-      state: 'MG',
-      description: 'Competição regional de marcha com participação de 50 animais',
-      relatedAnimals: [
-        { name: 'Relâmpago Negro', registry: 'ABCCMM 1234567-10', image: null },
-      ],
-      organizer: 'Associação Regional',
-      link: '',
-      reminders: ['3 dias antes'],
-      attachments: [],
-    },
-  ];
+  const typesFilter: AgendaEventType[] = activeTab === 'events'
+    ? ['Evento']
+    : ['Serviço', 'Veterinário', 'Casqueamento', 'Dentista', 'Aplicação P4', 'Coleta Embrião', 'Diagnóstico Gestação', 'Outro'];
 
-  // Combinar serviços e eventos para visualização no calendário
-  const allItems = activeTab === 'services' ? internalServices : activeTab === 'events' ? publicEvents : [];
+  const shouldLoadAgenda = !!harasId && activeTab !== 'awards';
+
+  const { data: eventsResponse } = useAgendaEvents(
+    {
+      haras_id: harasId,
+      start_date: monthStart.toISOString(),
+      end_date: monthEnd.toISOString(),
+      type: typesFilter,
+    },
+    { page: 1, limit: 200 },
+    shouldLoadAgenda
+  );
+
+  const events = eventsResponse?.data || [];
+
+  const { mutateAsync: createAgendaEvent, isPending: isCreating } = useCreateAgendaEvent();
+  const { mutateAsync: deleteAgendaEvent } = useDeleteAgendaEvent();
+
+  const handleCreateEvent = async (input: CreateAgendaEventInput) => {
+    if (!harasId) {
+      throw new Error('Haras não identificado.');
+    }
+    await createAgendaEvent(input);
+  };
+
+  const allItems = useMemo(() => {
+    const toTimeLabel = (date: Date) =>
+      date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    return events.map((event) => {
+      const startDate = new Date(event.start_date);
+      const endDate = event.end_date ? new Date(event.end_date) : null;
+      const details = event.details;
+      const tabKey = activeTab === 'events' ? 'events' : 'services';
+      const categoryConfig = getCategoryConfig(details?.category, tabKey);
+      const relatedIds = details?.relatedAnimalIds?.length
+        ? details.relatedAnimalIds
+        : event.animal_id
+          ? [event.animal_id]
+          : [];
+      const relatedAnimals = relatedIds
+        .map((id) => animalsById[id])
+        .filter(Boolean)
+        .map((animal) => ({
+          name: animal.name,
+          registry: animal.registry_number,
+          image: null,
+        }));
+      const animalLabel =
+        relatedAnimals.length > 1
+          ? `${relatedAnimals.length} animais`
+          : relatedAnimals.length === 1
+            ? relatedAnimals[0].name
+            : event.animal?.name || '-';
+
+      return {
+        id: event.id,
+        type: tabKey === 'events' ? 'event' : 'service',
+        title: event.title,
+        category: details?.categoryLabel || categoryConfig.label,
+        categoryColor: details?.categoryColor || categoryConfig.color,
+        date: startDate.getDate(),
+        time: details?.time || toTimeLabel(startDate),
+        endDate: endDate ? endDate.getDate() : undefined,
+        endTime: details?.endTime || (endDate ? toTimeLabel(endDate) : undefined),
+        location: event.location || '-',
+        city: details?.city,
+        state: details?.state,
+        description: event.description || event.observations || '',
+        relatedAnimals,
+        veterinarian: details?.veterinarian,
+        reminders: details?.reminders || [],
+        attachments: [],
+        organizer: details?.organizer,
+        link: details?.link,
+        animal: animalLabel,
+      };
+    });
+  }, [events, activeTab, animalsById]);
 
   const handleItemClick = (item: any) => {
     setSelectedItem(item);
@@ -174,10 +142,17 @@ export function BreederAgendaContent() {
     setShowDeleteModal(true);
   };
 
-  const handleConfirmDelete = () => {
-    toast.success(itemToDelete.type === 'service' ? 'Serviço excluído com sucesso!' : 'Evento excluído com sucesso!');
-    setShowDeleteModal(false);
-    setItemToDelete(null);
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      await deleteAgendaEvent(itemToDelete.id);
+      toast.success(itemToDelete.type === 'service' ? 'Serviço excluído com sucesso!' : 'Evento excluído com sucesso!');
+      setShowDeleteModal(false);
+      setItemToDelete(null);
+    } catch (error) {
+      console.error('Erro ao excluir evento:', error);
+      toast.error('Erro ao excluir evento.');
+    }
   };
 
   const selectedItems = allItems.filter(item => item.date === selectedDate);
@@ -237,7 +212,11 @@ export function BreederAgendaContent() {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
               <div className="flex gap-2 order-1 lg:order-2">
                 <button
-                  onClick={() => setCurrentDate(new Date())}
+                  onClick={() => {
+                    const now = new Date();
+                    setCurrentDate(now);
+                    setSelectedDate(now.getDate());
+                  }}
                   className="flex-1 lg:flex-none px-4 py-2 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-lg hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
                 >
                   Hoje
@@ -283,7 +262,10 @@ export function BreederAgendaContent() {
               {getDaysInMonth().map((day, idx) => {
                 const hasItems = day && allItems.some(item => item.date === day);
                 const isSelected = day === selectedDate;
-                const isToday = day === 18;
+                const isToday = !!day &&
+                  currentDate.getMonth() === today.getMonth() &&
+                  currentDate.getFullYear() === today.getFullYear() &&
+                  day === today.getDate();
                 
                 return (
                   <button
@@ -352,6 +334,10 @@ export function BreederAgendaContent() {
             <AddServiceEventModal 
               onClose={() => setShowAddModal(false)} 
               initialType={activeTab === 'services' ? 'service' : 'event'}
+              onCreate={handleCreateEvent}
+              harasId={harasId}
+              animals={animals}
+              isSaving={isCreating}
             />
           )}
 

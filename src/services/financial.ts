@@ -11,8 +11,93 @@ import type {
     PaginationParams,
     PaginatedResponse,
     FinancialSummary,
-    TransactionCategory
+    TransactionCategory,
+    TransactionType
 } from '@/types';
+
+const CATEGORY_VALUES: TransactionCategory[] = [
+    'venda_animal',
+    'servico_reproducao',
+    'premiacao',
+    'alimentacao',
+    'veterinario',
+    'medicamento',
+    'equipamento',
+    'funcionario',
+    'infraestrutura',
+    'outros',
+];
+
+const CATEGORY_MAP: Record<string, TransactionCategory> = {
+    'venda de cavalo': 'venda_animal',
+    'venda de animal': 'venda_animal',
+    'servico de cobertura': 'servico_reproducao',
+    'serviço de cobertura': 'servico_reproducao',
+    'servico de reproducao': 'servico_reproducao',
+    'serviço de reprodução': 'servico_reproducao',
+    'venda de embriao': 'servico_reproducao',
+    'venda de embrião': 'servico_reproducao',
+    'venda de semen': 'servico_reproducao',
+    'venda de sêmen': 'servico_reproducao',
+    'premios': 'premiacao',
+    'prêmios': 'premiacao',
+    'medicamentos': 'medicamento',
+    'equipamentos': 'equipamento',
+    'funcionarios': 'funcionario',
+    'funcionários': 'funcionario',
+};
+
+const TYPE_MAP: Record<string, TransactionType> = {
+    entrada: 'receita',
+    receita: 'receita',
+    saida: 'despesa',
+    saída: 'despesa',
+    despesa: 'despesa',
+};
+
+function mapTypeToDb(value: string | null | undefined): string {
+    const normalized = normalizeType(value);
+    return normalized === 'receita' ? 'Receita' : 'Despesa';
+}
+
+function normalizeCategory(value: string | null | undefined): TransactionCategory {
+    if (!value) return 'outros';
+    if (CATEGORY_VALUES.includes(value as TransactionCategory)) return value as TransactionCategory;
+    const key = value.toLowerCase().trim();
+    return CATEGORY_MAP[key] || 'outros';
+}
+
+function normalizeType(value: string | null | undefined): TransactionType {
+    if (!value) return 'despesa';
+    const key = value.toLowerCase().trim();
+    return TYPE_MAP[key] || 'despesa';
+}
+
+function mapTransactionRow(row: any): Transaction {
+    return {
+        id: row.id,
+        haras_id: row.haras_id,
+        type: normalizeType(row.tipo),
+        category: normalizeCategory(row.categoria),
+        amount: Number(row.valor) || 0,
+        description: row.descricao ?? '',
+        date: row.data_transacao ?? '',
+        animal_id: row.animal_id ?? null,
+        reference_id: row.reference_id ?? null,
+        created_by: row.created_by ?? null,
+        created_at: row.created_at ?? null,
+        updated_at: row.updated_at ?? null,
+        observations: row.observacoes ?? null,
+        payment_method: row.forma_pagamento ?? null,
+        animal: row.animal
+            ? {
+                id: row.animal.id,
+                name: row.animal.nome ?? row.animal.name ?? '',
+            }
+            : null,
+        created_by_profile: null,
+    };
+}
 
 export const financialService = {
     /**
@@ -26,37 +111,38 @@ export const financialService = {
             .from('transactions')
             .select(`
         *,
-        animal:animals(id, name),
-        created_by_profile:profiles!transactions_created_by_fkey(id, full_name)
+        animal:animals(id, nome)
       `, { count: 'exact' });
 
         if (filters.haras_id) {
             query = query.eq('haras_id', filters.haras_id);
         }
         if (filters.type) {
-            query = query.eq('type', filters.type);
+            query = query.eq('tipo', mapTypeToDb(filters.type));
         }
         if (filters.category) {
-            query = query.eq('category', filters.category);
+            query = query.eq('categoria', filters.category);
         }
         if (filters.start_date) {
-            query = query.gte('date', filters.start_date);
+            query = query.gte('data_transacao', filters.start_date);
         }
         if (filters.end_date) {
-            query = query.lte('date', filters.end_date);
+            query = query.lte('data_transacao', filters.end_date);
         }
         if (filters.animal_id) {
             query = query.eq('animal_id', filters.animal_id);
         }
 
-        query = query.order('date', { ascending: false });
+        query = query.order('data_transacao', { ascending: false });
         query = applyPagination(query, pagination);
 
         const { data, error, count } = await query;
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mappedData = (data || []).map(mapTransactionRow);
+
+        return formatPaginatedResponse(mappedData, count || 0, pagination);
     },
 
     /**
@@ -67,8 +153,7 @@ export const financialService = {
             .from('transactions')
             .select(`
         *,
-        animal:animals(id, name),
-        created_by_profile:profiles!transactions_created_by_fkey(id, full_name)
+        animal:animals(id, nome)
       `)
             .eq('id', id)
             .single();
@@ -78,45 +163,61 @@ export const financialService = {
             handleSupabaseError(error);
         }
 
-        return data as Transaction;
+        return data ? mapTransactionRow(data) : null;
     },
 
     /**
      * Cria uma nova transação
      */
     async create(input: CreateTransactionInput): Promise<Transaction> {
-        // Obter usuário atual
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Usuário não autenticado');
-
         const { data, error } = await supabase
             .from('transactions')
             .insert({
-                ...input,
-                created_by: user.id
+                haras_id: input.haras_id,
+                tipo: mapTypeToDb(input.type),
+                categoria: input.category,
+                valor: input.amount,
+                descricao: input.description,
+                data_transacao: input.date,
+                animal_id: input.animal_id ?? null,
+                observacoes: input.observations ?? null,
+                forma_pagamento: input.payment_method ?? null,
             })
             .select()
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return data as Transaction;
+        return mapTransactionRow(data);
     },
 
     /**
      * Atualiza uma transação
      */
     async update(id: string, input: Partial<CreateTransactionInput>): Promise<Transaction> {
+        const updateData: Record<string, unknown> = {
+            updated_at: new Date().toISOString(),
+        };
+
+        if (input.type !== undefined) updateData.tipo = mapTypeToDb(input.type);
+        if (input.category !== undefined) updateData.categoria = input.category;
+        if (input.amount !== undefined) updateData.valor = input.amount;
+        if (input.description !== undefined) updateData.descricao = input.description;
+        if (input.date !== undefined) updateData.data_transacao = input.date;
+        if (input.animal_id !== undefined) updateData.animal_id = input.animal_id;
+        if (input.observations !== undefined) updateData.observacoes = input.observations;
+        if (input.payment_method !== undefined) updateData.forma_pagamento = input.payment_method;
+
         const { data, error } = await supabase
             .from('transactions')
-            .update({ ...input, updated_at: new Date().toISOString() })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return data as Transaction;
+        return mapTransactionRow(data);
     },
 
     /**
@@ -141,14 +242,14 @@ export const financialService = {
     ): Promise<FinancialSummary> {
         let query = supabase
             .from('transactions')
-            .select('type, category, amount')
+            .select('tipo, categoria, valor')
             .eq('haras_id', harasId);
 
         if (startDate) {
-            query = query.gte('date', startDate);
+            query = query.gte('data_transacao', startDate);
         }
         if (endDate) {
-            query = query.lte('date', endDate);
+            query = query.lte('data_transacao', endDate);
         }
 
         const { data, error } = await query;
@@ -164,16 +265,18 @@ export const financialService = {
         };
 
         data?.forEach(transaction => {
-            const amount = Number(transaction.amount);
+            const amount = Number((transaction as any).valor);
+            const type = normalizeType((transaction as any).tipo);
+            const category = normalizeCategory((transaction as any).categoria);
 
-            if (transaction.type === 'receita') {
+            if (type === 'receita') {
                 summary.totalRevenue += amount;
-                summary.revenueByCategory[transaction.category as TransactionCategory] =
-                    (summary.revenueByCategory[transaction.category as TransactionCategory] || 0) + amount;
+                summary.revenueByCategory[category] =
+                    (summary.revenueByCategory[category] || 0) + amount;
             } else {
                 summary.totalExpenses += amount;
-                summary.expensesByCategory[transaction.category as TransactionCategory] =
-                    (summary.expensesByCategory[transaction.category as TransactionCategory] || 0) + amount;
+                summary.expensesByCategory[category] =
+                    (summary.expensesByCategory[category] || 0) + amount;
             }
         });
 
@@ -195,10 +298,10 @@ export const financialService = {
 
         const { data, error } = await supabase
             .from('transactions')
-            .select('type, amount, date')
+            .select('tipo, valor, data_transacao')
             .eq('haras_id', harasId)
-            .gte('date', startDate)
-            .lte('date', endDate);
+            .gte('data_transacao', startDate)
+            .lte('data_transacao', endDate);
 
         if (error) handleSupabaseError(error);
 
@@ -210,10 +313,11 @@ export const financialService = {
         }
 
         data?.forEach(transaction => {
-            const month = new Date(transaction.date).getMonth() + 1;
-            const amount = Number(transaction.amount);
+            const month = new Date((transaction as any).data_transacao).getMonth() + 1;
+            const amount = Number((transaction as any).valor);
+            const type = normalizeType((transaction as any).tipo);
 
-            if (transaction.type === 'receita') {
+            if (type === 'receita') {
                 monthlyData[month].revenue += amount;
             } else {
                 monthlyData[month].expenses += amount;
@@ -235,14 +339,14 @@ export const financialService = {
             .from('transactions')
             .select(`
         *,
-        animal:animals(id, name)
+        animal:animals(id, nome)
       `)
             .eq('haras_id', harasId)
-            .order('date', { ascending: false })
+            .order('data_transacao', { ascending: false })
             .limit(limit);
 
         if (error) handleSupabaseError(error);
 
-        return data as Transaction[];
+        return (data || []).map(mapTransactionRow);
     }
 };

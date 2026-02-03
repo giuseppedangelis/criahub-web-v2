@@ -7,9 +7,10 @@ import { supabase } from '@/services/base';
 
 interface AddCollaboratorFormProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
+export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormProps) {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -77,6 +78,7 @@ export function AddCollaboratorForm({ onClose }: AddCollaboratorFormProps) {
       });
 
       toast.success('Colaborador adicionado com sucesso!');
+      onSuccess?.();
       onClose();
     } catch (error: any) {
       console.error('Erro ao criar colaborador:', error);

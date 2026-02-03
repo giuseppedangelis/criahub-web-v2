@@ -1,8 +1,15 @@
-import { useState } from 'react';
-import { FileText, Download, Calendar, TrendingUp, DollarSign, Activity, Users, Award, Printer, Filter, Clock } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { FileText, Download, Calendar, TrendingUp, DollarSign, Activity, Users, Award, Printer, Clock } from 'lucide-react';
+import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useReports, useReportsSummary } from '@/hooks/useReports';
+import { reportsService } from '@/services/reports';
+import { REPORT_LAYOUT_VERSION, uploadReportFile } from '@/services/reportFiles';
+import type { ReportFormat, ReportType } from '@/types';
 
 interface ReportTemplate {
   id: string;
+  reportType: ReportType;
   name: string;
   description: string;
   icon: any;
@@ -17,16 +24,83 @@ interface RecentReport {
   name: string;
   type: string;
   date: string;
-  format: 'PDF' | 'Excel' | 'CSV';
+  format: string;
   size: string;
+  fileUrl?: string | null;
+  rawFormat?: ReportFormat;
+  rawType?: ReportType;
+  parameters?: Record<string, unknown> | null;
 }
 
 interface ReportsTabProps {
-  onGenerateAnimalReport: () => void;
-  onGenerateHerdReport: () => void;
+  onGenerateAnimalReport: (type?: ReportType) => void;
+  onGenerateHerdReport: (type?: ReportType) => void;
   onGenerateFinancialReport: () => void;
   onGenerateHealthReport: () => void;
 }
+
+const REPORT_TEMPLATES: ReportTemplate[] = [
+  {
+    id: '1',
+    reportType: 'animal',
+    name: 'Relatório Individual de Animal',
+    description: 'Histórico completo, genealogia, saúde e premiações de um animal específico',
+    icon: FileText,
+    color: 'bg-purple-500',
+    category: 'animal',
+    frequency: 'manual'
+  },
+  {
+    id: '2',
+    reportType: 'plantel',
+    name: 'Relatório do Plantel Completo',
+    description: 'Visão geral do plantel com estatísticas, distribuição e análises',
+    icon: Users,
+    color: 'bg-emerald-500',
+    category: 'plantel',
+    frequency: 'mensal'
+  },
+  {
+    id: '3',
+    reportType: 'financeiro',
+    name: 'Relatório Financeiro',
+    description: 'Receitas, despesas, investimentos e ROI do haras',
+    icon: DollarSign,
+    color: 'bg-amber-500',
+    category: 'financeiro',
+    frequency: 'mensal'
+  },
+  {
+    id: '4',
+    reportType: 'saude',
+    name: 'Relatório de Saúde do Plantel',
+    description: 'Vacinas, procedimentos veterinários e alertas de saúde',
+    icon: Activity,
+    color: 'bg-red-500',
+    category: 'saude',
+    frequency: 'trimestral'
+  },
+  {
+    id: '5',
+    reportType: 'premiacoes',
+    name: 'Relatório de Premiações',
+    description: 'Histórico de competições, troféus e desempenho em exposições',
+    icon: Award,
+    color: 'bg-gray-500',
+    category: 'animal',
+    frequency: 'manual'
+  },
+  {
+    id: '6',
+    reportType: 'reproducao',
+    name: 'Relatório de Reprodução',
+    description: 'Coberturas, gestações, nascimentos e índices reprodutivos',
+    icon: TrendingUp,
+    color: 'bg-pink-500',
+    category: 'plantel',
+    frequency: 'trimestral'
+  }
+];
 
 export function ReportsTab({ 
   onGenerateAnimalReport, 
@@ -35,147 +109,169 @@ export function ReportsTab({
   onGenerateHealthReport 
 }: ReportsTabProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
 
-  // Templates de relatórios disponíveis
-  const reportTemplates: ReportTemplate[] = [
-    {
-      id: '1',
-      name: 'Relatório Individual de Animal',
-      description: 'Histórico completo, genealogia, saúde e premiações de um animal específico',
-      icon: FileText,
-      color: 'bg-purple-500',
-      category: 'animal',
-      lastGenerated: '2024-12-10',
-      frequency: 'manual'
-    },
-    {
-      id: '2',
-      name: 'Relatório do Plantel Completo',
-      description: 'Visão geral do plantel com estatísticas, distribuição e análises',
-      icon: Users,
-      color: 'bg-emerald-500',
-      category: 'plantel',
-      lastGenerated: '2024-12-01',
-      frequency: 'mensal'
-    },
-    {
-      id: '3',
-      name: 'Relatório Financeiro',
-      description: 'Receitas, despesas, investimentos e ROI do haras',
-      icon: DollarSign,
-      color: 'bg-amber-500',
-      category: 'financeiro',
-      lastGenerated: '2024-11-30',
-      frequency: 'mensal'
-    },
-    {
-      id: '4',
-      name: 'Relatório de Saúde do Plantel',
-      description: 'Vacinas, procedimentos veterinários e alertas de saúde',
-      icon: Activity,
-      color: 'bg-red-500',
-      category: 'saude',
-      lastGenerated: '2024-12-05',
-      frequency: 'trimestral'
-    },
-    {
-      id: '5',
-      name: 'Relatório de Premiações',
-      description: 'Histórico de competições, troféus e desempenho em exposições',
-      icon: Award,
-      color: 'bg-gray-500',
-      category: 'animal',
-      frequency: 'manual'
-    },
-    {
-      id: '6',
-      name: 'Relatório de Reprodução',
-      description: 'Coberturas, gestações, nascimentos e índices reprodutivos',
-      icon: TrendingUp,
-      color: 'bg-pink-500',
-      category: 'plantel',
-      lastGenerated: '2024-11-15',
-      frequency: 'trimestral'
-    }
-  ];
+  const { data: reportsResponse } = useReports(
+    { haras_id: harasId },
+    { page: 1, limit: 200 },
+    !!harasId
+  );
+  const { data: summary } = useReportsSummary(harasId);
 
-  // Relatórios recentes
-  const recentReports: RecentReport[] = [
-    {
-      id: '1',
-      name: 'Relatório Individual - Ventania da Serra',
-      type: 'Animal Individual',
-      date: '2024-12-10',
-      format: 'PDF',
-      size: '2.4 MB'
-    },
-    {
-      id: '2',
-      name: 'Relatório Plantel - Dezembro 2024',
-      type: 'Plantel Completo',
-      date: '2024-12-01',
-      format: 'PDF',
-      size: '5.8 MB'
-    },
-    {
-      id: '3',
-      name: 'Relatório Financeiro - Novembro 2024',
-      type: 'Financeiro',
-      date: '2024-11-30',
-      format: 'Excel',
-      size: '1.2 MB'
-    },
-    {
-      id: '4',
-      name: 'Relatório Saúde - 4º Trimestre 2024',
-      type: 'Saúde do Plantel',
-      date: '2024-12-05',
-      format: 'PDF',
-      size: '3.1 MB'
-    }
-  ];
-
-  const filteredTemplates = selectedCategory === 'all' 
-    ? reportTemplates 
-    : reportTemplates.filter(t => t.category === selectedCategory);
-
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  const handleGenerateReport = (templateId: string) => {
-    switch(templateId) {
-      case '1':
-      case '5':
-        onGenerateAnimalReport();
-        break;
-      case '2':
-      case '6':
-        onGenerateHerdReport();
-        break;
-      case '3':
-        onGenerateFinancialReport();
-        break;
-      case '4':
-        onGenerateHealthReport();
-        break;
-    }
-  };
+  const reports = reportsResponse?.data || [];
 
   const categoryConfig = {
     'animal': { label: 'Animal', color: 'bg-purple-500' },
     'plantel': { label: 'Plantel', color: 'bg-emerald-500' },
     'financeiro': { label: 'Financeiro', color: 'bg-amber-500' },
     'saude': { label: 'Saúde', color: 'bg-red-500' }
-  };
+  } as const;
 
   const frequencyConfig = {
     'manual': { label: 'Manual', color: 'text-gray-500' },
     'mensal': { label: 'Mensal', color: 'text-emerald-500' },
     'trimestral': { label: 'Trimestral', color: 'text-amber-500' },
     'anual': { label: 'Anual', color: 'text-purple-500' }
+  } as const;
+
+  const reportTypeLabels: Record<ReportType, string> = {
+    animal: 'Animal Individual',
+    plantel: 'Plantel Completo',
+    financeiro: 'Financeiro',
+    saude: 'Saúde do Plantel',
+    premiacoes: 'Premiações',
+    reproducao: 'Reprodução',
   };
+
+  const lastGeneratedByType = useMemo(() => {
+    const map: Partial<Record<ReportType, string>> = {};
+    reports.forEach((report) => {
+      if (report.created_at && !map[report.type]) {
+        map[report.type] = report.created_at;
+      }
+    });
+    return map;
+  }, [reports]);
+
+  const reportTemplatesWithHistory = useMemo(() => {
+    return REPORT_TEMPLATES.map((template) => ({
+      ...template,
+      lastGenerated: lastGeneratedByType[template.reportType],
+    }));
+  }, [lastGeneratedByType]);
+
+  const recentReports: RecentReport[] = useMemo(() => {
+    return reports.slice(0, 4).map((report) => ({
+      id: report.id,
+      name: report.name,
+      type: reportTypeLabels[report.type] || report.type,
+      date: report.created_at || '',
+      format: report.format ? report.format.toUpperCase() : '-',
+      size: report.size_bytes ? formatBytes(report.size_bytes) : '-',
+      fileUrl: report.file_url,
+      rawFormat: report.format,
+      rawType: report.type,
+      parameters: report.parameters ?? null,
+    }));
+  }, [reports, reportTypeLabels]);
+
+  const filteredTemplates = selectedCategory === 'all' 
+    ? reportTemplatesWithHistory 
+    : reportTemplatesWithHistory.filter(t => t.category === selectedCategory);
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const handleGenerateReport = (reportType: ReportType) => {
+    if (reportType === 'animal' || reportType === 'premiacoes') {
+      onGenerateAnimalReport(reportType);
+      return;
+    }
+    if (reportType === 'plantel' || reportType === 'reproducao') {
+      onGenerateHerdReport(reportType);
+      return;
+    }
+    if (reportType === 'financeiro') {
+      onGenerateFinancialReport();
+      return;
+    }
+    if (reportType === 'saude') {
+      onGenerateHealthReport();
+    }
+  };
+
+  const lastGeneratedLabel = formatDate(summary?.lastGeneratedAt || reports[0]?.created_at);
+  const totalReports = summary?.total ?? reportsResponse?.total ?? 0;
+  const scheduledReports = summary?.scheduled ?? 0;
+
+  const ensureReportFile = async (report: RecentReport) => {
+    if (!harasId) throw new Error('Haras não identificado.');
+    const format = report.rawFormat || 'html';
+    const payload = report.parameters || {};
+
+    const { fileUrl, sizeBytes, storedFormat, notice } = await uploadReportFile({
+      harasId,
+      reportName: report.name,
+      format,
+      payload,
+      reportType: report.rawType,
+    });
+
+    await reportsService.update(report.id, {
+      file_url: fileUrl,
+      size_bytes: sizeBytes,
+      format: storedFormat,
+      status: 'Gerado',
+    });
+
+    if (notice) {
+      toast.message(notice);
+    }
+
+    return fileUrl;
+  };
+
+  const handleDownload = async (report: RecentReport) => {
+    try {
+      const metaVersion = (report.parameters as any)?.meta?.layoutVersion;
+      const shouldRegenerate = !report.fileUrl || !metaVersion || metaVersion !== REPORT_LAYOUT_VERSION;
+      const url = shouldRegenerate ? await ensureReportFile(report) : report.fileUrl;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Erro ao baixar relatório:', error);
+      toast.error('Relatório ainda não está disponível para download.');
+    }
+  };
+
+  const handlePrint = async (report: RecentReport) => {
+    try {
+      const metaVersion = (report.parameters as any)?.meta?.layoutVersion;
+      const shouldRegenerate = !report.fileUrl || !metaVersion || metaVersion !== REPORT_LAYOUT_VERSION;
+      const url = shouldRegenerate ? await ensureReportFile(report) : report.fileUrl;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Erro ao imprimir relatório:', error);
+      toast.error('Relatório ainda não está disponível para impressão.');
+    }
+  };
+
+  function formatBytes(bytes: number): string {
+    if (!bytes || bytes <= 0) return '-';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  }
+
 
   return (
     <div className="space-y-6">
@@ -187,7 +283,7 @@ export function ReportsTab({
               <FileText className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground dark:text-white">6</p>
+              <p className="text-2xl font-bold text-foreground dark:text-white">{REPORT_TEMPLATES.length}</p>
               <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Tipos Disponíveis</p>
             </div>
           </div>
@@ -199,7 +295,7 @@ export function ReportsTab({
               <Download className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground dark:text-white">47</p>
+              <p className="text-2xl font-bold text-foreground dark:text-white">{totalReports}</p>
               <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Relatórios Gerados</p>
             </div>
           </div>
@@ -211,7 +307,7 @@ export function ReportsTab({
               <Clock className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <p className="text-sm font-bold text-foreground dark:text-white">10/12/2024</p>
+              <p className="text-sm font-bold text-foreground dark:text-white">{lastGeneratedLabel}</p>
               <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Último Gerado</p>
             </div>
           </div>
@@ -223,7 +319,7 @@ export function ReportsTab({
               <Calendar className="w-5 h-5 text-gray-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground dark:text-white">3</p>
+              <p className="text-2xl font-bold text-foreground dark:text-white">{scheduledReports}</p>
               <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Agendados</p>
             </div>
           </div>
@@ -298,7 +394,7 @@ export function ReportsTab({
                 </div>
 
                 <button
-                  onClick={() => handleGenerateReport(template.id)}
+                  onClick={() => handleGenerateReport(template.reportType)}
                   className="w-full px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
@@ -320,6 +416,11 @@ export function ReportsTab({
         </div>
 
         <div className="space-y-3">
+          {recentReports.length === 0 && (
+            <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+              Nenhum relatório gerado ainda.
+            </p>
+          )}
           {recentReports.map((report) => (
             <div
               key={report.id}
@@ -346,10 +447,16 @@ export function ReportsTab({
                   <span className="px-3 py-1 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-md text-xs font-medium">
                     {report.format}
                   </span>
-                  <button className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors">
+                  <button
+                    onClick={() => handleDownload(report)}
+                    className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
+                  >
                     <Download className="w-4 h-4 text-foreground dark:text-white" />
                   </button>
-                  <button className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors">
+                  <button
+                    onClick={() => handlePrint(report)}
+                    className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
+                  >
                     <Printer className="w-4 h-4 text-foreground dark:text-white" />
                   </button>
                 </div>

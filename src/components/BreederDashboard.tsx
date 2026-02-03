@@ -2,7 +2,7 @@
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { LayoutDashboard, Users as HorseIcon, Heart, DollarSign, Calendar, Settings, Moon, Sun, Bell, User, Menu, X, FileText, HelpCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
 import { UserDropdown } from './shared/UserDropdown';
@@ -21,11 +21,34 @@ import { AnimalReportModal } from './breeder/AnimalReportModal';
 import { HerdReportModal } from './breeder/HerdReportModal';
 import { FinancialReportModal } from './breeder/FinancialReportModal';
 import { HealthReportModal } from './breeder/HealthReportModal';
+import type { ReportType } from '@/types';
+import type { Notification } from '@/types';
+import { notificationsService } from '@/services/notifications';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { toast } from 'sonner';
+
+const formatNotificationTime = (dateValue?: string | null) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Agora';
+  if (diffMins < 60) return `${diffMins} min atrás`;
+  if (diffHours < 24) return `${diffHours}h atrás`;
+  if (diffDays === 1) return '1 dia atrás';
+  return `${diffDays} dias atrás`;
+};
 
 export function BreederDashboard() {
   const { theme, toggleTheme } = useTheme();
   const { userRole, userEmail, userName, logout } = useUser();
   const { isMobile } = useResponsive();
+  const { data: currentHaras } = useCurrentHaras();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
@@ -33,20 +56,30 @@ export function BreederDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAnimalReportModal, setShowAnimalReportModal] = useState(false);
   const [showHerdReportModal, setShowHerdReportModal] = useState(false);
+  const [animalReportType, setAnimalReportType] = useState<ReportType>('animal');
+  const [herdReportType, setHerdReportType] = useState<ReportType>('plantel');
   const [showFinancialReportModal, setShowFinancialReportModal] = useState(false);
   const [showHealthReportModal, setShowHealthReportModal] = useState(false);
   const [showNotificationsCenter, setShowNotificationsCenter] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Nova cobertura registrada', message: 'Estrela Mangalarga x Vento Sul', time: '2 min atrás', unread: true },
-    { id: 2, title: 'Lembrete de vacina', message: 'Sol do Amanhecer - vacina vence em 3 dias', time: '1 hora atrás', unread: true },
-    { id: 3, title: 'Pagamento recebido', message: 'R$ 2.500 - venda de produto Lua da Serra', time: '2 horas atrás', unread: true },
-    { id: 4, title: 'Evento agendado', message: 'Exposição Mangalarga - 15/12', time: '1 dia atrás', unread: false },
-    { id: 5, title: 'Documento pendente', message: 'GIA de Estrela Dourada aguardando assinatura', time: '2 dias atrás', unread: false },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const loadNotifications = useCallback(async () => {
+    setIsLoadingNotifications(true);
+    try {
+      const response = await notificationsService.list({ page: 1, limit: 50 });
+      setNotifications(response.data);
+    } catch (error: any) {
+      console.error('Erro ao carregar notificações:', error);
+      toast.error(error.message || 'Erro ao carregar notificações.');
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
 
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
@@ -54,6 +87,10 @@ export function BreederDashboard() {
       setIsSidebarOpen(false);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   // Fecha dropdowns quando clicar fora
   useEffect(() => {
@@ -79,19 +116,40 @@ export function BreederDashboard() {
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
   ];
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsService.markAllAsRead();
+      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const handleMarkAsRead = (ids: number[]) => {
-    setNotifications(notifications.map(n =>
-      ids.includes(n.id) ? { ...n, unread: false } : n
-    ));
+  const handleMarkAsRead = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.markAsRead(id)));
+      setNotifications((prev) =>
+        prev.map((item) => (ids.includes(item.id) ? { ...item, read: true } : item))
+      );
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const handleDelete = (ids: number[]) => {
-    setNotifications(notifications.filter(n => !ids.includes(n.id)));
+  const handleDelete = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.delete(id)));
+      setNotifications((prev) => prev.filter((item) => !ids.includes(item.id)));
+    } catch (error: any) {
+      console.error('Erro ao excluir notificações:', error);
+      toast.error(error.message || 'Erro ao excluir notificações.');
+    }
   };
+
+  const handleMarkSingleAsRead = (id: string) => handleMarkAsRead([id]);
+  const handleDeleteSingle = (id: string) => handleDelete([id]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -123,7 +181,9 @@ export function BreederDashboard() {
         <div className="h-[101px] px-6 flex items-center justify-between border-b border-border dark:border-[#1a1a1a]">
           <div>
             <h1 className="text-foreground dark:text-white mb-2">CriaHub</h1>
-            <p className="text-muted-foreground dark:text-[#99a1af]">Haras Vale Verde</p>
+            <p className="text-muted-foreground dark:text-[#99a1af]">
+              {currentHaras?.name || 'Haras'}
+            </p>
           </div>
           {isMobile && (
             <button
@@ -261,14 +321,24 @@ export function BreederDashboard() {
                     </button>
                   </div>
                   <div className="max-h-96 overflow-y-auto mobile-scroll-hidden">
-                    {notifications.map((notif) => (
+                    {isLoadingNotifications && (
+                      <div className="p-4 text-sm text-muted-foreground dark:text-[#99a1af]">
+                        Carregando notificações...
+                      </div>
+                    )}
+                    {!isLoadingNotifications && notifications.length === 0 && (
+                      <div className="p-4 text-sm text-muted-foreground dark:text-[#99a1af]">
+                        Nenhuma notificação.
+                      </div>
+                    )}
+                    {!isLoadingNotifications && notifications.map((notif) => (
                       <div
                         key={notif.id}
-                        className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${notif.unread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                        className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${!notif.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                           }`}
                       >
                         <div className="flex items-start gap-3">
-                          {notif.unread && (
+                          {!notif.read && (
                             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                           )}
                           <div className="flex-1">
@@ -277,7 +347,7 @@ export function BreederDashboard() {
                               {notif.message}
                             </p>
                             <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                              {notif.time}
+                              {formatNotificationTime(notif.created_at)}
                             </p>
                           </div>
                         </div>
@@ -343,14 +413,20 @@ export function BreederDashboard() {
           {activeTab === 'help' && <BreederHelpContent />}
           {activeTab === 'settings' && <BreederSettingsContent />}
           {activeTab === 'profile' && <ProfileView />}
-          {activeTab === 'reports' && (
-            <ReportsTab
-              onGenerateAnimalReport={() => setShowAnimalReportModal(true)}
-              onGenerateHerdReport={() => setShowHerdReportModal(true)}
+            {activeTab === 'reports' && (
+              <ReportsTab
+              onGenerateAnimalReport={(type = 'animal') => {
+                setAnimalReportType(type);
+                setShowAnimalReportModal(true);
+              }}
+              onGenerateHerdReport={(type = 'plantel') => {
+                setHerdReportType(type);
+                setShowHerdReportModal(true);
+              }}
               onGenerateFinancialReport={() => setShowFinancialReportModal(true)}
               onGenerateHealthReport={() => setShowHealthReportModal(true)}
-            />
-          )}
+              />
+            )}
         </div>
       </main>
 
@@ -366,15 +442,17 @@ export function BreederDashboard() {
       />
 
       {/* Report Modals */}
-      <AnimalReportModal
-        isOpen={showAnimalReportModal}
-        onClose={() => setShowAnimalReportModal(false)}
-      />
+        <AnimalReportModal
+          isOpen={showAnimalReportModal}
+          onClose={() => setShowAnimalReportModal(false)}
+          reportType={animalReportType}
+        />
 
-      <HerdReportModal
-        isOpen={showHerdReportModal}
-        onClose={() => setShowHerdReportModal(false)}
-      />
+        <HerdReportModal
+          isOpen={showHerdReportModal}
+          onClose={() => setShowHerdReportModal(false)}
+          reportType={herdReportType}
+        />
 
       <FinancialReportModal
         isOpen={showFinancialReportModal}
@@ -390,6 +468,10 @@ export function BreederDashboard() {
       <NotificationsCenter
         isOpen={showNotificationsCenter}
         onClose={() => setShowNotificationsCenter(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkSingleAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onDelete={handleDeleteSingle}
       />
     </div>
   );

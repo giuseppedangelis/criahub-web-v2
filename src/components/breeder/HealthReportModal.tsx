@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { X, Activity, Download, Check, AlertTriangle } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
+import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useCreateReport } from '@/hooks/useReports';
+import { useHaras } from '@/hooks/useHaras';
+import { useHealthSummary } from '@/hooks/useAnimalHealth';
+import type { ReportFormat } from '@/types';
+import { uploadReportFile } from '@/services/reportFiles';
 
 interface HealthReportModalProps {
   isOpen: boolean;
@@ -8,6 +15,9 @@ interface HealthReportModalProps {
 }
 
 export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+  const { data: haras } = useHaras(harasId);
   const [reportPeriod, setReportPeriod] = useState('year');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -31,6 +41,8 @@ export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
   });
   const [reportFormat, setReportFormat] = useState('pdf');
   const [includeDetails, setIncludeDetails] = useState(true);
+  const { data: healthSummary } = useHealthSummary(harasId);
+  const { mutateAsync: createReport, isPending: isCreating } = useCreateReport();
 
   const handleToggleSection = (section: keyof typeof reportSections) => {
     setReportSections(prev => ({
@@ -56,26 +68,114 @@ export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const selectedCount = Object.values(reportSections).filter(v => v).length;
     if (selectedCount === 0) {
-      alert('Por favor, selecione pelo menos uma seção');
+      toast.error('Por favor, selecione pelo menos uma seção');
       return;
     }
 
     if (reportPeriod === 'custom' && (!customStartDate || !customEndDate)) {
-      alert('Por favor, preencha as datas do período personalizado');
+      toast.error('Por favor, preencha as datas do período personalizado');
       return;
     }
 
-    // Aqui seria a lógica de geração do relatório
-    console.log('Gerando relatório de saúde:', { 
-      reportPeriod, 
-      reportSections, 
-      animalFilters,
-      reportFormat 
-    });
-    onClose();
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    const reportName = 'Relatório de Saúde';
+
+    try {
+      const selectedSections = sections
+        .filter((section) => reportSections[section.key as keyof typeof reportSections])
+        .map((section) => section.label);
+
+      const filters = [
+        animalFilters.includeAll ? 'Todos os animais' : null,
+        animalFilters.withAlerts ? 'Com alertas ativos' : null,
+        animalFilters.vaccineOverdue ? 'Vacinas atrasadas' : null,
+        animalFilters.underTreatment ? 'Em tratamento' : null,
+      ].filter(Boolean) as string[];
+
+      const periodLabels: Record<string, string> = {
+        current: 'Situação Atual',
+        month: 'Último Mês',
+        quarter: 'Último Trimestre',
+        semester: 'Último Semestre',
+        year: 'Último Ano',
+        custom: 'Personalizado',
+      };
+
+      const reportPayload = {
+        reportType: 'saude',
+        meta: {
+          title: reportName,
+          subtitle: 'Panorama de saúde com alertas, vacinas e procedimentos',
+          harasName: haras?.name || 'Haras',
+          harasLocation: [haras?.city, haras?.state].filter(Boolean).join(' • '),
+          author: profile?.full_name || profile?.email || 'Equipe CriaHub',
+          generatedAt: new Date().toISOString(),
+          periodLabel: periodLabels[reportPeriod] || 'Atual',
+          periodRange: reportPeriod === 'custom' ? `${customStartDate || '-'} até ${customEndDate || '-'}` : '',
+        },
+        tags: ['Saúde', reportPeriod === 'custom' ? 'Período personalizado' : 'Período atual'],
+        summary: [
+          { label: 'Animais', value: summary.totalAnimals.toString() },
+          { label: 'Vacinas OK', value: summary.vaccinatedUpToDate.toString(), tone: 'success' },
+          { label: 'Vacinas Atrasadas', value: summary.vaccineOverdue.toString(), tone: 'danger' },
+          { label: 'Alertas', value: summary.activeAlerts.toString(), tone: 'warning' },
+          { label: 'Procedimentos', value: summary.totalProcedures.toString() },
+        ],
+        highlights: summary.vaccineOverdue > 0
+          ? [`${summary.vaccineOverdue} registros de vacinas estão atrasados.`]
+          : [],
+        sections: [
+          {
+            title: 'Seções selecionadas',
+            description: 'Conteúdos escolhidos para detalhamento.',
+            bullets: selectedSections,
+          },
+          {
+            title: 'Filtros aplicados',
+            bullets: filters.length > 0 ? filters : ['Nenhum filtro específico aplicado'],
+          },
+          {
+            title: 'Configurações',
+            bullets: [`Detalhamento por animal: ${includeDetails ? 'Sim' : 'Não'}`],
+          },
+        ],
+      };
+
+      const { fileUrl, sizeBytes, storedFormat, notice } = await uploadReportFile({
+        harasId,
+        reportName,
+        format: reportFormat as ReportFormat,
+        payload: reportPayload,
+        reportType: 'saude',
+      });
+
+      if (notice) {
+        toast.message(notice);
+      }
+
+      await createReport({
+        haras_id: harasId,
+        name: reportName,
+        type: 'saude',
+        format: storedFormat,
+        created_by: profile?.id,
+        file_url: fileUrl,
+        size_bytes: sizeBytes,
+        parameters: reportPayload,
+      });
+      toast.success('Relatório solicitado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar relatório de saúde:', error);
+      toast.error('Erro ao gerar relatório.');
+    }
   };
 
   const sections = [
@@ -144,13 +244,12 @@ export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
   const selectedSectionsCount = Object.values(reportSections).filter(v => v).length;
   const selectedFiltersCount = Object.entries(animalFilters).filter(([k, v]) => k !== 'includeAll' && v).length;
 
-  // Mock de dados de saúde
-  const healthSummary = {
-    totalAnimals: 42,
-    vaccinatedUpToDate: 35,
-    vaccineOverdue: 7,
-    activeAlerts: 12,
-    totalProcedures: 156
+  const summary = {
+    totalAnimals: healthSummary?.totalAnimals ?? 0,
+    vaccinatedUpToDate: healthSummary?.vaccinatedUpToDate ?? 0,
+    vaccineOverdue: healthSummary?.vaccineOverdue ?? 0,
+    activeAlerts: healthSummary?.activeAlerts ?? 0,
+    totalProcedures: healthSummary?.totalProcedures ?? 0,
   };
 
   if (!isOpen) return null;
@@ -180,34 +279,34 @@ export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-card dark:bg-[#0d0d0d] rounded-lg p-3 border border-border dark:border-[rgba(255,255,255,0.1)]">
               <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Animais</p>
-              <p className="text-xl font-bold text-foreground dark:text-white">{healthSummary.totalAnimals}</p>
+              <p className="text-xl font-bold text-foreground dark:text-white">{summary.totalAnimals}</p>
             </div>
             <div className="bg-card dark:bg-[#0d0d0d] rounded-lg p-3 border border-border dark:border-[rgba(255,255,255,0.1)]">
               <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Vacinas OK</p>
-              <p className="text-xl font-bold text-emerald-500">{healthSummary.vaccinatedUpToDate}</p>
+              <p className="text-xl font-bold text-emerald-500">{summary.vaccinatedUpToDate}</p>
             </div>
             <div className="bg-card dark:bg-[#0d0d0d] rounded-lg p-3 border border-border dark:border-[rgba(255,255,255,0.1)]">
               <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Atrasadas</p>
-              <p className="text-xl font-bold text-red-500">{healthSummary.vaccineOverdue}</p>
+              <p className="text-xl font-bold text-red-500">{summary.vaccineOverdue}</p>
             </div>
             <div className="bg-card dark:bg-[#0d0d0d] rounded-lg p-3 border border-border dark:border-[rgba(255,255,255,0.1)]">
               <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Alertas</p>
-              <p className="text-xl font-bold text-amber-500">{healthSummary.activeAlerts}</p>
+              <p className="text-xl font-bold text-amber-500">{summary.activeAlerts}</p>
             </div>
             <div className="bg-card dark:bg-[#0d0d0d] rounded-lg p-3 border border-border dark:border-[rgba(255,255,255,0.1)]">
               <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Procedimentos</p>
-              <p className="text-xl font-bold text-foreground dark:text-white">{healthSummary.totalProcedures}</p>
+              <p className="text-xl font-bold text-foreground dark:text-white">{summary.totalProcedures}</p>
             </div>
           </div>
 
           {/* Alertas Críticos */}
-          {healthSummary.vaccineOverdue > 0 && (
+          {summary.vaccineOverdue > 0 && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-foreground dark:text-white font-medium mb-1">
-                    Atenção: {healthSummary.vaccineOverdue} animais com vacinas atrasadas
+                    Atenção: {summary.vaccineOverdue} registros de vacinas atrasadas
                   </p>
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
                     É importante manter o calendário de vacinação em dia para garantir a saúde do plantel.
@@ -459,11 +558,11 @@ export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
           </button>
           <button
             onClick={handleGenerate}
-            disabled={selectedSectionsCount === 0}
+            disabled={selectedSectionsCount === 0 || isCreating}
             className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Gerar Relatório
+            {isCreating ? 'Gerando...' : 'Gerar Relatório'}
           </button>
         </div>
       </div>

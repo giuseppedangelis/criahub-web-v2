@@ -34,11 +34,13 @@ export const animalKeys = {
  */
 export function useAnimals(
     filters: AnimalFilters = {},
-    pagination: PaginationParams = { page: 1, limit: 20 }
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
 ) {
     return useQuery({
         queryKey: animalKeys.list(filters, pagination),
         queryFn: () => animalsService.list(filters, pagination),
+        enabled,
     })
 }
 

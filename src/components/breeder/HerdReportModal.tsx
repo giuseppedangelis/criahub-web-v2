@@ -1,13 +1,32 @@
 import { useState } from 'react';
-import { X, FileText, Download, Check, Calendar } from 'lucide-react';
+import { X, FileText, Download, Check } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
+import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useCreateReport } from '@/hooks/useReports';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useHaras, useDashboardStats } from '@/hooks/useHaras';
+import { useReproductionStats } from '@/hooks/useReproduction';
+import type { ReportFormat, ReportType } from '@/types';
+import { uploadReportFile } from '@/services/reportFiles';
 
 interface HerdReportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  reportType?: ReportType;
 }
 
-export function HerdReportModal({ isOpen, onClose }: HerdReportModalProps) {
+export function HerdReportModal({ isOpen, onClose, reportType = 'plantel' }: HerdReportModalProps) {
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+  const { data: haras } = useHaras(harasId);
+  const { data: dashboardStats } = useDashboardStats(harasId);
+  const { data: reproductionStats } = useReproductionStats(harasId);
+  const { data: animalsResponse } = useAnimals(
+    { haras_id: harasId },
+    { page: 1, limit: 200 },
+    !!harasId
+  );
   const [reportPeriod, setReportPeriod] = useState('current');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -32,6 +51,21 @@ export function HerdReportModal({ isOpen, onClose }: HerdReportModalProps) {
   });
   const [reportFormat, setReportFormat] = useState('pdf');
   const [includePhotos, setIncludePhotos] = useState(false);
+  const { mutateAsync: createReport, isPending: isCreating } = useCreateReport();
+
+  const animals = animalsResponse?.data || [];
+  const totalAnimals = animalsResponse?.total ?? animals.length;
+  const maleCount = animals.filter((animal) => animal.sex === 'Macho').length;
+  const femaleCount = animals.filter((animal) => animal.sex === 'Fêmea').length;
+  const activeCount = animals.filter((animal) => animal.status === 'ativo').length;
+
+  const animalSampleRows = animals.slice(0, 12).map((animal) => [
+    animal.name,
+    animal.sex || '-',
+    animal.category || '-',
+    animal.status || '-',
+    animal.birth_date ? new Date(animal.birth_date).toLocaleDateString('pt-BR') : '-',
+  ]);
 
   const handleToggleSection = (section: keyof typeof reportSections) => {
     setReportSections(prev => ({
@@ -58,26 +92,134 @@ export function HerdReportModal({ isOpen, onClose }: HerdReportModalProps) {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const selectedCount = Object.values(reportSections).filter(v => v).length;
     if (selectedCount === 0) {
-      alert('Por favor, selecione pelo menos uma seção');
+      toast.error('Por favor, selecione pelo menos uma seção');
       return;
     }
     
     if (reportPeriod === 'custom' && (!customStartDate || !customEndDate)) {
-      alert('Por favor, preencha as datas do período personalizado');
+      toast.error('Por favor, preencha as datas do período personalizado');
       return;
     }
 
-    // Aqui seria a lógica de geração do relatório
-    console.log('Gerando relatório do plantel:', { 
-      reportPeriod, 
-      reportSections, 
-      animalFilters,
-      reportFormat 
-    });
-    onClose();
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    const reportName = reportType === 'reproducao' ? 'Relatório de Reprodução' : 'Relatório do Plantel';
+
+    try {
+      const selectedSections = sections
+        .filter((section) => reportSections[section.key as keyof typeof reportSections])
+        .map((section) => section.label);
+
+      const filters = [
+        animalFilters.includeAll ? 'Todos os animais' : null,
+        animalFilters.onlyMales ? 'Apenas machos' : null,
+        animalFilters.onlyFemales ? 'Apenas fêmeas' : null,
+        animalFilters.onlyBreeding ? 'Apenas reprodução' : null,
+        animalFilters.onlyCompetition ? 'Apenas competição' : null,
+      ].filter(Boolean) as string[];
+
+      const periodLabels: Record<string, string> = {
+        current: 'Situação Atual',
+        month: 'Último Mês',
+        quarter: 'Último Trimestre',
+        semester: 'Último Semestre',
+        year: 'Último Ano',
+        custom: 'Personalizado',
+      };
+
+      const reportPayload = {
+        reportType,
+        meta: {
+          title: reportName,
+          subtitle: reportType === 'reproducao'
+            ? 'Indicadores completos de reprodução do plantel'
+            : 'Visão consolidada do plantel com estatísticas e distribuição',
+          harasName: haras?.name || 'Haras',
+          harasLocation: [haras?.city, haras?.state].filter(Boolean).join(' • '),
+          author: profile?.full_name || profile?.email || 'Equipe CriaHub',
+          generatedAt: new Date().toISOString(),
+          periodLabel: periodLabels[reportPeriod] || 'Atual',
+          periodRange: reportPeriod === 'custom' ? `${customStartDate || '-'} até ${customEndDate || '-'}` : '',
+        },
+        tags: [
+          reportType === 'reproducao' ? 'Reprodução' : 'Plantel',
+          `${totalAnimals} animais`,
+        ],
+        heroImageUrl: includePhotos ? animals[0]?.main_image_url || undefined : undefined,
+        summary: [
+          { label: 'Animais Totais', value: totalAnimals.toString() },
+          { label: 'Machos', value: maleCount.toString(), tone: 'primary' },
+          { label: 'Fêmeas', value: femaleCount.toString(), tone: 'primary' },
+          { label: 'Ativos', value: activeCount.toString(), tone: 'success' },
+          { label: 'Gestações Ativas', value: (dashboardStats?.activeGestations ?? 0).toString(), tone: 'warning' },
+          { label: 'Serviços Pendentes', value: (dashboardStats?.pendingServices ?? 0).toString(), tone: 'warning' },
+        ],
+        highlights: reportType === 'reproducao' && reproductionStats
+          ? [
+              `Taxa de sucesso: ${reproductionStats.successRate}%`,
+              `Gestações confirmadas: ${reproductionStats.confirmedGestations}`,
+              `Nascimentos registrados: ${reproductionStats.births}`,
+            ]
+          : [],
+        sections: [
+          {
+            title: 'Seções selecionadas',
+            description: 'Conteúdos configurados para o relatório completo.',
+            bullets: selectedSections,
+          },
+          {
+            title: 'Filtros aplicados',
+            bullets: filters.length > 0 ? filters : ['Nenhum filtro específico aplicado'],
+          },
+          {
+            title: 'Configurações',
+            bullets: [`Incluir fotos: ${includePhotos ? 'Sim' : 'Não'}`],
+          },
+          {
+            title: 'Amostra do Plantel',
+            description: 'Prévia dos animais incluídos no relatório.',
+            table: {
+              headers: ['Nome', 'Sexo', 'Categoria', 'Status', 'Nascimento'],
+              rows: animalSampleRows.length > 0 ? animalSampleRows : [['-', '-', '-', '-', '-']],
+            },
+          },
+        ],
+      };
+
+      const { fileUrl, sizeBytes, storedFormat, notice } = await uploadReportFile({
+        harasId,
+        reportName,
+        format: reportFormat as ReportFormat,
+        payload: reportPayload,
+        reportType,
+      });
+
+      if (notice) {
+        toast.message(notice);
+      }
+
+      await createReport({
+        haras_id: harasId,
+        name: reportName,
+        type: reportType,
+        format: storedFormat,
+        created_by: profile?.id,
+        file_url: fileUrl,
+        size_bytes: sizeBytes,
+        parameters: reportPayload,
+      });
+      toast.success('Relatório solicitado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      toast.error('Erro ao gerar relatório.');
+    }
   };
 
   const sections = [
@@ -104,9 +246,13 @@ export function HerdReportModal({ isOpen, onClose }: HerdReportModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)] sticky top-0 bg-card dark:bg-[#1a1a1a] z-10">
           <div>
-            <h3 className="text-xl text-foreground dark:text-white">Relatório do Plantel Completo</h3>
+            <h3 className="text-xl text-foreground dark:text-white">
+              {reportType === 'reproducao' ? 'Relatório de Reprodução' : 'Relatório do Plantel Completo'}
+            </h3>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-1">
-              Gere um relatório abrangente de todo o plantel do haras
+              {reportType === 'reproducao'
+                ? 'Gere um relatório com indicadores reprodutivos do plantel'
+                : 'Gere um relatório abrangente de todo o plantel do haras'}
             </p>
           </div>
           <button
@@ -384,11 +530,11 @@ export function HerdReportModal({ isOpen, onClose }: HerdReportModalProps) {
           </button>
           <button
             onClick={handleGenerate}
-            disabled={selectedSectionsCount === 0}
+            disabled={selectedSectionsCount === 0 || isCreating}
             className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Gerar Relatório
+            {isCreating ? 'Gerando...' : 'Gerar Relatório'}
           </button>
         </div>
       </div>

@@ -99,7 +99,7 @@ export const dashboardService = {
             .eq('haras_id', harasId)
             .gte('data_inicio', `${today}T00:00:00`)
             .lte('data_inicio', `${today}T23:59:59`)
-            .neq('status', 'cancelado');
+            .neq('status', 'Cancelado');
 
         if (eventsError) console.error('Events error:', eventsError);
 
@@ -291,7 +291,7 @@ export const dashboardService = {
             .select('id, titulo, data_inicio, tipo, status')
             .eq('haras_id', harasId)
             .gte('data_inicio', today)
-            .neq('status', 'cancelado')
+            .neq('status', 'Cancelado')
             .order('data_inicio', { ascending: true })
             .limit(limit);
 
@@ -356,7 +356,7 @@ export const dashboardService = {
         recentTransactions?.forEach(trans => {
             activities.push({
                 id: trans.id,
-                title: trans.tipo === 'receita' ? 'Receita registrada' : 'Despesa registrada',
+                title: trans.tipo === 'Receita' ? 'Receita registrada' : 'Despesa registrada',
                 description: `${trans.descricao} - R$ ${Number(trans.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
                 time: formatTimeAgo(trans.created_at),
                 type: 'receita'

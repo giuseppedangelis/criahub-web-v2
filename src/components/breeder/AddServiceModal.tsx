@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { X, ChevronLeft, Calendar, Clock, MapPin, User, FileText, Plus, Trash2, Bell } from 'lucide-react';
+import { X, ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
+import type { Animal, CreateAgendaEventInput } from '@/types';
+import { useVeterinarians } from '@/hooks/useVeterinarians';
+import { resolveAgendaType, serviceCategories } from './agendaUtils';
 
 interface AddServiceModalProps {
   onClose: () => void;
   onBack?: () => void;
+  onCreate: (input: CreateAgendaEventInput) => Promise<void> | void;
+  harasId: string;
+  animals: Animal[];
+  isSaving?: boolean;
 }
 
-export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
+export function AddServiceModal({ onClose, onBack, onCreate, harasId, animals, isSaving = false }: AddServiceModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -16,38 +23,15 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
     time: '',
     location: '',
     description: '',
-    veterinarian: '',
+    veterinarianId: '',
   });
 
   const [selectedAnimals, setSelectedAnimals] = useState<string[]>([]);
   const [reminders, setReminders] = useState<string[]>(['30 minutos antes']);
 
-  const serviceCategories = [
-    { value: 'saude', label: 'Saúde', color: 'bg-green-500' },
-    { value: 'consulta', label: 'Consulta Veterinária', color: 'bg-blue-500' },
-    { value: 'cobertura', label: 'Cobertura', color: 'bg-red-500' },
-    { value: 'exame', label: 'Exame Reprodutivo', color: 'bg-purple-500' },
-    { value: 'casqueamento', label: 'Casqueamento', color: 'bg-yellow-500' },
-    { value: 'parto', label: 'Parto', color: 'bg-pink-500' },
-    { value: 'coleta', label: 'Coleta de Sêmen', color: 'bg-cyan-500' },
-    { value: 'manejo', label: 'Manejo Geral', color: 'bg-orange-500' },
-  ];
+  const { data: veterinarians = [], isLoading: isLoadingVets, isError: isVetsError } = useVeterinarians(harasId, !!harasId);
 
-  const availableAnimals = [
-    { id: '1', name: 'Trovão', registry: 'ABCCMM 1234567-01' },
-    { id: '2', name: 'Ventania', registry: 'ABCCMM 1234567-02' },
-    { id: '3', name: 'Estrela', registry: 'ABCCMM 1234567-03' },
-    { id: '4', name: 'Relâmpago Negro', registry: 'ABCCMM 1234567-10' },
-    { id: '5', name: 'Estrela Dourada', registry: 'ABCCMM 1234567-11' },
-  ];
-
-  const veterinarians = [
-    'Dr. João Silva',
-    'Dr. Maria Santos',
-    'Dr. Pedro Costa',
-  ];
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.title || !formData.category || !formData.date || !formData.time) {
@@ -55,8 +39,42 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
       return;
     }
 
-    toast.success('Serviço cadastrado com sucesso!');
-    onClose();
+    const category = serviceCategories.find((item) => item.value === formData.category);
+    const startDate = `${formData.date}T${formData.time}:00`;
+    const primaryAnimalId = selectedAnimals[0];
+    const selectedVet = veterinarians.find((vet) => vet.id === formData.veterinarianId);
+    const veterinarianLabel = selectedVet ? (selectedVet.full_name?.trim() || selectedVet.email) : '';
+
+    const payload: CreateAgendaEventInput = {
+      haras_id: harasId,
+      title: formData.title,
+      type: resolveAgendaType('services'),
+      start_date: startDate,
+      description: formData.description,
+      location: formData.location || undefined,
+      status: 'Pendente',
+      animal_id: primaryAnimalId,
+      responsible: veterinarianLabel || undefined,
+      details: {
+        category: formData.category,
+        categoryLabel: category?.label,
+        categoryColor: category?.color,
+        time: formData.time,
+        veterinarian: veterinarianLabel || undefined,
+        veterinarianId: selectedVet?.id || undefined,
+        reminders,
+        relatedAnimalIds: selectedAnimals,
+      },
+    };
+
+    try {
+      await onCreate(payload);
+      toast.success('Serviço cadastrado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao criar serviço:', error);
+      toast.error('Erro ao cadastrar serviço');
+    }
   };
 
   const toggleAnimal = (animalId: string) => {
@@ -182,15 +200,29 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
                 Veterinário Responsável
               </label>
               <NativeSelect
-                value={formData.veterinarian}
-                onChange={(e) => setFormData({ ...formData, veterinarian: e.target.value })}
+                value={formData.veterinarianId}
+                onChange={(e) => setFormData({ ...formData, veterinarianId: e.target.value })}
                 className="w-full"
               >
                 <option value="">Selecione o veterinário</option>
-                {veterinarians.map(vet => (
-                  <option key={vet} value={vet}>{vet}</option>
-                ))}
+                {isLoadingVets && (
+                  <option value="" disabled>Carregando veterinários...</option>
+                )}
+                {!isLoadingVets && veterinarians.length === 0 && (
+                  <option value="" disabled>Nenhum veterinário cadastrado</option>
+                )}
+                {veterinarians.map((vet) => {
+                  const label = vet.full_name?.trim() || vet.email;
+                  return (
+                    <option key={vet.id} value={vet.id}>
+                      {label}
+                    </option>
+                  );
+                })}
               </NativeSelect>
+              {isVetsError && (
+                <p className="text-xs text-red-500 mt-2">Não foi possível carregar os veterinários.</p>
+              )}
             </div>
 
             <div>
@@ -211,7 +243,7 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
           <div className="space-y-4">
             <h3 className="text-foreground dark:text-white">Animais Relacionados</h3>
             <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-4 max-h-60 overflow-y-auto">
-              {availableAnimals.map(animal => (
+              {animals.map(animal => (
                 <label
                   key={animal.id}
                   className="flex items-center gap-3 p-3 hover:bg-muted dark:hover:bg-[#1a1a1a] rounded-lg cursor-pointer transition-colors"
@@ -224,7 +256,7 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
                   />
                   <div>
                     <p className="text-foreground dark:text-white">{animal.name}</p>
-                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{animal.registry}</p>
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{animal.registry_number}</p>
                   </div>
                 </label>
               ))}
@@ -291,9 +323,10 @@ export function AddServiceModal({ onClose, onBack }: AddServiceModalProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+              disabled={isSaving}
+              className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Cadastrar Serviço
+              {isSaving ? 'Salvando...' : 'Cadastrar Serviço'}
             </button>
           </div>
         </form>

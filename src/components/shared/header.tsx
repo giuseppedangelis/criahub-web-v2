@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useUser } from '@/contexts/UserContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import type { UserRole as DatabaseUserRole } from '@/types/database.types'
 import type { UserRole } from '@/contexts/UserContext'
 
 interface HeaderProps {

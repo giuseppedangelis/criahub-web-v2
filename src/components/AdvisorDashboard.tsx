@@ -18,11 +18,31 @@ import { AdvisorHelpContent } from './advisor/AdvisorHelpContent';
 import { UserDropdown } from './shared/UserDropdown';
 import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
+import type { Notification } from '@/types';
+import { useCurrentHaras } from '@/hooks/useHaras';
+
+const formatNotificationTime = (dateValue?: string | null) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Agora';
+  if (diffMins < 60) return `${diffMins} min atrás`;
+  if (diffHours < 24) return `${diffHours}h atrás`;
+  if (diffDays === 1) return '1 dia atrás';
+  return `${diffDays} dias atrás`;
+};
 
 export function AdvisorDashboard() {
   const { theme, toggleTheme } = useTheme();
   const { userRole, userName, userEmail, logout } = useUser();
   const { isMobile } = useResponsive();
+  const { data: currentHaras } = useCurrentHaras();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -30,67 +50,82 @@ export function AdvisorDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [notifications, setNotifications] = useState([
+  const [notifications, setNotifications] = useState<Notification[]>([
     {
-      id: 1,
+      id: '1',
+      user_id: '',
+      type: 'geral',
       title: 'Documento Assinado',
       message: 'GIA - Estrela Mangalarga foi assinado',
-      time: 'Há 2 horas',
-      unread: true
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 2,
+      id: '2',
+      user_id: '',
+      type: 'geral',
       title: 'Evento Próximo',
       message: 'Vistoria ABCCMM agendada para amanhã às 10:00',
-      time: 'Há 3 horas',
-      unread: true
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 3,
+      id: '3',
+      user_id: '',
+      type: 'geral',
       title: 'Tarefa Atribuída',
       message: 'Atualizar registro de Vento Sul no ABCCMM',
-      time: 'Há 5 horas',
-      unread: true
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 4,
+      id: '4',
+      user_id: '',
+      type: 'financeiro',
       title: 'Pagamento Pendente',
       message: 'Fatura de veterinário vence em 3 dias',
-      time: 'Há 1 dia',
-      unread: true
+      read: false,
+      data: null,
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     },
     {
-      id: 5,
+      id: '5',
+      user_id: '',
+      type: 'geral',
       title: 'Novo Membro da Equipe',
       message: 'Carlos Silva foi adicionado à equipe',
-      time: 'Há 2 dias',
-      unread: false
+      read: true,
+      data: null,
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     },
   ]);
 
-  const unreadNotifications = notifications.filter(n => n.unread).length;
+  const unreadNotifications = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: number) => {
+  const markAsRead = (id: string) => {
     setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, unread: false } : n
+      n.id === id ? { ...n, read: true } : n
     ));
   };
 
   const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
-  const handleMarkAsRead = (ids: number[]) => {
+  const handleMarkAsRead = (ids: string[]) => {
     setNotifications(notifications.map(n =>
-      ids.includes(n.id) ? { ...n, unread: false } : n
+      ids.includes(n.id) ? { ...n, read: true } : n
     ));
   };
 
-  const handleDelete = (ids: number[]) => {
+  const handleDelete = (ids: string[]) => {
     setNotifications(notifications.filter(n => !ids.includes(n.id)));
   };
 
-  const deleteNotification = (id: number) => {
+  const deleteNotification = (id: string) => {
     setNotifications(notifications.filter(n => n.id !== id));
   };
 
@@ -238,7 +273,7 @@ export function AdvisorDashboard() {
                     menuItems.find(m => m.id === activeMenu)?.label}
               </h2>
               <p className="text-muted-foreground dark:text-[#99a1af]">
-                Haras Vale Verde
+                {currentHaras?.name || 'Haras'}
               </p>
             </div>
           </div>
@@ -300,11 +335,11 @@ export function AdvisorDashboard() {
                         {notifications.map((notif) => (
                           <div
                             key={notif.id}
-                            className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${notif.unread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                            className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${!notif.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                               }`}
                           >
                             <div className="flex items-start gap-3">
-                              {notif.unread && (
+                              {!notif.read && (
                                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                               )}
                               <div className="flex-1">
@@ -313,7 +348,7 @@ export function AdvisorDashboard() {
                                   {notif.message}
                                 </p>
                                 <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                                  {notif.time}
+                                  {formatNotificationTime(notif.created_at)}
                                 </p>
                               </div>
                             </div>

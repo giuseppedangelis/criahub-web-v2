@@ -6,6 +6,19 @@
 import { supabase, applyPagination, formatPaginatedResponse, handleSupabaseError } from './base';
 import type { Notification, NotificationType, PaginationParams, PaginatedResponse } from '@/types';
 
+function mapNotification(row: any): Notification {
+    return {
+        id: row.id,
+        user_id: row.user_id,
+        type: row.type,
+        title: row.title,
+        message: row.message,
+        read: row.lida ?? row.read ?? false,
+        data: row.data ?? null,
+        created_at: row.created_at
+    };
+}
+
 export const notificationsService = {
     /**
      * Lista notificações do usuário
@@ -23,7 +36,7 @@ export const notificationsService = {
             .eq('user_id', user.id);
 
         if (unreadOnly) {
-            query = query.eq('read', false);
+            query = query.eq('lida', false);
         }
 
         query = query.order('created_at', { ascending: false });
@@ -33,7 +46,8 @@ export const notificationsService = {
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mapped = (data || []).map(mapNotification);
+        return formatPaginatedResponse(mapped, count || 0, pagination);
     },
 
     /**
@@ -42,7 +56,7 @@ export const notificationsService = {
     async markAsRead(notificationId: string): Promise<void> {
         const { error } = await supabase
             .from('notifications')
-            .update({ read: true })
+            .update({ lida: true })
             .eq('id', notificationId);
 
         if (error) handleSupabaseError(error);
@@ -57,9 +71,9 @@ export const notificationsService = {
 
         const { error } = await supabase
             .from('notifications')
-            .update({ read: true })
+            .update({ lida: true })
             .eq('user_id', user.id)
-            .eq('read', false);
+            .eq('lida', false);
 
         if (error) handleSupabaseError(error);
     },
@@ -93,14 +107,15 @@ export const notificationsService = {
                 type,
                 title,
                 message,
-                data
+                data,
+                lida: false
             })
             .select()
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return notification as Notification;
+        return mapNotification(notification);
     },
 
     /**
@@ -114,7 +129,7 @@ export const notificationsService = {
             .from('notifications')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', user.id)
-            .eq('read', false);
+            .eq('lida', false);
 
         if (error) return 0;
 

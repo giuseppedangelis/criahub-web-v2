@@ -248,5 +248,73 @@ export const healthService = {
 
         if (error) handleSupabaseError(error);
         return mapExam(data);
-    }
+    },
+
+    /**
+     * Resumo de saude do haras
+     */
+    async getHealthSummary(harasId: string): Promise<{
+        totalAnimals: number;
+        vaccinatedUpToDate: number;
+        vaccineOverdue: number;
+        activeAlerts: number;
+        totalProcedures: number;
+    }> {
+        const today = new Date().toISOString().split('T')[0];
+
+        const [
+            { count: animalsCount, error: animalsError },
+            { count: overdueCount, error: overdueError },
+            { count: upToDateCount, error: upToDateError },
+            { count: noNextDoseCount, error: noNextDoseError },
+            { count: alertsCount, error: alertsError },
+            { count: proceduresCount, error: proceduresError },
+        ] = await Promise.all([
+            supabase
+                .from('animals')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('status', 'Ativo'),
+            supabase
+                .from('vaccines')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .lt('data_proxima_dose', today),
+            supabase
+                .from('vaccines')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .gte('data_proxima_dose', today),
+            supabase
+                .from('vaccines')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .is('data_proxima_dose', null),
+            supabase
+                .from('system_alerts')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('module', 'saude')
+                .is('resolved_at', null),
+            supabase
+                .from('health_records')
+                .select('*', { count: 'exact', head: true })
+                .eq('haras_id', harasId),
+        ]);
+
+        if (animalsError) handleSupabaseError(animalsError);
+        if (overdueError) handleSupabaseError(overdueError);
+        if (upToDateError) handleSupabaseError(upToDateError);
+        if (noNextDoseError) handleSupabaseError(noNextDoseError);
+        if (alertsError) handleSupabaseError(alertsError);
+        if (proceduresError) handleSupabaseError(proceduresError);
+
+        return {
+            totalAnimals: animalsCount || 0,
+            vaccinatedUpToDate: (upToDateCount || 0) + (noNextDoseCount || 0),
+            vaccineOverdue: overdueCount || 0,
+            activeAlerts: alertsCount || 0,
+            totalProcedures: proceduresCount || 0,
+        };
+    },
 };

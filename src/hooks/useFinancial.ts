@@ -33,11 +33,13 @@ export const financialKeys = {
  */
 export function useTransactions(
     filters: TransactionFilters = {},
-    pagination: PaginationParams = { page: 1, limit: 20 }
+    pagination: PaginationParams = { page: 1, limit: 20 },
+    enabled: boolean = true
 ) {
     return useQuery({
         queryKey: financialKeys.transactionsList(filters, pagination),
         queryFn: () => financialService.list(filters, pagination),
+        enabled,
     })
 }
 

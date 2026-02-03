@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { User, Package, Plug, Shield, Wrench, Save, Check, X, AlertCircle, Upload, Eye, Key, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '../../contexts/UserContext';
-import { useResponsive } from '../../hooks/useResponsive';
 import { NativeSelect } from '../ui/native-select';
 import { createClient } from '@/lib/supabase/client';
+import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
+import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
 
 type SettingsTab = 'profile' | 'plans' | 'integrations' | 'security' | 'maintenance';
 
@@ -18,13 +19,48 @@ interface Plan {
   active: boolean;
 }
 
+const FALLBACK_PLANS: Plan[] = [
+  {
+    id: 'fallback-basic',
+    name: 'Básico',
+    price: '99.00',
+    maxUsers: 3,
+    maxHorses: 50,
+    storage: '5GB',
+    active: true,
+  },
+  {
+    id: 'fallback-premium',
+    name: 'Premium',
+    price: '249.00',
+    maxUsers: 10,
+    maxHorses: 200,
+    storage: '20GB',
+    active: true,
+  },
+  {
+    id: 'fallback-enterprise',
+    name: 'Enterprise',
+    price: '499.00',
+    maxUsers: 999,
+    maxHorses: 9999,
+    storage: '100GB',
+    active: true,
+  },
+];
+
 export function AdminSettingsContent() {
   const supabase = createClient();
   const { user, profile, refreshProfile } = useUser();
-  const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const { data: sessionsData, isLoading: isLoadingSessions, isError: isSessionsError } = useUserSessions();
+  const revokeSession = useRevokeSession();
 
   // Estados do Perfil - inicializa vazio e carrega do contexto
   const [profileData, setProfileData] = useState({
@@ -106,6 +142,174 @@ export function AdminSettingsContent() {
     }
   };
 
+  const formatTime = (value?: string | null) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
+
+  const formatSessionDate = (value?: string | null) => {
+    if (!value) return 'Sem registro';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  };
+
+  const formatUserAgent = (userAgent?: string | null) => {
+    if (!userAgent) return 'Dispositivo desconhecido';
+    const ua = userAgent.toLowerCase();
+    const device = ua.includes('android')
+      ? 'Android'
+      : ua.includes('iphone') || ua.includes('ipad')
+        ? 'iOS'
+        : ua.includes('windows')
+          ? 'Windows'
+          : ua.includes('mac')
+            ? 'MacOS'
+            : ua.includes('linux')
+              ? 'Linux'
+              : '';
+    const browser = ua.includes('edg')
+      ? 'Edge'
+      : ua.includes('chrome')
+        ? 'Chrome'
+        : ua.includes('firefox')
+          ? 'Firefox'
+          : ua.includes('safari')
+            ? 'Safari'
+            : '';
+    const label = [browser, device].filter(Boolean).join(' • ');
+    return label || userAgent;
+  };
+
+  const sessions = (sessionsData || []).slice().sort((a, b) => {
+    const aValue = a.refreshed_at || a.updated_at || a.created_at;
+    const bValue = b.refreshed_at || b.updated_at || b.created_at;
+    const aDate = aValue ? new Date(aValue) : null;
+    const bDate = bValue ? new Date(bValue) : null;
+    const aTime = aDate && !Number.isNaN(aDate.getTime()) ? aDate.getTime() : 0;
+    const bTime = bDate && !Number.isNaN(bDate.getTime()) ? bDate.getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const loadPlans = async () => {
+    setIsLoadingPlans(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('subscription_plans')
+        .select('*')
+        .order('price', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setPlans(
+          data.map((plan: any) => ({
+            id: plan.id,
+            name: plan.name,
+            price: plan.price?.toString() ?? '0',
+            maxUsers: plan.max_users ?? 0,
+            maxHorses: plan.max_horses ?? 0,
+            storage: plan.storage ?? '',
+            active: plan.active ?? true,
+          }))
+        );
+      } else {
+        setPlans(FALLBACK_PLANS);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar planos:', err);
+      setPlans(FALLBACK_PLANS);
+    } finally {
+      setIsLoadingPlans(false);
+    }
+  };
+
+  const loadIntegrations = async () => {
+    setIsLoadingIntegrations(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('integrations')
+        .select('*');
+
+      if (error) throw error;
+
+      const rows = data || [];
+      const findByName = (name: string) =>
+        rows.find((row: any) => (row.name || '').toLowerCase() === name.toLowerCase());
+
+      const stripe = findByName('Stripe');
+      const asaas = findByName('Asaas');
+      const abccmm = findByName('ABCCMM');
+
+      setIntegrationIds({
+        stripe: stripe?.id,
+        asaas: asaas?.id,
+        abccmm: abccmm?.id,
+      });
+
+      setIntegrations({
+        stripe: {
+          connected: !!stripe?.connected,
+          apiKey: stripe?.api_key || '',
+          publicKey: stripe?.public_key || '',
+        },
+        asaas: {
+          connected: !!asaas?.connected,
+          apiKey: asaas?.api_key || '',
+          publicKey: asaas?.public_key || '',
+        },
+        abccmm: {
+          connected: !!abccmm?.connected,
+          status: abccmm?.status || 'Inativo',
+          lastSync: formatTime(abccmm?.last_sync),
+        },
+      });
+    } catch (err) {
+      console.error('Erro ao carregar integrações:', err);
+    } finally {
+      setIsLoadingIntegrations(false);
+    }
+  };
+
+  const loadLogs = async () => {
+    setIsLoadingLogs(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('sync_logs')
+        .select('log_time, log_type, message')
+        .order('log_time', { ascending: false })
+        .limit(12);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setLogs(
+          data.map((log: any) => ({
+            time: formatTime(log.log_time),
+            type: log.log_type,
+            message: log.message,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Erro ao carregar logs:', err);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPlans();
+    loadIntegrations();
+    loadLogs();
+  }, []);
+
   // Função para formatar telefone brasileiro
   const formatPhone = (value: string): string => {
     // Remove tudo que não é número
@@ -184,42 +388,15 @@ export function AdminSettingsContent() {
   ];
 
   // Estados dos Planos
-  const [plans, setPlans] = useState<Plan[]>([
-    {
-      id: '1',
-      name: 'Básico',
-      price: '99.00',
-      maxUsers: 3,
-      maxHorses: 50,
-      storage: '5GB',
-      active: true,
-    },
-    {
-      id: '2',
-      name: 'Premium',
-      price: '249.00',
-      maxUsers: 10,
-      maxHorses: 200,
-      storage: '20GB',
-      active: true,
-    },
-    {
-      id: '3',
-      name: 'Enterprise',
-      price: '499.00',
-      maxUsers: 999,
-      maxHorses: 9999,
-      storage: '100GB',
-      active: true,
-    },
-  ]);
+  const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS);
 
   // Estados das Integrações
   const [integrations, setIntegrations] = useState({
-    stripe: { connected: true, apiKey: 'sk_live_*********************', publicKey: 'pk_live_*********************' },
+    stripe: { connected: false, apiKey: '', publicKey: '' },
     asaas: { connected: false, apiKey: '', publicKey: '' },
-    abccmm: { connected: true, status: 'Ativo', lastSync: '25/11/2025 14:30' },
+    abccmm: { connected: false, status: 'Inativo', lastSync: '' },
   });
+  const [integrationIds, setIntegrationIds] = useState<{ stripe?: string; asaas?: string; abccmm?: string }>({});
 
   // Estados de Segurança
   const [securityData, setSecurityData] = useState({
@@ -250,24 +427,57 @@ export function AdminSettingsContent() {
     { id: 'maintenance' as SettingsTab, name: 'Manutenção', icon: Wrench },
   ];
 
-  // Logs simulados
-  const logs = [
+  // Logs (fallback)
+  const [logs, setLogs] = useState([
     { time: '15:45:01', type: 'INFO', message: 'Conexão ABCCMM estabelecida com sucesso.' },
     { time: '15:45:10', type: 'WARN', message: "Erro na sincronização do haras 'Haras Trovão'. (Time Out)" },
     { time: '15:45:12', type: 'SUCCESS', message: "Importação da planilha 'Plantel' finalizada. 120 novos animais registrados." },
     { time: '15:45:15', type: 'DEBUG', message: 'Próxima tentativa de sincronização agendada para 00:00.' },
-  ];
+  ]);
 
   // Handlers
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadToStorage = async (file: File, pathPrefix: string) => {
+    const ext = file.name.split('.').pop();
+    const filePath = `${pathPrefix}/${Date.now()}_${Math.random().toString(36).slice(2)}${ext ? `.${ext}` : ''}`;
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileData({ ...profileData, avatar: reader.result as string });
-        toast.success('Foto de perfil atualizada!');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!user?.id) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const publicUrl = await uploadToStorage(file, `users/${user.id}/avatar`);
+      const { error } = await (supabase as any)
+        .from('profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfileData((prev) => ({ ...prev, avatar: publicUrl }));
+      await refreshProfile();
+      toast.success('Foto de perfil atualizada!');
+    } catch (err: any) {
+      console.error('Erro ao enviar avatar:', err);
+      toast.error(err.message || 'Erro ao enviar foto de perfil.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -276,12 +486,17 @@ export function AdminSettingsContent() {
       toast.error('Usuário não autenticado.');
       return;
     }
+    if (profileData.phone && !isValidPhone(profileData.phone)) {
+      toast.error('Telefone inválido.');
+      return;
+    }
 
     setIsSaving(true);
     try {
+      let emailUpdated = false;
       const updateData = {
         full_name: profileData.name,
-        phone: profileData.phone,
+        phone: profileData.phone.replace(/\D/g, ''),
         bio: profileData.bio,
         avatar_url: profileData.avatar,
         cep: profileData.cep.replace(/\D/g, ''),
@@ -292,7 +507,16 @@ export function AdminSettingsContent() {
         city: profileData.city,
         state: profileData.state,
         updated_at: new Date().toISOString(),
-      };
+      } as Record<string, any>;
+
+      if (profileData.email && profileData.email !== profile?.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: profileData.email,
+        });
+        if (authError) throw authError;
+        updateData.email = profileData.email;
+        emailUpdated = true;
+      }
 
       const { error } = await (supabase as any)
         .from('profiles')
@@ -307,6 +531,9 @@ export function AdminSettingsContent() {
       await refreshProfile();
 
       toast.success('Perfil atualizado com sucesso!');
+      if (emailUpdated) {
+        toast.message('Confirme o novo e-mail para concluir a alteração.');
+      }
     } catch (err: any) {
       console.error('Erro ao salvar perfil:', err);
       toast.error(err.message || 'Erro ao salvar perfil.');
@@ -323,22 +550,66 @@ export function AdminSettingsContent() {
   const handleSavePlan = () => {
     if (!editingPlan) return;
 
-    setPlans(plans.map(p => p.id === editingPlan.id ? editingPlan : p));
-    setShowEditPlanModal(false);
-    toast.success(`Plano ${editingPlan.name} atualizado com sucesso!`);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(editingPlan.id);
+    const payload = {
+      name: editingPlan.name,
+      price: Number(editingPlan.price),
+      max_users: editingPlan.maxUsers,
+      max_horses: editingPlan.maxHorses,
+      storage: editingPlan.storage,
+      active: editingPlan.active,
+      updated_at: new Date().toISOString(),
+    };
+
+    const persist = async () => {
+      if (isUuid) {
+        const { error } = await (supabase as any)
+          .from('subscription_plans')
+          .update(payload)
+          .eq('id', editingPlan.id);
+
+        if (error) throw error;
+      }
+    };
+
+    persist()
+      .then(() => {
+        setPlans(plans.map(p => p.id === editingPlan.id ? editingPlan : p));
+        setShowEditPlanModal(false);
+        toast.success(`Plano ${editingPlan.name} atualizado com sucesso!`);
+      })
+      .catch((err: any) => {
+        console.error('Erro ao salvar plano:', err);
+        toast.error(err.message || 'Erro ao salvar plano.');
+      });
   };
 
   const handleTogglePlan = (planId: string) => {
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(plan.id);
 
     setConfirmAction({
       title: plan.active ? 'Desativar Plano' : 'Ativar Plano',
       message: `Tem certeza que deseja ${plan.active ? 'desativar' : 'ativar'} o plano ${plan.name}? ${plan.active ? 'Clientes com este plano não poderão mais usá-lo.' : ''}`,
-      action: () => {
-        setPlans(plans.map(p => p.id === planId ? { ...p, active: !p.active } : p));
-        toast.success(`Plano ${plan.name} ${plan.active ? 'desativado' : 'ativado'} com sucesso!`);
-        setShowConfirmModal(false);
+      action: async () => {
+        try {
+          if (isUuid) {
+            const { error } = await (supabase as any)
+              .from('subscription_plans')
+              .update({ active: !plan.active, updated_at: new Date().toISOString() })
+              .eq('id', planId);
+
+            if (error) throw error;
+          }
+
+          setPlans(plans.map(p => p.id === planId ? { ...p, active: !p.active } : p));
+          toast.success(`Plano ${plan.name} ${plan.active ? 'desativado' : 'ativado'} com sucesso!`);
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao atualizar plano:', err);
+          toast.error(err.message || 'Erro ao atualizar plano.');
+        }
       }
     });
     setShowConfirmModal(true);
@@ -353,12 +624,36 @@ export function AdminSettingsContent() {
   };
 
   const handleSaveStripeKeys = () => {
-    setIntegrations({
-      ...integrations,
-      stripe: { ...integrations.stripe, ...stripeKeys, connected: true }
-    });
-    setShowConfigureStripeModal(false);
-    toast.success('Chaves do Stripe salvas com sucesso!');
+    const persist = async () => {
+      if (integrationIds.stripe) {
+        const { error } = await (supabase as any)
+          .from('integrations')
+          .update({
+            api_key: stripeKeys.apiKey,
+            public_key: stripeKeys.publicKey,
+            connected: true,
+            status: 'Ativo',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', integrationIds.stripe);
+
+        if (error) throw error;
+      }
+    };
+
+    persist()
+      .then(() => {
+        setIntegrations({
+          ...integrations,
+          stripe: { ...integrations.stripe, ...stripeKeys, connected: true }
+        });
+        setShowConfigureStripeModal(false);
+        toast.success('Chaves do Stripe salvas com sucesso!');
+      })
+      .catch((err: any) => {
+        console.error('Erro ao salvar Stripe:', err);
+        toast.error(err.message || 'Erro ao salvar chaves do Stripe.');
+      });
   };
 
   const handleConfigureAsaas = () => {
@@ -370,12 +665,36 @@ export function AdminSettingsContent() {
   };
 
   const handleSaveAsaasKeys = () => {
-    setIntegrations({
-      ...integrations,
-      asaas: { ...integrations.asaas, ...asaasKeys, connected: true }
-    });
-    setShowConfigureAsaasModal(false);
-    toast.success('Chaves do Asaas salvas com sucesso!');
+    const persist = async () => {
+      if (integrationIds.asaas) {
+        const { error } = await (supabase as any)
+          .from('integrations')
+          .update({
+            api_key: asaasKeys.apiKey,
+            public_key: asaasKeys.publicKey,
+            connected: true,
+            status: 'Ativo',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', integrationIds.asaas);
+
+        if (error) throw error;
+      }
+    };
+
+    persist()
+      .then(() => {
+        setIntegrations({
+          ...integrations,
+          asaas: { ...integrations.asaas, ...asaasKeys, connected: true }
+        });
+        setShowConfigureAsaasModal(false);
+        toast.success('Chaves do Asaas salvas com sucesso!');
+      })
+      .catch((err: any) => {
+        console.error('Erro ao salvar Asaas:', err);
+        toast.error(err.message || 'Erro ao salvar chaves do Asaas.');
+      });
   };
 
   const handleDisconnectIntegration = (service: 'stripe' | 'asaas' | 'abccmm') => {
@@ -384,15 +703,53 @@ export function AdminSettingsContent() {
     setConfirmAction({
       title: `Desconectar ${serviceName}`,
       message: `Tem certeza que deseja desconectar o ${serviceName}? Esta ação pode afetar o funcionamento da plataforma.`,
-      action: () => {
-        if (service === 'abccmm') {
-          setIntegrations({
-            ...integrations,
-            abccmm: { ...integrations.abccmm, connected: false }
-          });
+      action: async () => {
+        try {
+          const integrationId =
+            service === 'stripe'
+              ? integrationIds.stripe
+              : service === 'asaas'
+              ? integrationIds.asaas
+              : integrationIds.abccmm;
+
+          if (integrationId) {
+            const { error } = await (supabase as any)
+              .from('integrations')
+              .update({
+                connected: false,
+                status: 'Inativo',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', integrationId);
+
+            if (error) throw error;
+          }
+
+          if (service === 'stripe') {
+            setIntegrations({
+              ...integrations,
+              stripe: { ...integrations.stripe, connected: false },
+            });
+          }
+          if (service === 'asaas') {
+            setIntegrations({
+              ...integrations,
+              asaas: { ...integrations.asaas, connected: false },
+            });
+          }
+          if (service === 'abccmm') {
+            setIntegrations({
+              ...integrations,
+              abccmm: { ...integrations.abccmm, connected: false, status: 'Inativo' },
+            });
+          }
+
+          toast.info(`${serviceName} desconectado.`);
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao desconectar integração:', err);
+          toast.error(err.message || 'Erro ao desconectar integração.');
         }
-        toast.info(`${serviceName} desconectado.`);
-        setShowConfirmModal(false);
       }
     });
     setShowConfirmModal(true);
@@ -407,18 +764,28 @@ export function AdminSettingsContent() {
       toast.error('As senhas não coincidem.');
       return;
     }
-    if (securityData.newPassword.length < 8) {
-      toast.error('A senha deve ter no mínimo 8 caracteres.');
+    const passwordErrors = validatePasswordStrength(securityData.newPassword);
+    if (passwordErrors.length > 0) {
+      toast.error(passwordErrors[0]);
       return;
     }
 
     setConfirmAction({
       title: 'Alterar Senha',
       message: 'Tem certeza que deseja alterar sua senha? Você será desconectado de todos os dispositivos.',
-      action: () => {
-        setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        toast.success('Senha alterada com sucesso!');
-        setShowConfirmModal(false);
+      action: async () => {
+        try {
+          const { error } = await supabase.auth.updateUser({
+            password: securityData.newPassword,
+          });
+          if (error) throw error;
+          setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          toast.success('Senha alterada com sucesso!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao alterar senha:', err);
+          toast.error(err.message || 'Erro ao alterar senha.');
+        }
       }
     });
     setShowConfirmModal(true);
@@ -428,9 +795,34 @@ export function AdminSettingsContent() {
     setConfirmAction({
       title: 'Encerrar Todas as Sessões',
       message: 'Tem certeza que deseja encerrar todas as sessões ativas? Você precisará fazer login novamente em todos os dispositivos.',
-      action: () => {
-        toast.success('Logout realizado em todos os dispositivos!');
-        setShowConfirmModal(false);
+      action: async () => {
+        try {
+          const { error } = await supabase.auth.signOut({ scope: 'global' });
+          if (error) throw error;
+          toast.success('Logout realizado em todos os dispositivos!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao encerrar sessões:', err);
+          toast.error(err.message || 'Erro ao encerrar sessões.');
+        }
+      }
+    });
+    setShowConfirmModal(true);
+  };
+
+  const handleRevokeSession = (sessionId: string) => {
+    setConfirmAction({
+      title: 'Encerrar Sessão',
+      message: 'Tem certeza que deseja encerrar esta sessão?',
+      action: async () => {
+        try {
+          await revokeSession.mutateAsync(sessionId);
+          toast.success('Sessão encerrada com sucesso!');
+          setShowConfirmModal(false);
+        } catch (err: any) {
+          console.error('Erro ao encerrar sessão:', err);
+          toast.error(err.message || 'Erro ao encerrar sessão.');
+        }
       }
     });
     setShowConfirmModal(true);
@@ -516,9 +908,14 @@ export function AdminSettingsContent() {
                   </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 p-2 bg-primary dark:bg-white text-white dark:text-black rounded-full hover:opacity-90 transition-opacity"
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 p-2 bg-primary dark:bg-white text-white dark:text-black rounded-full hover:opacity-90 transition-opacity disabled:opacity-60"
                   >
-                    <Upload className="w-4 h-4" />
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -733,6 +1130,16 @@ export function AdminSettingsContent() {
           {/* Planos e Produtos */}
           {activeTab === 'plans' && (
             <div className="space-y-6">
+              {isLoadingPlans && (
+                <div className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Carregando planos...
+                </div>
+              )}
+              {!isLoadingPlans && plans.length === 0 && (
+                <div className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Nenhum plano encontrado.
+                </div>
+              )}
               {plans.map((plan) => (
                 <div
                   key={plan.id}
@@ -793,6 +1200,11 @@ export function AdminSettingsContent() {
           {/* Integrações */}
           {activeTab === 'integrations' && (
             <div className="space-y-6">
+              {isLoadingIntegrations && (
+                <div className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Carregando integrações...
+                </div>
+              )}
               {/* Gateway de Pagamento - Stripe */}
               <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -1008,15 +1420,72 @@ export function AdminSettingsContent() {
                   Sessões Ativas
                 </h3>
                 <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-4">
-                  Encerre todas as sessões ativas em outros dispositivos por segurança.
+                  Acompanhe os logins ativos e encerre sessões que você não reconhece.
                 </p>
-                <button
-                  onClick={handleLogoutAllDevices}
-                  className="flex items-center gap-2 px-6 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
-                >
-                  <AlertCircle className="w-5 h-5" />
-                  Encerrar Todas as Sessões
-                </button>
+                <div className="space-y-4">
+                  {isLoadingSessions && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-[#99a1af]">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando sessões...
+                    </div>
+                  )}
+                  {!isLoadingSessions && isSessionsError && (
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      Não foi possível carregar as sessões.
+                    </p>
+                  )}
+                  {!isLoadingSessions && !isSessionsError && sessions.length === 0 && (
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Nenhuma sessão ativa encontrada.
+                    </p>
+                  )}
+                  {!isLoadingSessions && !isSessionsError && sessions.length > 0 && (
+                    <div className="space-y-3">
+                      {sessions.map((session) => {
+                        const lastActive = session.refreshed_at || session.updated_at || session.created_at;
+                        return (
+                          <div
+                            key={session.id}
+                            className="flex flex-col gap-3 rounded-xl border border-border dark:border-[#2a2a2a] bg-muted/10 dark:bg-white/5 p-4"
+                          >
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="space-y-1">
+                                <p className="text-sm text-foreground dark:text-white">
+                                  {formatUserAgent(session.user_agent)}
+                                </p>
+                                <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                                  Última atividade: {formatSessionDate(lastActive)}
+                                </p>
+                                {session.ip && (
+                                  <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                                    IP: {session.ip}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleRevokeSession(session.id)}
+                                disabled={revokeSession.isPending}
+                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-border dark:border-[#3a3a3a] text-sm text-foreground dark:text-white hover:bg-muted dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                              >
+                                {revokeSession.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
+                                Encerrar sessão
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="pt-4 border-t border-border dark:border-[#2a2a2a]">
+                    <button
+                      onClick={handleLogoutAllDevices}
+                      className="flex items-center gap-2 px-6 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
+                    >
+                      <AlertCircle className="w-5 h-5" />
+                      Encerrar Todas as Sessões
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1178,6 +1647,12 @@ export function AdminSettingsContent() {
               </div>
 
               <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-4 h-[200px] overflow-y-auto font-mono text-xs">
+                {isLoadingLogs && (
+                  <p className="text-muted-foreground dark:text-gray-400">Carregando logs...</p>
+                )}
+                {!isLoadingLogs && logs.length === 0 && (
+                  <p className="text-muted-foreground dark:text-gray-400">Nenhum log encontrado.</p>
+                )}
                 {logs.map((log, index) => (
                   <p key={index} className="text-muted-foreground dark:text-gray-400 mb-1">
                     <span className="text-muted-foreground dark:text-gray-500">[{log.time}]</span>{' '}

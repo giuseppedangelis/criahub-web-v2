@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { X, DollarSign, Download, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { NativeSelect } from '../ui/native-select';
+import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useCreateReport } from '@/hooks/useReports';
+import { useHaras } from '@/hooks/useHaras';
+import { useFinancialSummary } from '@/hooks/useFinancial';
+import type { ReportFormat } from '@/types';
+import { uploadReportFile } from '@/services/reportFiles';
 
 interface FinancialReportModalProps {
   isOpen: boolean;
@@ -8,8 +15,12 @@ interface FinancialReportModalProps {
 }
 
 export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalProps) {
+  const { profile } = useUser();
+  const harasId = profile?.haras_id || '';
+  const { data: haras } = useHaras(harasId);
+  const currentYear = new Date().getFullYear();
   const [reportPeriod, setReportPeriod] = useState('year');
-  const [fiscalYear, setFiscalYear] = useState('2024');
+  const [fiscalYear, setFiscalYear] = useState(String(currentYear));
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [reportSections, setReportSections] = useState({
@@ -27,6 +38,25 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
   const [detailLevel, setDetailLevel] = useState('medium');
   const [reportFormat, setReportFormat] = useState('pdf');
   const [includeCharts, setIncludeCharts] = useState(true);
+  const { mutateAsync: createReport, isPending: isCreating } = useCreateReport();
+
+  const toDateString = (date: Date) => date.toISOString().split('T')[0];
+  const now = new Date();
+  const endCurrent = toDateString(now);
+  const startCurrent = toDateString(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()));
+  const startPrevious = toDateString(new Date(now.getFullYear() - 2, now.getMonth(), now.getDate()));
+  const endPrevious = startCurrent;
+
+  const { data: currentSummary } = useFinancialSummary(harasId, startCurrent, endCurrent);
+  const { data: previousSummary } = useFinancialSummary(harasId, startPrevious, endPrevious);
+
+  const totalReceitas = currentSummary?.totalRevenue ?? 0;
+  const totalDespesas = currentSummary?.totalExpenses ?? 0;
+  const lucro = currentSummary?.balance ?? totalReceitas - totalDespesas;
+  const previousBalance = previousSummary?.balance ?? 0;
+  const crescimentoAnual = previousBalance !== 0
+    ? ((lucro - previousBalance) / Math.abs(previousBalance)) * 100
+    : 0;
 
   const handleToggleSection = (section: keyof typeof reportSections) => {
     setReportSections(prev => ({
@@ -35,26 +65,127 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
     }));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const selectedCount = Object.values(reportSections).filter(v => v).length;
     if (selectedCount === 0) {
-      alert('Por favor, selecione pelo menos uma seção');
+      toast.error('Por favor, selecione pelo menos uma seção');
       return;
     }
 
     if (reportPeriod === 'custom' && (!customStartDate || !customEndDate)) {
-      alert('Por favor, preencha as datas do período personalizado');
+      toast.error('Por favor, preencha as datas do período personalizado');
       return;
     }
 
-    // Aqui seria a lógica de geração do relatório
-    console.log('Gerando relatório financeiro:', { 
-      reportPeriod, 
-      reportSections, 
-      detailLevel,
-      reportFormat 
-    });
-    onClose();
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    const reportName = 'Relatório Financeiro';
+
+    try {
+      const selectedSections = sections
+        .filter((section) => reportSections[section.key as keyof typeof reportSections])
+        .map((section) => section.label);
+
+      const topRevenue = Object.entries(currentSummary?.revenueByCategory || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([category, value]) => [categoryLabels[category] || category, formatCurrency(value)]);
+
+      const topExpenses = Object.entries(currentSummary?.expensesByCategory || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([category, value]) => [categoryLabels[category] || category, formatCurrency(value)]);
+
+      const periodLabels: Record<string, string> = {
+        month: 'Mensal',
+        quarter: 'Trimestral',
+        semester: 'Semestral',
+        year: 'Anual',
+        custom: 'Personalizado',
+      };
+
+      const reportPayload = {
+        reportType: 'financeiro',
+        meta: {
+          title: reportName,
+          subtitle: 'Análise financeira com indicadores e tendências do haras',
+          harasName: haras?.name || 'Haras',
+          harasLocation: [haras?.city, haras?.state].filter(Boolean).join(' • '),
+          author: profile?.full_name || profile?.email || 'Equipe CriaHub',
+          generatedAt: new Date().toISOString(),
+          periodLabel: periodLabels[reportPeriod] || 'Atual',
+          periodRange: reportPeriod === 'custom' ? `${customStartDate || '-'} até ${customEndDate || '-'}` : fiscalYear,
+        },
+        tags: ['Financeiro', reportPeriod === 'custom' ? 'Período personalizado' : 'Período atual'],
+        summary: [
+          { label: 'Receitas', value: formatCurrency(totalReceitas), tone: 'success' },
+          { label: 'Despesas', value: formatCurrency(totalDespesas), tone: 'danger' },
+          { label: 'Saldo', value: formatCurrency(lucro), tone: lucro >= 0 ? 'success' : 'danger' },
+          { label: 'Crescimento', value: `${crescimentoAnual >= 0 ? '+' : ''}${crescimentoAnual.toFixed(1)}%`, tone: crescimentoAnual >= 0 ? 'success' : 'warning' },
+        ],
+        sections: [
+          {
+            title: 'Seções selecionadas',
+            description: 'Conteúdos que serão detalhados no relatório final.',
+            bullets: selectedSections,
+          },
+          {
+            title: 'Configurações',
+            bullets: [
+              `Nível de detalhamento: ${detailLevel === 'basic' ? 'Básico' : detailLevel === 'detailed' ? 'Detalhado' : 'Médio'}`,
+              `Incluir gráficos: ${includeCharts ? 'Sim' : 'Não'}`,
+            ],
+          },
+          {
+            title: 'Receitas por Categoria',
+            description: 'Principais fontes de receita do período.',
+            table: {
+              headers: ['Categoria', 'Valor'],
+              rows: topRevenue.length > 0 ? topRevenue : [['Sem dados', '-']],
+            },
+          },
+          {
+            title: 'Despesas por Categoria',
+            description: 'Principais centros de custo do período.',
+            table: {
+              headers: ['Categoria', 'Valor'],
+              rows: topExpenses.length > 0 ? topExpenses : [['Sem dados', '-']],
+            },
+          },
+        ],
+      };
+
+      const { fileUrl, sizeBytes, storedFormat, notice } = await uploadReportFile({
+        harasId,
+        reportName,
+        format: reportFormat as ReportFormat,
+        payload: reportPayload,
+        reportType: 'financeiro',
+      });
+
+      if (notice) {
+        toast.message(notice);
+      }
+
+      await createReport({
+        haras_id: harasId,
+        name: reportName,
+        type: 'financeiro',
+        format: storedFormat,
+        created_by: profile?.id,
+        file_url: fileUrl,
+        size_bytes: sizeBytes,
+        parameters: reportPayload,
+      });
+      toast.success('Relatório solicitado com sucesso!');
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar relatório financeiro:', error);
+      toast.error('Erro ao gerar relatório.');
+    }
   };
 
   const sections = [
@@ -122,19 +253,24 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
 
   const selectedSectionsCount = Object.values(reportSections).filter(v => v).length;
 
-  // Mock de dados financeiros
-  const financialSummary = {
-    totalReceitas: 285000,
-    totalDespesas: 142000,
-    lucro: 143000,
-    crescimentoAnual: 23.5
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
+  };
+
+  const categoryLabels: Record<string, string> = {
+    venda_animal: 'Venda de Animal',
+    servico_reproducao: 'Serviço Reprodutivo',
+    premiacao: 'Premiações',
+    alimentacao: 'Alimentação',
+    veterinario: 'Veterinário',
+    medicamento: 'Medicamentos',
+    equipamento: 'Equipamentos',
+    funcionario: 'Funcionários',
+    infraestrutura: 'Infraestrutura',
+    outros: 'Outros',
   };
 
   if (!isOpen) return null;
@@ -166,27 +302,27 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
               <div>
                 <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Receitas Totais</p>
                 <p className="text-lg font-bold text-foreground dark:text-white flex items-center gap-1">
-                  {formatCurrency(financialSummary.totalReceitas)}
+                  {formatCurrency(totalReceitas)}
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Despesas Totais</p>
                 <p className="text-lg font-bold text-foreground dark:text-white flex items-center gap-1">
-                  {formatCurrency(financialSummary.totalDespesas)}
+                  {formatCurrency(totalDespesas)}
                   <TrendingDown className="w-4 h-4 text-red-500" />
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Lucro/Prejuízo</p>
                 <p className="text-lg font-bold text-emerald-500">
-                  {formatCurrency(financialSummary.lucro)}
+                  {formatCurrency(lucro)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Crescimento</p>
                 <p className="text-lg font-bold text-emerald-500">
-                  +{financialSummary.crescimentoAnual}%
+                  {crescimentoAnual >= 0 ? '+' : ''}{crescimentoAnual.toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -210,17 +346,19 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
                 <option value="custom">Personalizado</option>
               </NativeSelect>
 
-              {reportPeriod !== 'custom' && (
-                <NativeSelect
-                  value={fiscalYear}
-                  onChange={(e) => setFiscalYear(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
-                >
-                  <option value="2024">2024</option>
-                  <option value="2023">2023</option>
-                  <option value="2022">2022</option>
-                </NativeSelect>
-              )}
+            {reportPeriod !== 'custom' && (
+              <NativeSelect
+                value={fiscalYear}
+                onChange={(e) => setFiscalYear(e.target.value)}
+                className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+              >
+                {[currentYear, currentYear - 1, currentYear - 2].map((year) => (
+                  <option key={year} value={String(year)}>
+                    {year}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
             </div>
 
             {reportPeriod === 'custom' && (
@@ -407,11 +545,11 @@ export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalPr
           </button>
           <button
             onClick={handleGenerate}
-            disabled={selectedSectionsCount === 0}
+            disabled={selectedSectionsCount === 0 || isCreating}
             className="flex-1 px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Gerar Relatório
+            {isCreating ? 'Gerando...' : 'Gerar Relatório'}
           </button>
         </div>
       </div>

@@ -3,11 +3,23 @@ import { useMemo, useState } from 'react';
 import { RegisterOvulationModal, OvulationData } from './RegisterOvulationModal';
 import { RegisterInseminationModal, InseminationData } from './RegisterInseminationModal';
 import { ConfirmPregnancyModal, PregnancyData } from './ConfirmPregnancyModal';
-import type { ReproductiveEvent } from '@/types';
+import { NativeSelect } from '../ui/native-select';
+import type { Animal, CreateReproductiveEventInput, ReproductiveEvent } from '@/types';
+import { toast } from 'sonner';
 
 interface ReproductionAutomationTabProps {
   onNavigateToAgenda?: () => void;
   events?: ReproductiveEvent[];
+  harasId?: string;
+  mares?: Animal[];
+  onCreateEvent?: (input: CreateReproductiveEventInput) => Promise<ReproductiveEvent>;
+  onConfirmGestation?: (input: {
+    mareId: string;
+    stallionId?: string;
+    confirmationDate: string;
+    method: string;
+    observations?: string;
+  }) => Promise<void> | void;
 }
 
 interface AutoEvent {
@@ -33,6 +45,10 @@ const mapEventTypeLabel = (eventType?: string | null) => {
       return 'Coleta de Embrião';
     case 'transferencia_embriao':
       return 'Transferência de Embrião';
+    case 'diagnostico_gestacao':
+      return 'Diagnóstico de Gestação';
+    case 'aplicacao_p4':
+      return 'Aplicação P4';
     case 'cobertura':
       return 'Cobertura';
     default:
@@ -40,12 +56,20 @@ const mapEventTypeLabel = (eventType?: string | null) => {
   }
 };
 
-export function ReproductionAutomationTab({ onNavigateToAgenda, events = [] }: ReproductionAutomationTabProps = {}) {
+export function ReproductionAutomationTab({
+  onNavigateToAgenda,
+  events = [],
+  harasId,
+  mares = [],
+  onCreateEvent,
+  onConfirmGestation,
+}: ReproductionAutomationTabProps = {}) {
   const [showOvulationModal, setShowOvulationModal] = useState(false);
   const [showInseminationModal, setShowInseminationModal] = useState(false);
   const [showPregnancyModal, setShowPregnancyModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [newEventsCount, setNewEventsCount] = useState(0);
+  const [selectedMareId, setSelectedMareId] = useState('');
 
   // Handler para ver eventos no calendário
   const handleViewCalendar = () => {
@@ -67,10 +91,11 @@ export function ReproductionAutomationTab({ onNavigateToAgenda, events = [] }: R
         ? Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : 0;
       const details = event.details as Record<string, any> | null;
+      const label = details?.label || mapEventTypeLabel(event.event_type);
 
       return {
         id: event.id,
-        type: mapEventTypeLabel(event.event_type),
+        type: label,
         animal: event.mare?.name || event.animal?.name || event.stallion?.name || 'Animal',
         scheduledDate,
         scheduledTime: details?.time || '09:00',
@@ -82,6 +107,39 @@ export function ReproductionAutomationTab({ onNavigateToAgenda, events = [] }: R
       };
     });
   }, [events]);
+
+  const selectedMare = useMemo(
+    () => mares.find((mare) => mare.id === selectedMareId),
+    [mares, selectedMareId]
+  );
+
+  const formatDateLabel = (value?: string | null) => {
+    if (!value) return '';
+    const [year, month, day] = value.split('T')[0].split('-');
+    if (!year || !month || !day) return value;
+    return `${day}/${month}/${year}`;
+  };
+
+  const ensureMareSelected = () => {
+    if (!selectedMare) {
+      toast.error('Selecione uma égua para registrar o evento.');
+      return null;
+    }
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return null;
+    }
+    if (!onCreateEvent) {
+      toast.error('Integração com eventos indisponível.');
+      return null;
+    }
+    return selectedMare;
+  };
+
+  const createEvent = async (input: CreateReproductiveEventInput) => {
+    if (!onCreateEvent) return null;
+    return await onCreateEvent(input);
+  };
 
   // Estatísticas
   const stats = {
@@ -165,6 +223,49 @@ export function ReproductionAutomationTab({ onNavigateToAgenda, events = [] }: R
             </div>
             <p className="text-3xl font-semibold text-foreground dark:text-white">{stats.nextWeek}</p>
           </div>
+        </div>
+
+        {/* Ações rápidas */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3">
+          <NativeSelect
+            value={selectedMareId}
+            onChange={(e) => setSelectedMareId(e.target.value)}
+            className="w-full h-10 bg-white dark:bg-[#0d0d0d] border border-gray-200 dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white rounded-lg"
+          >
+            <option value="">Selecione a égua</option>
+            {mares.map((mare) => (
+              <option key={mare.id} value={mare.id}>
+                {mare.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <button
+            onClick={() => {
+              if (!ensureMareSelected()) return;
+              setShowOvulationModal(true);
+            }}
+            className="w-full lg:w-auto px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            Registrar Ovulação
+          </button>
+          <button
+            onClick={() => {
+              if (!ensureMareSelected()) return;
+              setShowInseminationModal(true);
+            }}
+            className="w-full lg:w-auto px-4 py-2 bg-primary/10 dark:bg-white/10 text-foreground dark:text-white rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 border border-primary/20 dark:border-white/20"
+          >
+            Registrar Inseminação
+          </button>
+          <button
+            onClick={() => {
+              if (!ensureMareSelected()) return;
+              setShowPregnancyModal(true);
+            }}
+            className="w-full lg:w-auto px-4 py-2 bg-transparent text-foreground dark:text-white rounded-lg hover:bg-white/60 dark:hover:bg-white/10 transition-colors border border-gray-200 dark:border-white/20"
+          >
+            Confirmar Gestação
+          </button>
         </div>
       </div>
 
@@ -268,40 +369,187 @@ export function ReproductionAutomationTab({ onNavigateToAgenda, events = [] }: R
       {/* Modais */}
       {showOvulationModal && (
         <RegisterOvulationModal
-          animalName="Estrela da Manhã"
+          animalName={selectedMare?.name || 'Égua'}
           onClose={() => setShowOvulationModal(false)}
-          onRegister={(data: OvulationData) => {
-            setSuccessMessage(`Ovulação registrada! Coleta automática agendada para ${data.collectionDate}`);
-            setNewEventsCount(1);
-            setShowOvulationModal(false);
-            setTimeout(() => setSuccessMessage(null), 5000);
+          onRegister={async (data: OvulationData) => {
+            const mare = ensureMareSelected();
+            if (!mare || !harasId) return;
+            try {
+              await createEvent({
+                haras_id: harasId,
+                animal_id: mare.id,
+                mare_id: mare.id,
+                event_type: 'ovulacao',
+                event_date: data.date,
+                observations: data.observations || undefined,
+                details: {
+                  time: data.time,
+                  label: 'Ovulação',
+                },
+                auto_generated: false,
+                priority: 'Média',
+              });
+
+              let autoCount = 0;
+              if (data.autoScheduleCollection && data.collectionDate) {
+                await createEvent({
+                  haras_id: harasId,
+                  animal_id: mare.id,
+                  mare_id: mare.id,
+                  event_type: 'coleta_ovulos',
+                  event_date: data.collectionDate,
+                  details: {
+                    time: data.collectionTime || data.time,
+                    label: 'Coleta de Embrião',
+                    originEvent: `Ovulação em ${formatDateLabel(data.date)}`,
+                  },
+                  auto_generated: true,
+                  priority: 'Média',
+                });
+                autoCount = 1;
+              }
+
+              setSuccessMessage(
+                autoCount > 0
+                  ? `Ovulação registrada! Coleta automática agendada para ${formatDateLabel(data.collectionDate)}.`
+                  : 'Ovulação registrada com sucesso!'
+              );
+              setNewEventsCount(autoCount);
+              setShowOvulationModal(false);
+              setTimeout(() => setSuccessMessage(null), 5000);
+            } catch (error) {
+              console.error('Erro ao registrar ovulação:', error);
+              toast.error('Erro ao registrar ovulação. Tente novamente.');
+            }
           }}
         />
       )}
       
       {showInseminationModal && (
         <RegisterInseminationModal
-          animalName="Estrela da Manhã"
+          animalName={selectedMare?.name || 'Égua'}
           onClose={() => setShowInseminationModal(false)}
-          onRegister={(data: InseminationData) => {
-            setSuccessMessage(`Inseminação registrada! Coleta automática agendada para ${data.collectionDate}`);
-            setNewEventsCount(1);
-            setShowInseminationModal(false);
-            setTimeout(() => setSuccessMessage(null), 5000);
+          onRegister={async (data: InseminationData) => {
+            const mare = ensureMareSelected();
+            if (!mare || !harasId) return;
+            try {
+              await createEvent({
+                haras_id: harasId,
+                animal_id: mare.id,
+                mare_id: mare.id,
+                event_type: 'inseminacao',
+                event_date: data.date,
+                semen_type: data.semenType,
+                observations: data.observations || undefined,
+                details: {
+                  time: data.time,
+                  stallionName: data.stallionName || undefined,
+                  semenType: data.semenType,
+                },
+                auto_generated: false,
+                priority: 'Média',
+              });
+
+              let autoCount = 0;
+              if (data.autoScheduleCollection && data.collectionDate) {
+                await createEvent({
+                  haras_id: harasId,
+                  animal_id: mare.id,
+                  mare_id: mare.id,
+                  event_type: 'coleta_ovulos',
+                  event_date: data.collectionDate,
+                  details: {
+                    time: data.collectionTime || data.time,
+                    label: 'Coleta de Embrião',
+                    originEvent: `Inseminação em ${formatDateLabel(data.date)}`,
+                  },
+                  auto_generated: true,
+                  priority: 'Média',
+                });
+                autoCount = 1;
+              }
+
+              setSuccessMessage(
+                autoCount > 0
+                  ? `Inseminação registrada! Coleta automática agendada para ${formatDateLabel(data.collectionDate)}.`
+                  : 'Inseminação registrada com sucesso!'
+              );
+              setNewEventsCount(autoCount);
+              setShowInseminationModal(false);
+              setTimeout(() => setSuccessMessage(null), 5000);
+            } catch (error) {
+              console.error('Erro ao registrar inseminação:', error);
+              toast.error('Erro ao registrar inseminação. Tente novamente.');
+            }
           }}
         />
       )}
       
       {showPregnancyModal && (
         <ConfirmPregnancyModal
-          animalName="Estrela da Manhã"
+          animalName={selectedMare?.name || 'Égua'}
           onClose={() => setShowPregnancyModal(false)}
-          onConfirm={(data: PregnancyData) => {
-            const eventsCount = data.p4Schedule?.length || 0;
-            setSuccessMessage(`Gestação confirmada! ${eventsCount} aplicações P4 agendadas automaticamente.`);
-            setNewEventsCount(eventsCount);
-            setShowPregnancyModal(false);
-            setTimeout(() => setSuccessMessage(null), 5000);
+          onConfirm={async (data: PregnancyData) => {
+            const mare = ensureMareSelected();
+            if (!mare || !harasId) return;
+            try {
+              await onConfirmGestation?.({
+                mareId: mare.id,
+                confirmationDate: data.confirmationDate,
+                method: data.method,
+                observations: data.observations,
+              });
+
+              await createEvent({
+                haras_id: harasId,
+                animal_id: mare.id,
+                mare_id: mare.id,
+                event_type: 'diagnostico_gestacao',
+                event_date: data.confirmationDate,
+                observations: data.observations || undefined,
+                details: {
+                  time: data.confirmationTime,
+                  label: 'Diagnóstico de Gestação',
+                },
+                auto_generated: false,
+                priority: 'Média',
+              });
+
+              let autoCount = 0;
+              if (data.autoScheduleP4 && data.p4Schedule && data.p4Schedule.length > 0) {
+                for (const app of data.p4Schedule) {
+                  await createEvent({
+                    haras_id: harasId,
+                    animal_id: mare.id,
+                    mare_id: mare.id,
+                    event_type: 'aplicacao_p4',
+                    event_date: app.date,
+                    details: {
+                      time: app.time,
+                      label: 'Aplicação P4',
+                      applicationNumber: app.applicationNumber,
+                      gestationDay: app.gestationDay,
+                      originEvent: `Diagnóstico em ${formatDateLabel(data.confirmationDate)}`,
+                    },
+                    auto_generated: true,
+                    priority: 'Média',
+                  });
+                  autoCount += 1;
+                }
+              }
+
+              setSuccessMessage(
+                autoCount > 0
+                  ? `Gestação confirmada! ${autoCount} aplicações P4 agendadas automaticamente.`
+                  : 'Gestação confirmada com sucesso!'
+              );
+              setNewEventsCount(autoCount);
+              setShowPregnancyModal(false);
+              setTimeout(() => setSuccessMessage(null), 5000);
+            } catch (error) {
+              console.error('Erro ao confirmar gestação:', error);
+              toast.error('Erro ao confirmar gestação. Tente novamente.');
+            }
           }}
         />
       )}
