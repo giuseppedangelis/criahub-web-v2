@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
+import { normalizeRoleForStorage } from '@/lib/roles'
 
 // Definir tipos simples para evitar dependência circular ou complexa
 interface CreateClientData {
@@ -83,12 +84,14 @@ export async function createClientAction(data: CreateClientData) {
             throw new Error('Erro ao criar haras: ' + harasError.message)
         }
 
+        const normalizedRole = normalizeRoleForStorage(data.role) || data.role
+
         // 3. Atualizar/Criar Perfil
         // Tenta atualizar primeiro (caso exista trigger)
         const { error: profileError } = await supabase
             .from('profiles')
             .update({
-                role: data.role,
+                role: normalizedRole,
                 haras_id: haras.id,
                 full_name: data.ownerName,
                 phone: data.phone,
@@ -107,7 +110,7 @@ export async function createClientAction(data: CreateClientData) {
             .upsert({
                 id: userId,
                 email: data.email,
-                role: data.role,
+                role: normalizedRole,
                 haras_id: haras.id,
                 full_name: data.ownerName,
                 phone: data.phone,

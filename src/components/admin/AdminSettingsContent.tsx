@@ -1101,7 +1101,15 @@ export function AdminSettingsContent() {
                   </label>
                   <input
                     type="text"
-                    value={profileData.role === 'admin' ? 'Administrador' : profileData.role === 'criador' ? 'Criador' : profileData.role === 'assessor' ? 'Assessor' : profileData.role}
+                    value={
+                      profileData.role === 'admin'
+                        ? 'Administrador'
+                        : profileData.role === 'criador'
+                          ? 'Criador'
+                          : profileData.role === 'assessor' || profileData.role === 'acessor' || profileData.role === 'advisor'
+                            ? 'Acessor'
+                            : profileData.role
+                    }
                     disabled
                     className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-muted-foreground dark:text-[#99a1af] cursor-not-allowed"
                   />

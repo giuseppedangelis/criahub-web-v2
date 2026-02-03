@@ -4,6 +4,7 @@
 // ============================================
 
 import { supabase, handleSupabaseError } from './base';
+import { normalizeRoleForStorage } from '@/lib/roles';
 
 export interface CreateCollaboratorInput {
     full_name: string;
@@ -21,12 +22,16 @@ export const collaboratorsService = {
      */
     async createCollaborator(input: CreateCollaboratorInput): Promise<{ user_id: string }> {
         try {
+            const normalizedRole = normalizeRoleForStorage(input.role) || input.role;
+            if (normalizedRole === 'admin') {
+                throw new Error('Não é permitido criar administrador pelo módulo de equipe.');
+            }
             // Chamar função SQL
             const { data, error } = await supabase.rpc('create_collaborator', {
                 p_email: input.email,
                 p_password: input.password,
                 p_full_name: input.full_name,
-                p_role: input.role,
+                p_role: normalizedRole,
                 p_haras_id: input.haras_id
             });
 

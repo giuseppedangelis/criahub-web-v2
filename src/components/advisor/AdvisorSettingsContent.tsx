@@ -70,9 +70,9 @@ export function AdvisorSettingsContent() {
   const revokeSession = useRevokeSession();
 
   const ROLE_LABELS: Record<string, string> = {
-    assessor: 'Assessor Administrativo',
-    acessor: 'Assessor Administrativo',
-    advisor: 'Assessor Administrativo',
+    assessor: 'Acessor Administrativo',
+    acessor: 'Acessor Administrativo',
+    advisor: 'Acessor Administrativo',
     criador: 'Criador/Dono de Haras',
     breeder: 'Criador/Dono de Haras',
     veterinario: 'Veterinário',

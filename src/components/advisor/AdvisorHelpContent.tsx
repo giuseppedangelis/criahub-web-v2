@@ -6,14 +6,14 @@ export function AdvisorHelpContent() {
 
   const faqs = {
     geral: [
-      { q: 'Qual é o papel do Assessor Administrativo?', a: 'O Assessor Administrativo gerencia toda a parte burocrática e documental do haras, incluindo registros na ABCCMM, documentos, tarefas administrativas e controle financeiro.' },
+      { q: 'Qual é o papel do Acessor Administrativo?', a: 'O Acessor Administrativo gerencia toda a parte burocrática e documental do haras, incluindo registros na ABCCMM, documentos, tarefas administrativas e controle financeiro.' },
       { q: 'Como visualizar os haras que gerencio?', a: 'Acesse Equipe para ver todos os haras e criadores que você assessora.' },
       { q: 'Posso acessar informações de múltiplos haras?', a: 'Sim! Você tem acesso aos dados de todos os haras que contrataram seus serviços de assessoria.' },
     ],
     plantel: [
       { q: 'Como cadastrar animais para o criador?', a: 'Acesse Plantel > Cadastrar Animal e preencha todas as informações necessárias.' },
       { q: 'Como exportar dados do plantel?', a: 'Na tela de Plantel, use a opção Exportar para baixar os dados em formato Excel ou PDF.' },
-      { q: 'Posso editar informações dos animais?', a: 'Sim! Como assessor, você tem permissão para editar todas as informações dos animais dos haras que assessora.' },
+      { q: 'Posso editar informações dos animais?', a: 'Sim! Como acessor, você tem permissão para editar todas as informações dos animais dos haras que assessora.' },
     ],
     documentos: [
       { q: 'Como enviar GIA para ABCCMM?', a: 'Acesse Documentos > Novo Documento, selecione o tipo GIA, preencha os dados e envie digitalmente.' },

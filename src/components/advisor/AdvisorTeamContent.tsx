@@ -1,5 +1,5 @@
 import { Search, Plus, Users, X, Edit, Trash2, Loader2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
 import { useUser } from '@/contexts/UserContext';
@@ -22,6 +22,7 @@ import {
   type TeamPermissionKey,
   type TeamPermissions,
 } from '@/services/team';
+import { isAdminRole, isAdvisorRole, isCreatorRole, normalizeRole } from '@/lib/roles';
 
 const PERMISSION_LABELS: Record<TeamPermissionKey, string> = {
   viewHerd: 'Plantel',
@@ -31,13 +32,23 @@ const PERMISSION_LABELS: Record<TeamPermissionKey, string> = {
   financialManagement: 'Financeiro',
   trainingManagement: 'Treinamento',
   teamManagement: 'Equipe',
-  documentManagement: 'Documentos',
-  fullAdministrative: 'Administrativo',
+  documentManagement: 'Documentos e Relatórios',
+  fullAdministrative: 'Acesso total (exclusivo do Criador)',
 };
+
+const ASSIGNABLE_PERMISSION_KEYS: TeamPermissionKey[] = [
+  'viewHerd',
+  'registerActivities',
+  'healthManagement',
+  'reproduction',
+  'financialManagement',
+  'trainingManagement',
+  'teamManagement',
+  'documentManagement',
+];
 
 const SYSTEM_ROLE_OPTIONS = [
   { value: 'acessor', label: 'Acessor' },
-  { value: 'assessor', label: 'Assessor' },
   { value: 'veterinario', label: 'Veterinário' },
   { value: 'peao', label: 'Peão' },
   { value: 'funcionario', label: 'Funcionário' },
@@ -45,18 +56,19 @@ const SYSTEM_ROLE_OPTIONS = [
 
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
   criador: 'Criador/Dono de Haras',
-  assessor: 'Assessor Administrativo',
-  acessor: 'Assessor Administrativo',
+  assessor: 'Acessor Administrativo',
+  acessor: 'Acessor Administrativo',
+  advisor: 'Acessor Administrativo',
   veterinario: 'Veterinário',
   peao: 'Peão',
   funcionario: 'Funcionário',
 };
 
 const formatAllowedModules = (permissions: TeamPermissions) => {
-  if (permissions.fullAdministrative) return 'Todos';
-  const selected = Object.entries(PERMISSION_LABELS)
-    .filter(([key]) => key !== 'fullAdministrative' && permissions[key as TeamPermissionKey])
-    .map(([, label]) => label);
+  if (permissions.fullAdministrative) return 'Acesso total (Criador)';
+  const selected = ASSIGNABLE_PERMISSION_KEYS
+    .filter((key) => permissions[key])
+    .map((key) => PERMISSION_LABELS[key]);
   return selected.length ? selected.join(', ') : 'Nenhum';
 };
 
@@ -74,7 +86,11 @@ export function AdvisorTeamContent() {
   const { data: currentHaras } = useCurrentHaras();
   const harasId = currentHaras?.id || profile?.haras_id || '';
 
-  const isCreator = profile?.role === 'criador';
+  const currentRole = normalizeRole(profile?.role);
+  const isAdmin = isAdminRole(currentRole);
+  const isOwner = Boolean(currentHaras?.owner_id && profile?.id === currentHaras.owner_id);
+  const isCreator = isOwner || (!currentHaras?.owner_id && isCreatorRole(currentRole)) || isAdmin;
+  const isAdvisor = isAdvisorRole(currentRole);
 
   const [activeTab, setActiveTab] = useState<'team' | 'roles'>('team');
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,39 +157,171 @@ export function AdvisorTeamContent() {
       canDelete: role.can_delete ? 'Sim' : 'Não',
       users: memberCounts[role.id] || 0,
       permissions: role.permissions,
+      isLocked: normalizeTeamPermissions(role.permissions).fullAdministrative,
     }));
   }, [rolesData, memberCounts]);
 
   const team = useMemo(() => {
-    return membersData.map((member) => {
-      const displayRole = member.role?.name
-        || SYSTEM_ROLE_LABELS[member.profile.role || '']
-        || 'Colaborador';
+    const explicitOwnerId = currentHaras?.owner_id;
+    const fallbackOwnerId = !explicitOwnerId
+      ? membersData.find((member) => {
+        const normalized = normalizeRole(member.profile.role);
+        return normalized === 'criador' || normalized === 'breeder';
+      })?.user_id
+      : null;
+    const ownerId = explicitOwnerId || fallbackOwnerId || null;
+    const hasExplicitOwner = Boolean(explicitOwnerId);
 
-      return {
-        id: member.user_id,
-        memberId: member.id || null,
-        name: member.profile.full_name || member.profile.email || 'Colaborador',
-        email: member.profile.email || '',
-        role: displayRole,
-        roleId: member.role_id || '',
-        phone: member.profile.phone || '-',
-        lastAccess: formatDate(member.profile.updated_at || member.profile.created_at || undefined),
-        status: member.status || 'Ativo',
-        permissions: normalizeTeamPermissions(member.permissions || member.role?.permissions),
-        systemRole: member.profile.role || 'funcionario',
-        isOwner: member.profile.role === 'criador',
-        isSelf: member.user_id === user?.id,
-      };
-    });
-  }, [membersData, user?.id]);
+    return membersData
+      .map((member) => {
+        const normalizedSystemRole = normalizeRole(member.profile.role);
+        const isOwnerMember = Boolean(ownerId && member.user_id === ownerId);
+        const isCreatorSystemRole = normalizedSystemRole === 'criador' || normalizedSystemRole === 'breeder';
+        const displayRole = isOwnerMember
+          ? 'Criador (Admin total)'
+          : isCreatorSystemRole
+            ? (hasExplicitOwner ? 'Criador (sem acesso total)' : 'Criador')
+            : member.role?.name
+              || SYSTEM_ROLE_LABELS[member.profile.role || '']
+              || 'Colaborador';
+
+        return {
+          id: member.user_id,
+          memberId: member.id || null,
+          name: member.profile.full_name || member.profile.email || 'Colaborador',
+          email: member.profile.email || '',
+          role: displayRole,
+          roleId: member.role_id || '',
+          phone: member.profile.phone || '-',
+          lastAccess: formatDate(member.profile.updated_at || member.profile.created_at || undefined),
+          status: member.status || 'Ativo',
+          permissions: normalizeTeamPermissions(member.permissions || member.role?.permissions),
+          systemRole: member.profile.role || 'funcionario',
+          systemRoleKey: normalizedSystemRole,
+          isOwner: isOwnerMember,
+          isSelf: member.user_id === user?.id,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isOwner === b.isOwner) return a.name.localeCompare(b.name);
+        return a.isOwner ? -1 : 1;
+      });
+  }, [membersData, currentHaras?.owner_id, user?.id]);
 
   const currentMember = useMemo(() => membersData.find((member) => member.user_id === user?.id), [membersData, user?.id]);
   const currentPermissions = normalizeTeamPermissions(currentMember?.permissions || currentMember?.role?.permissions);
 
   const canManageRoles = isCreator;
-  const canManageUsers = isCreator || currentPermissions.teamManagement || currentPermissions.fullAdministrative;
-  const canCreateAction = activeTab === 'team' ? canManageUsers : canManageRoles;
+  const canManageUsers = isCreator || isAdvisor;
+  const canDelegatePermissions = isCreator;
+
+  const canDelegatePermission = (key: TeamPermissionKey) => {
+    if (key === 'fullAdministrative') return false;
+    if (isCreator) return true;
+    return currentPermissions[key];
+  };
+
+  const stripFullAdministrative = (permissions: TeamPermissions) => ({
+    ...permissions,
+    fullAdministrative: false,
+  });
+
+  const clampPermissions = (permissions: TeamPermissions) => {
+    const next = stripFullAdministrative({ ...permissions } as TeamPermissions);
+    if (isCreator) return next;
+    (Object.keys(next) as TeamPermissionKey[]).forEach((key) => {
+      if (!canDelegatePermission(key)) next[key] = false;
+    });
+    return next;
+  };
+
+  const isRoleDelegable = (permissions: TeamPermissions) => {
+    if (permissions.fullAdministrative) return false;
+    if (isCreator) return true;
+    return (Object.keys(permissions) as TeamPermissionKey[]).every((key) =>
+      !permissions[key] || canDelegatePermission(key)
+    );
+  };
+
+  const availableSystemRoles = useMemo(() => {
+    if (isCreator) return SYSTEM_ROLE_OPTIONS;
+    if (isAdvisor) {
+      return SYSTEM_ROLE_OPTIONS.filter((option) =>
+        option.value === 'peao' || option.value === 'veterinario'
+      );
+    }
+    return [];
+  }, [isAdvisor, isCreator]);
+
+  const selectableRoles = useMemo(() => {
+    return rolesData.filter((role) => isRoleDelegable(normalizeTeamPermissions(role.permissions)));
+  }, [isCreator, rolesData, currentPermissions]);
+
+  const normalizeName = useCallback((value?: string | null) => (
+    (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+  ), []);
+
+  const getDefaultRoleIdForSystemRole = useCallback((systemRole?: string | null) => {
+    const normalizedSystemRole = normalizeRole(systemRole);
+    if (!normalizedSystemRole) return '';
+    const target = normalizedSystemRole === 'veterinario'
+      ? 'veterinario'
+      : normalizedSystemRole === 'peao'
+        ? 'peao'
+        : '';
+    if (!target) return '';
+    const match = rolesData.find((role) => normalizeName(role.name) === target);
+    return match?.id || '';
+  }, [normalizeName, rolesData]);
+
+  const resolvePermissionsForRole = useCallback((roleId?: string | null) => {
+    const role = rolesData.find((item) => item.id === roleId);
+    return role ? normalizeTeamPermissions(role.permissions) : emptyPermissions();
+  }, [rolesData]);
+
+  const canCreateAction = activeTab === 'team'
+    ? (canManageUsers && availableSystemRoles.length > 0)
+    : canManageRoles;
+
+  useEffect(() => {
+    if (canDelegatePermissions) return;
+    if (!formData.systemRole || formData.roleId) return;
+    const defaultRoleId = getDefaultRoleIdForSystemRole(formData.systemRole);
+    if (!defaultRoleId) return;
+    setFormData((prev) => ({
+      ...prev,
+      roleId: defaultRoleId,
+      permissions: resolvePermissionsForRole(defaultRoleId),
+    }));
+  }, [canDelegatePermissions, formData.roleId, formData.systemRole, getDefaultRoleIdForSystemRole, resolvePermissionsForRole]);
+
+  const canManageSystemRole = (role?: string | null) => {
+    const normalized = normalizeRole(role);
+    if (isCreator) return !['admin', 'criador', 'breeder'].includes(normalized);
+    if (isAdvisor) return normalized === 'peao' || normalized === 'veterinario';
+    return false;
+  };
+
+  const canEditMember = (member: typeof team[number]) => {
+    if (!canManageUsers) return false;
+    if (member.isOwner) return false;
+    if (member.isSelf) return true;
+    if (isCreator) return true;
+    if (isAdvisor) return member.systemRoleKey === 'peao' || member.systemRoleKey === 'veterinario';
+    return false;
+  };
+
+  const canDeleteMember = (member: typeof team[number]) => {
+    if (!canManageUsers) return false;
+    if (member.isSelf || member.isOwner) return false;
+    if (isCreator) return true;
+    if (isAdvisor) return member.systemRoleKey === 'peao' || member.systemRoleKey === 'veterinario';
+    return false;
+  };
 
   const filteredTeam = useMemo(() => {
     if (!searchTerm.trim()) return team;
@@ -191,41 +339,32 @@ export function AdvisorTeamContent() {
     return roles.filter((role) => role.name.toLowerCase().includes(term));
   }, [roles, searchTerm]);
 
+  const ownerMember = useMemo(() => (
+    team.find((member) => member.isOwner) || null
+  ), [team]);
+
   const updatePermissionState = (permissions: TeamPermissions, key: TeamPermissionKey, value: boolean) => {
     if (key === 'fullAdministrative') {
-      if (value) {
-        return {
-          viewHerd: true,
-          registerActivities: true,
-          healthManagement: true,
-          reproduction: true,
-          financialManagement: true,
-          trainingManagement: true,
-          teamManagement: true,
-          documentManagement: true,
-          fullAdministrative: true,
-        } as TeamPermissions;
-      }
       return { ...permissions, fullAdministrative: false } as TeamPermissions;
     }
 
-    const next = { ...permissions, [key]: value } as TeamPermissions;
-    if (!value && permissions.fullAdministrative) {
-      next.fullAdministrative = false;
-    }
+    const next = { ...permissions, [key]: value, fullAdministrative: false } as TeamPermissions;
     return next;
   };
 
   const resetUserForm = () => {
+    const defaultSystemRole = isAdvisor && !isCreator ? 'peao' : 'funcionario';
+    const defaultRoleId = !isCreator ? getDefaultRoleIdForSystemRole(defaultSystemRole) : '';
+    const defaultPermissions = !isCreator ? resolvePermissionsForRole(defaultRoleId) : emptyPermissions();
     setFormData({
       name: '',
       email: '',
       password: '',
-      roleId: '',
-      systemRole: 'funcionario',
+      roleId: defaultRoleId,
+      systemRole: defaultSystemRole,
       phone: '',
       status: 'Ativo',
-      permissions: emptyPermissions(),
+      permissions: defaultPermissions,
     });
   };
 
@@ -262,11 +401,33 @@ export function AdvisorTeamContent() {
       return;
     }
 
+    if (!canManageSystemRole(formData.systemRole)) {
+      toast.error('Você não pode cadastrar este perfil de acesso.');
+      return;
+    }
+    if (!isCreator && normalizeRole(formData.systemRole) === 'acessor') {
+      toast.error('Somente o criador pode cadastrar acessores.');
+      return;
+    }
+    if (!canDelegatePermissions && !formData.roleId) {
+      toast.error('Função padrão não encontrada para este perfil. Peça ao criador para configurar.');
+      return;
+    }
+
+    if (formData.roleId && !selectableRoles.find((role) => role.id === formData.roleId)) {
+      toast.error('Selecione uma função compatível com suas permissões.');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error('Email inválido');
       return;
     }
+
+    const delegatedPermissions = canDelegatePermissions
+      ? clampPermissions(formData.permissions)
+      : resolvePermissionsForRole(formData.roleId);
 
     setIsSubmitting(true);
     try {
@@ -282,7 +443,7 @@ export function AdvisorTeamContent() {
         harasId,
         userId: response.user_id,
         roleId: formData.roleId || null,
-        permissions: formData.permissions,
+        permissions: delegatedPermissions,
         status: formData.status as 'Ativo' | 'Inativo',
         createdBy: profile?.id,
       });
@@ -319,7 +480,7 @@ export function AdvisorTeamContent() {
       return;
     }
 
-    const hasPermissions = Object.values(roleFormData.permissions).some((value) => value);
+    const hasPermissions = ASSIGNABLE_PERMISSION_KEYS.some((key) => roleFormData.permissions[key]);
     if (!hasPermissions) {
       toast.error('Selecione pelo menos uma permissão');
       return;
@@ -327,13 +488,14 @@ export function AdvisorTeamContent() {
 
     setIsSubmitting(true);
     try {
+      const sanitizedPermissions = stripFullAdministrative(roleFormData.permissions);
       await createRole.mutateAsync({
         harasId,
         createdBy: profile?.id,
         input: {
           name: roleFormData.name,
           user_type: roleFormData.userType,
-          permissions: roleFormData.permissions,
+          permissions: sanitizedPermissions,
           can_edit: roleFormData.canEdit === 'Sim',
           can_view: roleFormData.canView === 'Sim',
           can_delete: roleFormData.canDelete === 'Sim',
@@ -359,6 +521,11 @@ export function AdvisorTeamContent() {
 
     const role = rolesData.find((item) => item.id === roleId);
     if (!role) return;
+    const normalizedPermissions = normalizeTeamPermissions(role.permissions);
+    if (normalizedPermissions.fullAdministrative) {
+      toast.info('A função de acesso total é exclusiva do Criador e não pode ser editada.');
+      return;
+    }
 
     setRoleFormData({
       name: role.name,
@@ -367,7 +534,7 @@ export function AdvisorTeamContent() {
       canEdit: role.can_edit ? 'Sim' : 'Não',
       canView: role.can_view ? 'Sim' : 'Não',
       canDelete: role.can_delete ? 'Sim' : 'Não',
-      permissions: normalizeTeamPermissions(role.permissions),
+      permissions: normalizedPermissions,
     });
 
     setEditingRoleId(roleId);
@@ -386,7 +553,7 @@ export function AdvisorTeamContent() {
       return;
     }
 
-    const hasPermissions = Object.values(roleFormData.permissions).some((value) => value);
+    const hasPermissions = ASSIGNABLE_PERMISSION_KEYS.some((key) => roleFormData.permissions[key]);
     if (!hasPermissions) {
       toast.error('Selecione pelo menos uma permissão');
       return;
@@ -394,13 +561,14 @@ export function AdvisorTeamContent() {
 
     setIsSubmitting(true);
     try {
+      const sanitizedPermissions = stripFullAdministrative(roleFormData.permissions);
       await updateRole.mutateAsync({
         roleId: editingRoleId,
         harasId,
         input: {
           name: roleFormData.name,
           user_type: roleFormData.userType,
-          permissions: roleFormData.permissions,
+          permissions: sanitizedPermissions,
           can_edit: roleFormData.canEdit === 'Sim',
           can_view: roleFormData.canView === 'Sim',
           can_delete: roleFormData.canDelete === 'Sim',
@@ -422,16 +590,27 @@ export function AdvisorTeamContent() {
   const handleEditUserClick = (userId: string) => {
     const member = team.find((item) => item.id === userId);
     if (!member) return;
+    if (!canEditMember(member)) {
+      toast.error('Você não tem permissão para editar este usuário.');
+      return;
+    }
+
+    const fallbackRoleId = !canDelegatePermissions
+      ? getDefaultRoleIdForSystemRole(member.systemRole)
+      : '';
+    const resolvedRoleId = member.roleId || fallbackRoleId;
 
     setFormData({
       name: member.name,
       email: member.email,
       password: '',
-      roleId: member.roleId || '',
+      roleId: resolvedRoleId,
       systemRole: member.systemRole || 'funcionario',
       phone: member.phone === '-' ? '' : member.phone,
       status: member.status,
-      permissions: normalizeTeamPermissions(member.permissions),
+      permissions: canDelegatePermissions
+        ? clampPermissions(normalizeTeamPermissions(member.permissions))
+        : (resolvedRoleId ? resolvePermissionsForRole(resolvedRoleId) : normalizeTeamPermissions(member.permissions)),
     });
 
     setEditingUserId(userId);
@@ -440,6 +619,12 @@ export function AdvisorTeamContent() {
   };
 
   const handleDeleteUserClick = (userId: string) => {
+    const member = team.find((item) => item.id === userId);
+    if (!member) return;
+    if (!canDeleteMember(member)) {
+      toast.error('Você não tem permissão para remover este usuário.');
+      return;
+    }
     setUserToDelete(userId);
     setShowDeleteConfirmModal(true);
   };
@@ -479,11 +664,33 @@ export function AdvisorTeamContent() {
       return;
     }
 
+    if (!canManageSystemRole(formData.systemRole)) {
+      toast.error('Você não tem permissão para atribuir este perfil de acesso.');
+      return;
+    }
+    if (!isCreator && normalizeRole(formData.systemRole) === 'acessor') {
+      toast.error('Somente o criador pode atribuir o perfil de acessor.');
+      return;
+    }
+    if (!canDelegatePermissions && !formData.roleId) {
+      toast.error('Função padrão não encontrada para este perfil. Peça ao criador para configurar.');
+      return;
+    }
+
+    if (formData.roleId && !selectableRoles.find((role) => role.id === formData.roleId)) {
+      toast.error('Selecione uma função compatível com suas permissões.');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error('Email inválido');
       return;
     }
+
+    const delegatedPermissions = canDelegatePermissions
+      ? clampPermissions(formData.permissions)
+      : resolvePermissionsForRole(formData.roleId);
 
     setIsSubmitting(true);
     try {
@@ -501,7 +708,7 @@ export function AdvisorTeamContent() {
           harasId,
           input: {
             role_id: formData.roleId || null,
-            permissions: formData.permissions,
+            permissions: delegatedPermissions,
             status: formData.status as 'Ativo' | 'Inativo',
           },
         });
@@ -510,7 +717,7 @@ export function AdvisorTeamContent() {
           harasId,
           userId: editingUserId,
           roleId: formData.roleId || null,
-          permissions: formData.permissions,
+          permissions: delegatedPermissions,
           status: formData.status as 'Ativo' | 'Inativo',
           createdBy: profile?.id,
         });
@@ -584,6 +791,27 @@ export function AdvisorTeamContent() {
           {activeTab === 'team' ? 'Criar Novo Usuário' : 'Criar Nova Função'}
         </button>
       </div>
+      {activeTab === 'team' && isAdvisor && !isCreator && (
+        <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+          Acessor pode cadastrar Peão e Veterinário. Permissões são definidas pelo criador.
+        </p>
+      )}
+      {activeTab === 'team' && !isAdvisor && !isCreator && (
+        <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+          Você não tem permissão para cadastrar usuários.
+        </p>
+      )}
+
+      {activeTab === 'team' && ownerMember && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+          <strong>Administrador do haras:</strong> {ownerMember.name}. Apenas este usuário possui acesso total.
+        </div>
+      )}
+      {activeTab === 'team' && !ownerMember && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          <strong>Atenção:</strong> o Criador principal ainda não está definido no haras. Até isso ser ajustado, o acesso total fica restrito ao administrador logado.
+        </div>
+      )}
 
       {/* Content */}
       {activeTab === 'team' ? (
@@ -625,7 +853,16 @@ export function AdvisorTeamContent() {
                   <tr key={member.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
                     <td className="px-6 py-4 text-foreground dark:text-white">{member.name}</td>
                     <td className="px-6 py-4 text-foreground dark:text-white">{member.email}</td>
-                    <td className="px-6 py-4 text-foreground dark:text-white">{member.role}</td>
+                    <td className="px-6 py-4 text-foreground dark:text-white">
+                      <div className="flex flex-col">
+                        <span>{member.role}</span>
+                        {member.isOwner && (
+                          <span className="text-xs text-amber-600 dark:text-amber-300">
+                            Acesso total (Criador)
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-foreground dark:text-white">{member.lastAccess}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs ${
@@ -638,22 +875,51 @@ export function AdvisorTeamContent() {
                     </td>
                     <td className="px-6 py-4">
                       {canManageUsers ? (
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => handleEditUserClick(member.id)}
-                            className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                          >
-                            <Edit className="w-4 h-4 text-foreground dark:text-white" />
-                          </button>
-                          {!member.isOwner && (
-                            <button
-                              onClick={() => handleDeleteUserClick(member.id)}
-                              className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-500" />
-                            </button>
-                          )}
-                        </div>
+                        (() => {
+                          const allowEdit = canEditMember(member);
+                          const allowDelete = canDeleteMember(member);
+
+                          if (member.isOwner) {
+                            return (
+                              <span className="text-xs text-amber-600 dark:text-amber-300">
+                                Protegido (Criador)
+                              </span>
+                            );
+                          }
+
+                          if (!allowEdit && !allowDelete) {
+                            return (
+                              <span className="text-xs text-muted-foreground dark:text-[#99a1af]">Sem permissão</span>
+                            );
+                          }
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleEditUserClick(member.id)}
+                                disabled={!allowEdit}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  allowEdit
+                                    ? 'hover:bg-card dark:hover:bg-[#2a2a2a]'
+                                    : 'opacity-40 cursor-not-allowed'
+                                }`}
+                              >
+                                <Edit className="w-4 h-4 text-foreground dark:text-white" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUserClick(member.id)}
+                                disabled={!allowDelete}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  allowDelete
+                                    ? 'hover:bg-card dark:hover:bg-[#2a2a2a]'
+                                    : 'opacity-40 cursor-not-allowed'
+                                }`}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </button>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <span className="text-xs text-muted-foreground dark:text-[#99a1af]">Sem permissão</span>
                       )}
@@ -689,7 +955,12 @@ export function AdvisorTeamContent() {
                   <span className="text-sm text-muted-foreground dark:text-[#99a1af]">
                     {role.users} usuário{role.users > 1 ? 's' : ''}
                   </span>
-                  {canManageRoles && (
+                  {role.isLocked && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300">
+                      Exclusivo do Criador
+                    </span>
+                  )}
+                  {canManageRoles && !role.isLocked && (
                     <button
                       onClick={() => handleEditRoleClick(role.id)}
                       className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
@@ -779,16 +1050,22 @@ export function AdvisorTeamContent() {
                       value={formData.roleId}
                       onChange={(e) => {
                         const roleId = e.target.value;
-                        const role = rolesData.find((item) => item.id === roleId);
+                        const role = selectableRoles.find((item) => item.id === roleId);
                         setFormData({
                           ...formData,
                           roleId,
-                          permissions: role ? normalizeTeamPermissions(role.permissions) : emptyPermissions(),
+                          permissions: canDelegatePermissions
+                            ? clampPermissions(role ? normalizeTeamPermissions(role.permissions) : emptyPermissions())
+                            : resolvePermissionsForRole(roleId),
                         });
                       }}
+                      disabled={selectableRoles.length === 0 || !canDelegatePermissions}
                     >
                       <option value="">Selecione uma função</option>
-                      {roles.map((role) => (
+                      {selectableRoles.length === 0 && (
+                        <option value="" disabled>Nenhuma função disponível</option>
+                      )}
+                      {selectableRoles.map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.name}
                         </option>
@@ -809,6 +1086,11 @@ export function AdvisorTeamContent() {
                     </NativeSelect>
                   </div>
                 </div>
+                {!canDelegatePermissions && (
+                  <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                    Função definida automaticamente com base no perfil de acesso.
+                  </p>
+                )}
 
                 {/* Perfil de acesso */}
                 <div>
@@ -817,14 +1099,76 @@ export function AdvisorTeamContent() {
                   </label>
                   <NativeSelect
                     value={formData.systemRole}
-                    onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                    onChange={(e) => {
+                      const nextRole = e.target.value;
+                      if (!canManageSystemRole(nextRole)) return;
+                      const nextRoleId = !canDelegatePermissions
+                        ? getDefaultRoleIdForSystemRole(nextRole)
+                        : formData.roleId;
+                      setFormData({
+                        ...formData,
+                        systemRole: nextRole,
+                        roleId: nextRoleId,
+                        permissions: canDelegatePermissions
+                          ? formData.permissions
+                          : resolvePermissionsForRole(nextRoleId),
+                      });
+                    }}
+                    disabled={availableSystemRoles.length === 0}
                   >
-                    {SYSTEM_ROLE_OPTIONS.map((option) => (
+                    {availableSystemRoles.length === 0 && (
+                      <option value="" disabled>Nenhum perfil disponível</option>
+                    )}
+                    {availableSystemRoles.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </NativeSelect>
+                </div>
+
+                {/* Permissões por Módulo */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-3">
+                    Páginas permitidas *
+                  </label>
+                  {!canDelegatePermissions && (
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-3">
+                      Permissões definidas pelo criador. Você não pode alterar.
+                    </p>
+                  )}
+                  <div className="space-y-4 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      <strong>Acesso total:</strong> exclusivo do Criador e não pode ser delegado.
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ASSIGNABLE_PERMISSION_KEYS.map((key) => {
+                        const label = PERMISSION_LABELS[key];
+                        const isDisabled = !canDelegatePermissions || !canDelegatePermission(key);
+                        return (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-3 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.permissions[key]}
+                              disabled={isDisabled}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                permissions: updatePermissionState(formData.permissions, key, e.target.checked),
+                              })}
+                              className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
+                            />
+                            <span className="text-sm text-foreground dark:text-white">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                      Resumo do acesso: {formatAllowedModules(formData.permissions)}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Telefone */}
@@ -989,123 +1333,32 @@ export function AdvisorTeamContent() {
                   <label className="block text-sm text-foreground dark:text-white mb-3">
                     Permissões *
                   </label>
-                  <div className="space-y-3 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.viewHerd}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'viewHerd', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Plantel</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.registerActivities}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'registerActivities', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Atividades</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.healthManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'healthManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Saúde</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.reproduction}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'reproduction', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Reprodução</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.financialManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'financialManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Financeiro</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.trainingManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'trainingManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Treinamento</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.teamManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'teamManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Equipe</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.documentManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'documentManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Documentos</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.fullAdministrative}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'fullAdministrative', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Administrativo</span>
-                    </label>
+                  <div className="space-y-4 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      <strong>Acesso total:</strong> exclusivo do Criador e não faz parte das funções personalizadas.
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ASSIGNABLE_PERMISSION_KEYS.map((key) => {
+                        const label = PERMISSION_LABELS[key];
+                        return (
+                          <label key={key} className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={roleFormData.permissions[key]}
+                              onChange={(e) => setRoleFormData({
+                                ...roleFormData,
+                                permissions: updatePermissionState(roleFormData.permissions, key, e.target.checked)
+                              })}
+                              className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
+                            />
+                            <span className="text-sm text-foreground dark:text-white">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                      Resumo do acesso: {formatAllowedModules(roleFormData.permissions)}
+                    </p>
                   </div>
                 </div>
 
@@ -1258,123 +1511,32 @@ export function AdvisorTeamContent() {
                   <label className="block text-sm text-foreground dark:text-white mb-3">
                     Permissões *
                   </label>
-                  <div className="space-y-3 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.viewHerd}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'viewHerd', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Plantel</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.registerActivities}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'registerActivities', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Atividades</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.healthManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'healthManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Saúde</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.reproduction}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'reproduction', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Reprodução</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.financialManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'financialManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Financeiro</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.trainingManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'trainingManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Treinamento</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.teamManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'teamManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Equipe</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.documentManagement}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'documentManagement', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Documentos</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={roleFormData.permissions.fullAdministrative}
-                        onChange={(e) => setRoleFormData({
-                          ...roleFormData,
-                          permissions: updatePermissionState(roleFormData.permissions, 'fullAdministrative', e.target.checked)
-                        })}
-                        className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
-                      />
-                      <span className="text-sm text-foreground dark:text-white">Administrativo</span>
-                    </label>
+                  <div className="space-y-4 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      <strong>Acesso total:</strong> exclusivo do Criador e não faz parte das funções personalizadas.
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ASSIGNABLE_PERMISSION_KEYS.map((key) => {
+                        const label = PERMISSION_LABELS[key];
+                        return (
+                          <label key={key} className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={roleFormData.permissions[key]}
+                              onChange={(e) => setRoleFormData({
+                                ...roleFormData,
+                                permissions: updatePermissionState(roleFormData.permissions, key, e.target.checked)
+                              })}
+                              className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
+                            />
+                            <span className="text-sm text-foreground dark:text-white">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                      Resumo do acesso: {formatAllowedModules(roleFormData.permissions)}
+                    </p>
                   </div>
                 </div>
 
@@ -1479,16 +1641,22 @@ export function AdvisorTeamContent() {
                       value={formData.roleId}
                       onChange={(e) => {
                         const roleId = e.target.value;
-                        const role = rolesData.find((item) => item.id === roleId);
+                        const role = selectableRoles.find((item) => item.id === roleId);
                         setFormData({
                           ...formData,
                           roleId,
-                          permissions: role ? normalizeTeamPermissions(role.permissions) : emptyPermissions(),
+                          permissions: canDelegatePermissions
+                            ? clampPermissions(role ? normalizeTeamPermissions(role.permissions) : emptyPermissions())
+                            : resolvePermissionsForRole(roleId),
                         });
                       }}
+                      disabled={selectableRoles.length === 0 || !canDelegatePermissions}
                     >
                       <option value="">Selecione uma função</option>
-                      {roles.map((role) => (
+                      {selectableRoles.length === 0 && (
+                        <option value="" disabled>Nenhuma função disponível</option>
+                      )}
+                      {selectableRoles.map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.name}
                         </option>
@@ -1509,6 +1677,11 @@ export function AdvisorTeamContent() {
                     </NativeSelect>
                   </div>
                 </div>
+                {!canDelegatePermissions && (
+                  <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                    Função definida automaticamente com base no perfil de acesso.
+                  </p>
+                )}
 
                 {/* Perfil de acesso */}
                 <div>
@@ -1517,14 +1690,76 @@ export function AdvisorTeamContent() {
                   </label>
                   <NativeSelect
                     value={formData.systemRole}
-                    onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                    onChange={(e) => {
+                      const nextRole = e.target.value;
+                      if (!canManageSystemRole(nextRole)) return;
+                      const nextRoleId = !canDelegatePermissions
+                        ? getDefaultRoleIdForSystemRole(nextRole)
+                        : formData.roleId;
+                      setFormData({
+                        ...formData,
+                        systemRole: nextRole,
+                        roleId: nextRoleId,
+                        permissions: canDelegatePermissions
+                          ? formData.permissions
+                          : resolvePermissionsForRole(nextRoleId),
+                      });
+                    }}
+                    disabled={availableSystemRoles.length === 0}
                   >
-                    {SYSTEM_ROLE_OPTIONS.map((option) => (
+                    {availableSystemRoles.length === 0 && (
+                      <option value="" disabled>Nenhum perfil disponível</option>
+                    )}
+                    {availableSystemRoles.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </NativeSelect>
+                </div>
+
+                {/* Permissões por Módulo */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-3">
+                    Páginas permitidas *
+                  </label>
+                  {!canDelegatePermissions && (
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-3">
+                      Permissões definidas pelo criador. Você não pode alterar.
+                    </p>
+                  )}
+                  <div className="space-y-4 bg-muted dark:bg-[#0d0d0d] rounded-xl p-4">
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      <strong>Acesso total:</strong> exclusivo do Criador e não pode ser delegado.
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ASSIGNABLE_PERMISSION_KEYS.map((key) => {
+                        const label = PERMISSION_LABELS[key];
+                        const isDisabled = !canDelegatePermissions || !canDelegatePermission(key);
+                        return (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-3 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.permissions[key]}
+                              disabled={isDisabled}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                permissions: updatePermissionState(formData.permissions, key, e.target.checked),
+                              })}
+                              className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
+                            />
+                            <span className="text-sm text-foreground dark:text-white">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                      Resumo do acesso: {formatAllowedModules(formData.permissions)}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Telefone */}

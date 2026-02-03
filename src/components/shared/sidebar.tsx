@@ -31,6 +31,20 @@ interface SidebarProps {
     role: UserRole
 }
 
+const assessorMenu = [
+    { label: 'Dashboard', href: '/assessor', icon: Home },
+    { label: 'Plantel', href: '/assessor/plantel', icon: Users },
+    { label: 'Pendências', href: '/assessor/pendencias', icon: AlertTriangle },
+    { label: 'Reprodução', href: '/assessor/reproducao', icon: Heart },
+    { label: 'Financeiro', href: '/assessor/financeiro', icon: CreditCard },
+    { label: 'Tarefas', href: '/assessor/tarefas', icon: ClipboardList },
+    { label: 'Equipe', href: '/assessor/equipe', icon: Users },
+    { label: 'Agenda', href: '/assessor/agenda', icon: Calendar },
+    { label: 'Documentos', href: '/assessor/documentos', icon: FileText },
+    { label: 'Configurações', href: '/assessor/configuracoes', icon: Settings },
+    { label: 'Ajuda', href: '/assessor/ajuda', icon: HelpCircle },
+]
+
 const menuConfig = {
     admin: [
         { label: 'Dashboard', href: '/admin', icon: Home },
@@ -50,19 +64,9 @@ const menuConfig = {
         { label: 'Configurações', href: '/criador/configuracoes', icon: Settings },
         { label: 'Ajuda', href: '/criador/ajuda', icon: HelpCircle },
     ],
-    assessor: [
-        { label: 'Dashboard', href: '/assessor', icon: Home },
-        { label: 'Plantel', href: '/assessor/plantel', icon: Users },
-        { label: 'Pendências', href: '/assessor/pendencias', icon: AlertTriangle },
-        { label: 'Reprodução', href: '/assessor/reproducao', icon: Heart },
-        { label: 'Financeiro', href: '/assessor/financeiro', icon: CreditCard },
-        { label: 'Tarefas', href: '/assessor/tarefas', icon: ClipboardList },
-        { label: 'Equipe', href: '/assessor/equipe', icon: Users },
-        { label: 'Agenda', href: '/assessor/agenda', icon: Calendar },
-        { label: 'Documentos', href: '/assessor/documentos', icon: FileText },
-        { label: 'Configurações', href: '/assessor/configuracoes', icon: Settings },
-        { label: 'Ajuda', href: '/assessor/ajuda', icon: HelpCircle },
-    ],
+    assessor: assessorMenu,
+    acessor: assessorMenu,
+    advisor: assessorMenu,
 }
 
 export function Sidebar({ role }: SidebarProps) {

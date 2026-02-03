@@ -109,7 +109,6 @@ export function BreederSettingsContent() {
 
   const tabs = [
     { id: 'profile' as SettingsTab, name: 'Perfil', icon: User },
-    { id: 'team' as SettingsTab, name: 'Colaboradores', icon: Users },
     { id: 'plans' as SettingsTab, name: 'Planos', icon: Package },
     { id: 'security' as SettingsTab, name: 'Segurança', icon: Shield },
     { id: 'general' as SettingsTab, name: 'Geral', icon: Wrench },
@@ -118,9 +117,9 @@ export function BreederSettingsContent() {
   const ROLE_LABELS: Record<string, string> = {
     criador: 'Criador/Dono de Haras',
     breeder: 'Criador/Dono de Haras',
-    assessor: 'Assessor Administrativo',
-    acessor: 'Assessor Administrativo',
-    advisor: 'Assessor Administrativo',
+    assessor: 'Acessor Administrativo',
+    acessor: 'Acessor Administrativo',
+    advisor: 'Acessor Administrativo',
     peao: 'Funcionário de Campo',
     veterinario: 'Veterinário',
     employee: 'Funcionário de Campo',

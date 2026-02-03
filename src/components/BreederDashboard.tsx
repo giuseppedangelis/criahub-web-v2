@@ -2,7 +2,7 @@
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { LayoutDashboard, Users as HorseIcon, Users as TeamIcon, Heart, DollarSign, Calendar, Settings, Moon, Sun, Bell, User, Menu, X, FileText, HelpCircle, ClipboardList } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
 import { UserDropdown } from './shared/UserDropdown';
@@ -27,6 +27,7 @@ import type { ReportType } from '@/types';
 import type { Notification } from '@/types';
 import { notificationsService } from '@/services/notifications';
 import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAccessControl, type AccessModule } from '@/hooks/useAccessControl';
 import { toast } from 'sonner';
 
 const formatNotificationTime = (dateValue?: string | null) => {
@@ -46,11 +47,25 @@ const formatNotificationTime = (dateValue?: string | null) => {
   return `${diffDays} dias atrás`;
 };
 
+const BASE_MENU_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'plantel', label: 'Plantel', icon: HorseIcon },
+  { id: 'reproduction', label: 'Reprodução', icon: Heart },
+  { id: 'financial', label: 'Financeiro', icon: DollarSign },
+  { id: 'agenda', label: 'Agenda', icon: Calendar },
+  { id: 'tasks', label: 'Tarefas', icon: ClipboardList },
+  { id: 'team', label: 'Equipe', icon: TeamIcon },
+  { id: 'reports', label: 'Relatórios', icon: FileText },
+  { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'help', label: 'Ajuda', icon: HelpCircle },
+] as const;
+
 export function BreederDashboard() {
   const { theme, toggleTheme } = useTheme();
   const { userRole, userEmail, userName, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
+  const { canAccessModule, isReady: isAccessReady } = useAccessControl();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
@@ -107,18 +122,10 @@ export function BreederDashboard() {
     }
   }, [showNotifications, showUserMenu]);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'plantel', label: 'Plantel', icon: HorseIcon },
-    { id: 'reproduction', label: 'Reprodução', icon: Heart },
-    { id: 'financial', label: 'Financeiro', icon: DollarSign },
-    { id: 'agenda', label: 'Agenda', icon: Calendar },
-    { id: 'tasks', label: 'Tarefas', icon: ClipboardList },
-    { id: 'team', label: 'Equipe', icon: TeamIcon },
-    { id: 'reports', label: 'Relatórios', icon: FileText },
-    { id: 'settings', label: 'Configurações', icon: Settings },
-    { id: 'help', label: 'Ajuda', icon: HelpCircle },
-  ];
+  const menuItems = useMemo(
+    () => BASE_MENU_ITEMS.filter((item) => canAccessModule(item.id as AccessModule)),
+    [canAccessModule]
+  );
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -164,6 +171,23 @@ export function BreederDashboard() {
     }
   };
 
+  const handleSelectTab = useCallback((tabId: string) => {
+    if (!canAccessModule(tabId as AccessModule)) {
+      toast.error('Você não tem permissão para acessar esta página.');
+      return;
+    }
+    setActiveTab(tabId);
+    if (isMobile) setIsSidebarOpen(false);
+  }, [canAccessModule, isMobile]);
+
+  useEffect(() => {
+    if (!isAccessReady) return;
+    const isMenuTab = BASE_MENU_ITEMS.some((item) => item.id === activeTab);
+    if (isMenuTab && !canAccessModule(activeTab as AccessModule)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, canAccessModule, isAccessReady]);
+
   return (
     <div className="flex h-screen bg-background dark:bg-[#0d0d0d]">
       {/* Mobile Overlay */}
@@ -208,10 +232,7 @@ export function BreederDashboard() {
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (isMobile) setIsSidebarOpen(false);
-                }}
+                onClick={() => handleSelectTab(item.id)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all
                   ${isActive
@@ -408,10 +429,10 @@ export function BreederDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto mobile-scroll-hidden bg-background dark:bg-[#0d0d0d] p-4 md:p-8">
-          {activeTab === 'dashboard' && <BreederDashboardContent onNavigate={setActiveTab} />}
+          {activeTab === 'dashboard' && <BreederDashboardContent onNavigate={handleSelectTab} />}
           {activeTab === 'add-animal' && <AddAnimalForm onBack={() => setActiveTab('dashboard')} />}
           {activeTab === 'plantel' && <BreederPlantelContent />}
-          {activeTab === 'reproduction' && <BreederReproductionContent onNavigateToAgenda={() => setActiveTab('agenda')} />}
+          {activeTab === 'reproduction' && <BreederReproductionContent onNavigateToAgenda={() => handleSelectTab('agenda')} />}
           {activeTab === 'financial' && <BreederFinancialContent />}
           {activeTab === 'agenda' && <BreederAgendaContent />}
           {activeTab === 'tasks' && <AdvisorTasksContent showPendingValidation={false} />}

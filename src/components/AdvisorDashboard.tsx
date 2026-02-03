@@ -2,7 +2,7 @@
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, User, Menu, X, HelpCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
 import { AdvisorDashboardContent } from './advisor/AdvisorDashboardContent';
@@ -20,6 +20,8 @@ import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
 import type { Notification } from '@/types';
 import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAccessControl, type AccessModule } from '@/hooks/useAccessControl';
+import { toast } from 'sonner';
 
 const formatNotificationTime = (dateValue?: string | null) => {
   if (!dateValue) return '';
@@ -38,11 +40,25 @@ const formatNotificationTime = (dateValue?: string | null) => {
   return `${diffDays} dias atrás`;
 };
 
+const BASE_MENU_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'herd', label: 'Plantel', icon: Users },
+  { id: 'reproduction', label: 'Reprodução', icon: Heart },
+  { id: 'finance', label: 'Financeiro', icon: DollarSign },
+  { id: 'tasks', label: 'Tarefas', icon: CheckSquare },
+  { id: 'team', label: 'Equipe', icon: Users },
+  { id: 'calendar', label: 'Agenda', icon: Calendar },
+  { id: 'documents', label: 'Documentos', icon: FileText },
+  { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'help', label: 'Ajuda', icon: HelpCircle },
+] as const;
+
 export function AdvisorDashboard() {
   const { theme, toggleTheme } = useTheme();
   const { userRole, userName, userEmail, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
+  const { canAccessModule, isReady: isAccessReady } = useAccessControl();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -143,6 +159,23 @@ export function AdvisorDashboard() {
     }
   };
 
+  const handleSelectMenu = useCallback((menuId: string) => {
+    if (!canAccessModule(menuId as AccessModule)) {
+      toast.error('Você não tem permissão para acessar esta página.');
+      return;
+    }
+    setActiveMenu(menuId);
+    if (isMobile) setIsSidebarOpen(false);
+  }, [canAccessModule, isMobile]);
+
+  useEffect(() => {
+    if (!isAccessReady) return;
+    const isMenuTab = BASE_MENU_ITEMS.some((item) => item.id === activeMenu);
+    if (isMenuTab && !canAccessModule(activeMenu as AccessModule)) {
+      setActiveMenu('dashboard');
+    }
+  }, [activeMenu, canAccessModule, isAccessReady]);
+
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
     if (!isMobile) {
@@ -150,20 +183,12 @@ export function AdvisorDashboard() {
     }
   }, [isMobile]);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'herd', label: 'Plantel', icon: Users },
-    { id: 'reproduction', label: 'Reprodução', icon: Heart },
-    { id: 'finance', label: 'Financeiro', icon: DollarSign },
-    { id: 'tasks', label: 'Tarefas', icon: CheckSquare },
-    { id: 'team', label: 'Equipe', icon: Users },
-    { id: 'calendar', label: 'Agenda', icon: Calendar },
-    { id: 'documents', label: 'Documentos', icon: FileText },
-    { id: 'settings', label: 'Configurações', icon: Settings },
-    { id: 'help', label: 'Ajuda', icon: HelpCircle },
-  ];
+  const menuItems = useMemo(
+    () => BASE_MENU_ITEMS.filter((item) => canAccessModule(item.id as AccessModule)),
+    [canAccessModule]
+  );
 
-  const userRole_display = 'Assessora Administrativa';
+  const userRole_display = 'Acessor Administrativo';
 
   return (
     <div className="flex h-screen bg-background dark:bg-[#0d0d0d]">
@@ -209,10 +234,7 @@ export function AdvisorDashboard() {
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  setActiveMenu(item.id);
-                  if (isMobile) setIsSidebarOpen(false);
-                }}
+                onClick={() => handleSelectMenu(item.id)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all
                   ${isActive
@@ -413,15 +435,16 @@ export function AdvisorDashboard() {
           {activeMenu === 'settings' && <BreederSettingsContent />}
           {activeMenu === 'dashboard' && (
             <AdvisorDashboardContent
-              onNavigateToPendencies={() => setActiveMenu('tasks')}
-              onNavigateToImport={() => setActiveMenu('herd')}
-              onNavigateToFinancial={() => setActiveMenu('finance')}
-              onNavigateToDocuments={() => setActiveMenu('documents')}
+              onNavigateToPendencies={() => handleSelectMenu('tasks')}
+              onNavigateToImport={() => handleSelectMenu('herd')}
+              onNavigateToFinancial={() => handleSelectMenu('finance')}
+              onNavigateToDocuments={() => handleSelectMenu('documents')}
+              onNavigateToTeam={() => handleSelectMenu('team')}
             />
           )}
           {activeMenu === 'herd' && <BreederPlantelContent />}
           {activeMenu === 'reproduction' && (
-            <BreederReproductionContent onNavigateToAgenda={() => setActiveMenu('calendar')} />
+            <BreederReproductionContent onNavigateToAgenda={() => handleSelectMenu('calendar')} />
           )}
           {activeMenu === 'finance' && <AdvisorFinanceContent />}
           {activeMenu === 'tasks' && <AdvisorTasksContent />}

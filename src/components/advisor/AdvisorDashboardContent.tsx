@@ -21,6 +21,7 @@ interface AdvisorDashboardContentProps {
   onNavigateToImport?: () => void;
   onNavigateToFinancial?: () => void;
   onNavigateToDocuments?: () => void;
+  onNavigateToTeam?: () => void;
 }
 
 export function AdvisorDashboardContent({
@@ -28,6 +29,7 @@ export function AdvisorDashboardContent({
   onNavigateToImport,
   onNavigateToFinancial,
   onNavigateToDocuments,
+  onNavigateToTeam,
 }: AdvisorDashboardContentProps) {
   const { data: currentHaras } = useCurrentHaras();
   const harasId = currentHaras?.id || '';
@@ -194,6 +196,7 @@ export function AdvisorDashboardContent({
 
         <button
           className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)] hover:border-primary dark:hover:border-white/50 transition-all group text-left"
+          onClick={onNavigateToTeam}
         >
           <div className="w-12 h-12 bg-purple-500/10 dark:bg-gray-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <Users className="w-6 h-6 text-purple-600 dark:text-gray-400" />

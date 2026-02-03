@@ -1,14 +1,12 @@
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, AlertTriangle, Calendar, Heart, Users, Activity, Plus, UserPlus, DollarSign, Filter, ChevronRight, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { AddCollaboratorForm } from './AddCollaboratorForm';
 import { AddEventForm } from './AddEventForm';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
 import { NativeSelect } from '../ui/native-select';
 import { useDashboard } from '@/hooks/useDashboard';
 
 export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: string) => void }) {
-  const [showAddCollaboratorModal, setShowAddCollaboratorModal] = useState(false);
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [showCadastrarAnimal, setShowCadastrarAnimal] = useState(false);
   const [timeRange, setTimeRange] = useState('6months');
@@ -103,11 +101,11 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
             Agendar Evento
           </button>
           <button
-            onClick={() => setShowAddCollaboratorModal(true)}
+            onClick={() => onNavigate?.('team')}
             className="px-6 py-3 border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors flex items-center justify-center gap-2"
           >
             <UserPlus className="w-5 h-5" />
-            Novo Colaborador
+            Gerenciar Equipe
           </button>
         </div>
 
@@ -499,16 +497,6 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
       )}
 
       {/* Modals */}
-      {showAddCollaboratorModal && (
-        <AddCollaboratorForm
-          onClose={() => setShowAddCollaboratorModal(false)}
-          onSuccess={() => {
-            setShowAddCollaboratorModal(false);
-            refetch();
-          }}
-        />
-      )}
-
       {showNewEventModal && (
         <AddEventForm
           onClose={() => setShowNewEventModal(false)}

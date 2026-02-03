@@ -40,7 +40,7 @@ export function UserDropdown({
       case 'advisor':
       case 'assessor':
       case 'acessor':
-        return 'Assessor'
+        return 'Acessor'
       default:
         return 'Usuário'
     }

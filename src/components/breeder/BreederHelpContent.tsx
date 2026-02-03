@@ -10,7 +10,7 @@ export function BreederHelpContent() {
   const faqs = {
     geral: [
       { q: 'Como importar meu plantel via planilha ABCCMM?', a: 'Acesse Plantel > Importar Planilha e faça upload do arquivo fornecido pela ABCCMM.' },
-      { q: 'Posso adicionar colaboradores ao sistema?', a: 'Sim! Vá em Configurações > Colaboradores e adicione membros da sua equipe com permissões específicas.' },
+      { q: 'Posso adicionar colaboradores ao sistema?', a: 'Sim! Vá em Equipe e adicione membros da sua equipe com permissões específicas.' },
       { q: 'Como funciona o backup automático?', a: 'Usuários Premium têm backup automático diário de todos os dados do haras.' },
     ],
     plantel: [
@@ -116,9 +116,9 @@ export function BreederHelpContent() {
           <VideoCard title="Como importar planilha ABCCMM" duration="5:30" category="Plantel" />
           <VideoCard title="Cadastrando eventos na agenda" duration="3:45" category="Agenda" />
           <VideoCard title="Gestão de coberturas e gestações" duration="8:20" category="Reprodução" />
-          <VideoCard title="Configurando permissões de equipe" duration="4:15" category="Configurações" />
+          <VideoCard title="Configurando permissões de equipe" duration="4:15" category="Equipe" />
           <VideoCard title="Adicionando documentos aos animais" duration="2:50" category="Plantel" />
-          <VideoCard title="Gerenciando colaboradores" duration="6:10" category="Configurações" />
+          <VideoCard title="Gerenciando colaboradores" duration="6:10" category="Equipe" />
         </div>
       </div>
 

@@ -4,6 +4,7 @@
 // ============================================
 
 import { supabase, handleSupabaseError } from './base'
+import { normalizeRoleForStorage } from '@/lib/roles'
 
 export type TeamPermissionKey =
   | 'viewHerd'
@@ -302,7 +303,7 @@ export const teamService = {
     if (input.email !== undefined) payload.email = input.email
     if (input.phone !== undefined) payload.phone = input.phone
     if (input.status !== undefined) payload.status = input.status
-    if (input.role !== undefined) payload.role = input.role
+    if (input.role !== undefined) payload.role = normalizeRoleForStorage(input.role) ?? input.role
 
     const { error } = await (supabase as any)
       .from('profiles')
