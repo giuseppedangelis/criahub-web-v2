@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
 import { collaboratorsService } from '@/services/collaborators';
 import { supabase } from '@/services/base';
+import { DEFAULT_TEAM_PERMISSIONS, teamService } from '@/services/team';
 
 interface AddCollaboratorFormProps {
   onClose: () => void;
@@ -40,6 +41,14 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
     },
   });
 
+  const mapPermissionsToTeam = () => ({
+    ...DEFAULT_TEAM_PERMISSIONS,
+    viewHerd: permissions.plantel.view || permissions.plantel.edit || permissions.plantel.add,
+    registerActivities: permissions.agenda.createEdit,
+    reproduction: permissions.reproduction.manage || permissions.reproduction.view,
+    documentManagement: permissions.reports.export,
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -68,13 +77,22 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
 
     setIsLoading(true);
     try {
-      await collaboratorsService.createCollaborator({
+      const response = await collaboratorsService.createCollaborator({
         full_name: formData.fullName,
         email: formData.email,
         password: formData.password,
         role: formData.role as 'acessor' | 'veterinario' | 'peao',
         haras_id: profile.haras_id,
         permissions
+      });
+
+      await teamService.upsertMember({
+        harasId: profile.haras_id,
+        userId: response.user_id,
+        roleId: null,
+        permissions: mapPermissionsToTeam(),
+        status: 'Ativo',
+        createdBy: user.id,
       });
 
       toast.success('Colaborador adicionado com sucesso!');

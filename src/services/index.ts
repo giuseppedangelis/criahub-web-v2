@@ -18,3 +18,7 @@ export { reportsService } from './reports';
 export { harasSettingsService } from './harasSettings';
 export { profileSettingsService } from './profileSettings';
 export { sessionsService } from './sessions';
+export { advisorDashboardService } from './advisorDashboard';
+export { tasksService } from './tasks';
+export { teamService } from './team';
+export { documentsService } from './documents';

@@ -1,28 +1,77 @@
-import { Search, Plus, FileText, CheckCircle, Clock, AlertCircle, Download, Eye, Upload, X, Tag, Users, Filter, Paperclip } from 'lucide-react';
-import { useState } from 'react';
+import { Search, Plus, FileText, CheckCircle, Clock, AlertCircle, Download, Eye, Upload, X, Filter, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
+import { supabase } from '@/services/base';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useDocuments, useCreateDocument } from '@/hooks/useDocuments';
+import { useTeamMembers } from '@/hooks/useTeam';
+import { parseDocumentMeta, type DocumentMeta } from '@/services/documents';
 
 interface Document {
-  id: number;
+  id: string;
   number: string;
   name: string;
   animal: string;
   type: string;
   date: string;
   status: string;
-  signature: string;
   tags: string[]; // Tags do documento
   linkedTo?: {
     type: 'animal' | 'person';
-    id: number;
+    id: string;
     name: string;
   }[]; // Vínculos
   fileUrl?: string;
   fileSize?: string;
+  notes?: string;
 }
 
+const DOCUMENTS_BUCKET = 'animals';
+const BASE_TAGS = ['Contrato', 'Registro', 'Exame', 'Nota Fiscal', 'Veterinário', 'ABCCMM', 'Compra/Venda', 'Financeiro'];
+const DOCUMENT_TYPES = ['Contrato', 'Registro', 'Exame', 'Nota Fiscal', 'GIA'];
+const STATUS_OPTIONS = ['Pendente', 'Aguardando', 'Assinado'];
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024;
+
+const sanitizeFileName = (name: string) =>
+  name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+
+const buildDocumentStoragePath = (harasId: string, fileName: string) =>
+  `${harasId}/documents/${Date.now()}-${sanitizeFileName(fileName)}`;
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+};
+
+const formatBytes = (value?: number | null) => {
+  if (!value) return '-';
+  if (value < 1024) return `${value} B`;
+  const kb = value / 1024;
+  if (kb < 1024) return `${kb.toFixed(0)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
+};
+
+const uploadDocumentFile = async (harasId: string, file: File) => {
+  const filePath = buildDocumentStoragePath(harasId, file.name);
+  const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).upload(filePath, file);
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(filePath);
+  if (!data?.publicUrl) throw new Error('Erro ao obter URL do arquivo.');
+
+  return data.publicUrl;
+};
+
 export function AdvisorDocumentsContent() {
+  const { data: currentHaras } = useCurrentHaras();
+  const harasId = currentHaras?.id || '';
+
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -30,6 +79,7 @@ export function AdvisorDocumentsContent() {
   const [filterType, setFilterType] = useState('todos');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Formulário
   const [formData, setFormData] = useState({
@@ -37,107 +87,15 @@ export function AdvisorDocumentsContent() {
     type: '',
     status: 'Pendente',
     tags: [] as string[],
-    linkedAnimals: [] as { id: number; name: string }[],
-    linkedPeople: [] as { id: number; name: string }[],
+    linkedAnimals: [] as { id: string; name: string }[],
+    linkedPeople: [] as { id: string; name: string }[],
+    notes: '',
     file: null as File | null,
   });
-
-  const [documents, setDocuments] = useState<Document[]>([
-    { 
-      id: 1, 
-      number: 'DOC-001', 
-      name: 'GIA - Estrela Mangalarga', 
-      animal: 'Estrela Mangalarga', 
-      type: 'GIA', 
-      date: '15/11/2024', 
-      status: 'Assinado', 
-      signature: 'D4Sign',
-      tags: ['Contrato', 'Registro'],
-      linkedTo: [
-        { type: 'animal', id: 1, name: 'Estrela Mangalarga' },
-        { type: 'person', id: 1, name: 'Ricardo Silva' },
-      ],
-      fileUrl: 'https://example.com/doc001.pdf',
-      fileSize: '1.2 MB'
-    },
-    { 
-      id: 2, 
-      number: 'DOC-002', 
-      name: 'Registro ABCCMM - Vento Sul', 
-      animal: 'Vento Sul', 
-      type: 'Registro', 
-      date: '10/11/2024', 
-      status: 'Pendente', 
-      signature: '-',
-      tags: ['Registro', 'ABCCMM'],
-      linkedTo: [
-        { type: 'animal', id: 6, name: 'Vento Sul' },
-      ],
-      fileUrl: 'https://example.com/doc002.pdf',
-      fileSize: '856 KB'
-    },
-    { 
-      id: 3, 
-      number: 'DOC-003', 
-      name: 'Atestado Sanitário - Bella Vista', 
-      animal: 'Bella Vista', 
-      type: 'Exame', 
-      date: '08/11/2024', 
-      status: 'Assinado', 
-      signature: 'Dra. Maria Santos',
-      tags: ['Exame', 'Veterinário'],
-      linkedTo: [
-        { type: 'animal', id: 3, name: 'Bella Vista' },
-        { type: 'person', id: 2, name: 'Dra. Maria Santos' },
-      ],
-      fileUrl: 'https://example.com/doc003.pdf',
-      fileSize: '524 KB'
-    },
-    { 
-      id: 4, 
-      number: 'DOC-004', 
-      name: 'Nota Fiscal - Ração Premium', 
-      animal: '-', 
-      type: 'Nota Fiscal', 
-      date: '05/11/2024', 
-      status: 'Assinado', 
-      signature: '-',
-      tags: ['Nota Fiscal', 'Financeiro'],
-      linkedTo: [],
-      fileUrl: 'https://example.com/doc004.pdf',
-      fileSize: '245 KB'
-    },
-    { 
-      id: 5, 
-      number: 'DOC-005', 
-      name: 'Contrato de Compra - Relâmpago Negro', 
-      animal: 'Relâmpago Negro', 
-      type: 'Contrato', 
-      date: '01/11/2024', 
-      status: 'Assinado', 
-      signature: 'D4Sign',
-      tags: ['Contrato', 'Compra/Venda'],
-      linkedTo: [
-        { type: 'animal', id: 2, name: 'Relâmpago Negro' },
-        { type: 'person', id: 3, name: 'João Pereira' },
-      ],
-      fileUrl: 'https://example.com/doc005.pdf',
-      fileSize: '1.8 MB'
-    },
-  ]);
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Assinado':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'Aguardando':
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-      case 'Pendente':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      default:
-        return <FileText className="w-5 h-5 text-muted-foreground" />;
-    }
-  };
+  const { data: documentsData = [], isLoading } = useDocuments(harasId);
+  const { mutateAsync: createDocument } = useCreateDocument();
+  const { data: animalsData } = useAnimals({ haras_id: harasId }, { page: 1, limit: 200 }, !!harasId);
+  const { data: teamMembers = [] } = useTeamMembers(harasId);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -152,18 +110,81 @@ export function AdvisorDocumentsContent() {
     }
   };
 
-  const availableTags = ['Contrato', 'Registro', 'Exame', 'Nota Fiscal', 'Veterinário', 'ABCCMM', 'Compra/Venda', 'Financeiro'];
-  const availableAnimals = [
-    { id: 1, name: 'Estrela Mangalarga' },
-    { id: 2, name: 'Relâmpago Negro' },
-    { id: 3, name: 'Bella Vista' },
-    { id: 6, name: 'Vento Sul' },
-  ];
-  const availablePeople = [
-    { id: 1, name: 'Ricardo Silva' },
-    { id: 2, name: 'Dra. Maria Santos' },
-    { id: 3, name: 'João Pereira' },
-  ];
+  const availableAnimals = useMemo(
+    () =>
+      (animalsData?.data || []).map((animal) => ({
+        id: animal.id,
+        name: animal.name,
+      })),
+    [animalsData?.data]
+  );
+
+  const availablePeople = useMemo(
+    () =>
+      teamMembers.map((member) => ({
+        id: member.user_id,
+        name: member.profile.full_name || member.profile.email || 'Colaborador',
+      })),
+    [teamMembers]
+  );
+
+  const documents = useMemo<Document[]>(() => {
+    return documentsData.map((doc) => {
+      const meta = doc.meta || parseDocumentMeta(doc.observacoes);
+      const tags = meta.tags && meta.tags.length ? meta.tags : [doc.tipo].filter(Boolean);
+      const linkedTo: Document['linkedTo'] = [];
+      const linkedIds = new Set<string>();
+
+      if (doc.animal) {
+        linkedTo.push({ type: 'animal', id: doc.animal.id, name: doc.animal.nome });
+        linkedIds.add(doc.animal.id);
+      }
+
+      if (Array.isArray(meta.linked_animals)) {
+        meta.linked_animals.forEach((animal) => {
+          if (animal?.id && !linkedIds.has(animal.id)) {
+            linkedTo.push({ type: 'animal', id: animal.id, name: animal.name });
+            linkedIds.add(animal.id);
+          }
+        });
+      }
+
+      if (Array.isArray(meta.linked_people)) {
+        meta.linked_people.forEach((person) => {
+          if (person?.name) {
+            linkedTo.push({ type: 'person', id: person.id || person.name, name: person.name });
+          }
+        });
+      }
+
+      const animalName = doc.animal?.nome || meta.linked_animals?.[0]?.name || '-';
+
+      return {
+        id: doc.id,
+        number: `DOC-${doc.id.slice(0, 6).toUpperCase()}`,
+        name: doc.titulo,
+        animal: animalName,
+        type: doc.tipo,
+        date: formatDate(doc.created_at),
+        status: meta.status || 'Pendente',
+        tags,
+        linkedTo,
+        fileUrl: doc.file_url,
+        fileSize: formatBytes(doc.tamanho_bytes),
+        notes: meta.notes,
+      };
+    });
+  }, [documentsData]);
+
+  const availableTags = useMemo(() => {
+    const fromDocs = documents.flatMap((doc) => doc.tags || []);
+    return Array.from(new Set([...BASE_TAGS, ...fromDocs])).filter(Boolean);
+  }, [documents]);
+
+  const availableTypes = useMemo(() => {
+    const fromDocs = documents.map((doc) => doc.type).filter(Boolean);
+    return Array.from(new Set([...DOCUMENT_TYPES, ...fromDocs]));
+  }, [documents]);
 
   const handleAddTag = (tag: string) => {
     if (!formData.tags.includes(tag)) {
@@ -175,86 +196,130 @@ export function AdvisorDocumentsContent() {
     setFormData({ ...formData, tags: formData.tags.filter(t => t !== tag) });
   };
 
-  const handleAddAnimal = (animal: { id: number; name: string }) => {
+  const handleAddAnimal = (animal: { id: string; name: string }) => {
     if (!formData.linkedAnimals.find(a => a.id === animal.id)) {
       setFormData({ ...formData, linkedAnimals: [...formData.linkedAnimals, animal] });
     }
   };
 
-  const handleRemoveAnimal = (animalId: number) => {
+  const handleRemoveAnimal = (animalId: string) => {
     setFormData({ ...formData, linkedAnimals: formData.linkedAnimals.filter(a => a.id !== animalId) });
   };
 
-  const handleAddPerson = (person: { id: number; name: string }) => {
+  const handleAddPerson = (person: { id: string; name: string }) => {
     if (!formData.linkedPeople.find(p => p.id === person.id)) {
       setFormData({ ...formData, linkedPeople: [...formData.linkedPeople, person] });
     }
   };
 
-  const handleRemovePerson = (personId: number) => {
+  const handleRemovePerson = (personId: string) => {
     setFormData({ ...formData, linkedPeople: formData.linkedPeople.filter(p => p.id !== personId) });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > MAX_DOCUMENT_SIZE) {
+        toast.error('Arquivo maior que 10MB. Selecione um arquivo menor.');
+        return;
+      }
       setFormData({ ...formData, file });
       toast.success('Arquivo selecionado: ' + file.name);
     }
   };
 
-  const handleCreateDocument = () => {
+  const handleCreateDocument = async () => {
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    if (isSubmitting) return;
+
     if (!formData.name || !formData.type || !formData.file) {
       toast.error('Preencha todos os campos obrigatórios e selecione um arquivo');
       return;
     }
 
-    const linkedTo: Document['linkedTo'] = [
-      ...formData.linkedAnimals.map(a => ({ type: 'animal' as const, id: a.id, name: a.name })),
-      ...formData.linkedPeople.map(p => ({ type: 'person' as const, id: p.id, name: p.name })),
-    ];
+    setIsSubmitting(true);
 
-    const newDocument: Document = {
-      id: documents.length + 1,
-      number: `DOC-${String(documents.length + 1).padStart(3, '0')}`,
-      name: formData.name,
-      animal: formData.linkedAnimals.length > 0 ? formData.linkedAnimals[0].name : '-',
-      type: formData.type,
-      date: new Date().toLocaleDateString('pt-BR'),
-      status: formData.status,
-      signature: '-',
-      tags: formData.tags,
-      linkedTo: linkedTo,
-      fileUrl: URL.createObjectURL(formData.file),
-      fileSize: `${(formData.file.size / 1024).toFixed(0)} KB`,
-    };
+    try {
+      const fileUrl = await uploadDocumentFile(harasId, formData.file);
+      const linkedAnimals = formData.linkedAnimals.map((animal) => ({
+        id: animal.id,
+        name: animal.name,
+      }));
+      const linkedPeople = formData.linkedPeople.map((person) => ({
+        id: person.id,
+        name: person.name,
+      }));
 
-    setDocuments([newDocument, ...documents]);
-    
-    setFormData({
-      name: '',
-      type: '',
-      status: 'Pendente',
-      tags: [],
-      linkedAnimals: [],
-      linkedPeople: [],
-      file: null,
-    });
+      const meta: DocumentMeta = {
+        status: formData.status,
+        tags: formData.tags,
+        linked_animals: linkedAnimals,
+        linked_people: linkedPeople,
+        notes: formData.notes?.trim() || undefined,
+      };
 
-    setShowNewDocModal(false);
-    toast.success('Documento adicionado com sucesso!');
+      await createDocument({
+        haras_id: harasId,
+        animal_id: linkedAnimals[0]?.id ?? null,
+        titulo: formData.name,
+        tipo: formData.type,
+        file_url: fileUrl,
+        tamanho_bytes: formData.file.size,
+        meta,
+      });
+
+      setFormData({
+        name: '',
+        type: '',
+        status: 'Pendente',
+        tags: [],
+        linkedAnimals: [],
+        linkedPeople: [],
+        notes: '',
+        file: null,
+      });
+
+      setShowNewDocModal(false);
+      toast.success('Documento adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar documento', error);
+      toast.error('Erro ao adicionar documento');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadDocument = (doc: Document) => {
+    if (!doc.fileUrl) {
+      toast.error('Arquivo não encontrado.');
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = doc.fileUrl;
+    link.download = doc.name || 'documento';
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.click();
   };
 
   // Filtrar documentos
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          doc.number.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = filterTag === 'todos' || doc.tags.includes(filterTag);
-    const matchesType = filterType === 'todos' || doc.type === filterType;
-    const matchesStatus = filterStatus === 'todos' || doc.status === filterStatus;
-    
-    return matchesSearch && matchesTag && matchesType && matchesStatus;
-  });
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      const matchesSearch =
+        doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.number.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesTag = filterTag === 'todos' || doc.tags.includes(filterTag);
+      const matchesType = filterType === 'todos' || doc.type === filterType;
+      const matchesStatus = filterStatus === 'todos' || doc.status === filterStatus;
+
+      return matchesSearch && matchesTag && matchesType && matchesStatus;
+    });
+  }, [documents, filterStatus, filterTag, filterType, searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -366,20 +431,18 @@ export function AdvisorDocumentsContent() {
             <label className="block text-sm text-foreground dark:text-white mb-2">Tipo</label>
             <NativeSelect value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="todos">Todos os Tipos</option>
-              <option value="GIA">GIA</option>
-              <option value="Registro">Registro</option>
-              <option value="Contrato">Contrato</option>
-              <option value="Exame">Exame</option>
-              <option value="Nota Fiscal">Nota Fiscal</option>
+              {availableTypes.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </NativeSelect>
           </div>
           <div>
             <label className="block text-sm text-foreground dark:text-white mb-2">Status</label>
             <NativeSelect value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="todos">Todos os Status</option>
-              <option value="Assinado">Assinado</option>
-              <option value="Aguardando">Aguardando</option>
-              <option value="Pendente">Pendente</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
             </NativeSelect>
           </div>
         </div>
@@ -400,64 +463,84 @@ export function AdvisorDocumentsContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border dark:divide-[rgba(255,255,255,0.1)]">
-              {filteredDocuments.map((doc) => (
-                <tr key={doc.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-foreground dark:text-white">{doc.name}</p>
-                      <p className="text-xs text-muted-foreground dark:text-[#99a1af]">{doc.number} • {doc.fileSize}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {doc.tags.map((tag, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-primary/10 dark:bg-white/10 text-xs text-foreground dark:text-white rounded">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                      {doc.linkedTo && doc.linkedTo.length > 0 ? (
-                        doc.linkedTo.map((link, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              link.type === 'animal' 
-                                ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
-                                : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                            }`}>
-                              {link.type === 'animal' ? 'Animal' : 'Pessoa'}
-                            </span>
-                            <span>{link.name}</span>
-                          </div>
-                        ))
-                      ) : (
-                        '-'
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-foreground dark:text-white">{doc.date}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs ${getStatusColor(doc.status)}`}>
-                      {doc.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground dark:text-[#99a1af]">
                     <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => setViewingDocument(doc)}
-                        className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      >
-                        <Eye className="w-4 h-4 text-foreground dark:text-white" />
-                      </button>
-                      <button className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors">
-                        <Download className="w-4 h-4 text-foreground dark:text-white" />
-                      </button>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando documentos...
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : filteredDocuments.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground dark:text-[#99a1af]">
+                    Nenhum documento encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filteredDocuments.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-foreground dark:text-white">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground dark:text-[#99a1af]">{doc.number} • {doc.fileSize}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {doc.tags.map((tag, idx) => (
+                          <span key={idx} className="px-2 py-1 bg-primary/10 dark:bg-white/10 text-xs text-foreground dark:text-white rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                        {doc.linkedTo && doc.linkedTo.length > 0 ? (
+                          doc.linkedTo.map((link, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                link.type === 'animal' 
+                                  ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                                  : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                              }`}>
+                                {link.type === 'animal' ? 'Animal' : 'Pessoa'}
+                              </span>
+                              <span>{link.name}</span>
+                            </div>
+                          ))
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-foreground dark:text-white">{doc.date}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-xs ${getStatusColor(doc.status)}`}>
+                        {doc.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => setViewingDocument(doc)}
+                          className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                        >
+                          <Eye className="w-4 h-4 text-foreground dark:text-white" />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadDocument(doc)}
+                          className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                        >
+                          <Download className="w-4 h-4 text-foreground dark:text-white" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -499,11 +582,9 @@ export function AdvisorDocumentsContent() {
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   >
                     <option value="">Selecione o tipo</option>
-                    <option value="Contrato">Contrato</option>
-                    <option value="Registro">Registro</option>
-                    <option value="Exame">Exame</option>
-                    <option value="Nota Fiscal">Nota Fiscal</option>
-                    <option value="GIA">GIA</option>
+                    {DOCUMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </NativeSelect>
                 </div>
 
@@ -514,9 +595,9 @@ export function AdvisorDocumentsContent() {
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   >
-                    <option value="Pendente">Pendente</option>
-                    <option value="Aguardando">Aguardando</option>
-                    <option value="Assinado">Assinado</option>
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
                   </NativeSelect>
                 </div>
 
@@ -562,7 +643,7 @@ export function AdvisorDocumentsContent() {
                   <NativeSelect
                     value=""
                     onChange={(e) => {
-                      const animal = availableAnimals.find(a => a.id === Number(e.target.value));
+                      const animal = availableAnimals.find(a => a.id === e.target.value);
                       if (animal) handleAddAnimal(animal);
                     }}
                   >
@@ -589,7 +670,7 @@ export function AdvisorDocumentsContent() {
                   <NativeSelect
                     value=""
                     onChange={(e) => {
-                      const person = availablePeople.find(p => p.id === Number(e.target.value));
+                      const person = availablePeople.find(p => p.id === e.target.value);
                       if (person) handleAddPerson(person);
                     }}
                   >
@@ -598,6 +679,17 @@ export function AdvisorDocumentsContent() {
                       <option key={person.id} value={person.id}>{person.name}</option>
                     ))}
                   </NativeSelect>
+                </div>
+
+                {/* Observações */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">Observações</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Detalhes, observações ou instruções adicionais..."
+                    className="w-full min-h-[90px] px-4 py-3 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                  />
                 </div>
 
                 {/* Upload de Arquivo */}
@@ -633,9 +725,17 @@ export function AdvisorDocumentsContent() {
               </button>
               <button
                 onClick={handleCreateDocument}
-                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Adicionar Documento
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Adicionar Documento'
+                )}
               </button>
             </div>
           </div>
@@ -698,6 +798,14 @@ export function AdvisorDocumentsContent() {
                     </div>
                   </div>
                 )}
+                {viewingDocument.notes && (
+                  <div>
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-2">Observações</p>
+                    <p className="text-sm text-foreground dark:text-white whitespace-pre-line">
+                      {viewingDocument.notes}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -708,7 +816,10 @@ export function AdvisorDocumentsContent() {
               >
                 Fechar
               </button>
-              <button className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+              <button
+                onClick={() => handleDownloadDocument(viewingDocument)}
+                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
                 <Download className="w-5 h-5" />
                 Baixar
               </button>

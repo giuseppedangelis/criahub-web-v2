@@ -70,6 +70,16 @@ export type ServiceOrderStatus =
     | 'concluido'
     | 'cancelado';
 
+export type TaskStatus =
+    | 'pendente'
+    | 'em_andamento'
+    | 'concluida';
+
+export type TaskPriority =
+    | 'baixa'
+    | 'media'
+    | 'alta';
+
 export type NotificationType =
     | 'saude'
     | 'reproducao'
@@ -365,6 +375,46 @@ export interface ServiceOrder {
     animal?: Animal | null;
     haras?: Haras | null;
     client_haras?: Haras | null;
+}
+
+export interface TaskDocument {
+    id: string;
+    name: string;
+    size: string;
+    url?: string | null;
+}
+
+export interface TaskPhoto {
+    id: string;
+    name: string;
+    url?: string | null;
+}
+
+export interface Task {
+    id: string;
+    task_number: number | null;
+    haras_id: string;
+    title: string;
+    due_date: string;
+    status: TaskStatus;
+    priority: TaskPriority;
+    observations?: string | null;
+    animal_id?: string | null;
+    responsible_id?: string | null;
+    documents?: TaskDocument[] | null;
+    photos?: TaskPhoto[] | null;
+    created_by?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    animal?: {
+        id: string;
+        name?: string | null;
+    } | null;
+    responsible?: {
+        id: string;
+        full_name?: string | null;
+        email?: string | null;
+    } | null;
 }
 
 export interface Notification {
@@ -682,6 +732,41 @@ export interface TransactionFilters {
     start_date?: string;
     end_date?: string;
     animal_id?: string;
+}
+
+export interface TaskFilters {
+    haras_id?: string;
+    status?: TaskStatus;
+    priority?: TaskPriority;
+    responsible_id?: string;
+    animal_id?: string;
+    search?: string;
+}
+
+export interface CreateTaskInput {
+    haras_id: string;
+    title: string;
+    due_date: string;
+    status?: TaskStatus;
+    priority?: TaskPriority;
+    observations?: string | null;
+    animal_id?: string | null;
+    responsible_id?: string | null;
+    documents?: TaskDocument[] | null;
+    photos?: TaskPhoto[] | null;
+    created_by?: string | null;
+}
+
+export interface UpdateTaskInput {
+    title?: string;
+    due_date?: string;
+    status?: TaskStatus;
+    priority?: TaskPriority;
+    observations?: string | null;
+    animal_id?: string | null;
+    responsible_id?: string | null;
+    documents?: TaskDocument[] | null;
+    photos?: TaskPhoto[] | null;
 }
 
 export interface AgendaEventFilters {

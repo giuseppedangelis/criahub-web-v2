@@ -1,6 +1,7 @@
-import { AlertTriangle, FileText, TrendingUp, TrendingDown, Upload, Plus, Users, CheckCircle, Clock, DollarSign, Eye, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, FileText, TrendingUp, TrendingDown, Upload, Plus, Users, CheckCircle, Clock, DollarSign, Eye, ChevronRight, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAdvisorDashboard } from '@/hooks/useAdvisorDashboard';
 
 interface DashboardStats {
   pendingBirths: number;
@@ -28,18 +29,22 @@ export function AdvisorDashboardContent({
   onNavigateToFinancial,
   onNavigateToDocuments,
 }: AdvisorDashboardContentProps) {
-  const [stats] = useState<DashboardStats>({
-    pendingBirths: 3,
-    pendingOccurrences: 2,
-    activeAnimals: 45,
-    soldAnimals: 12,
-    deceasedAnimals: 3,
-    categoryPista: 15,
-    categoryPasto: 20,
-    categoryReproduction: 10,
-    monthlyRevenue: 45000,
-    monthlyExpenses: 28500,
-  });
+  const { data: currentHaras } = useCurrentHaras();
+  const harasId = currentHaras?.id || '';
+  const { data: dashboardStats, isLoading, error } = useAdvisorDashboard(harasId);
+
+  const stats: DashboardStats = dashboardStats || {
+    pendingBirths: 0,
+    pendingOccurrences: 0,
+    activeAnimals: 0,
+    soldAnimals: 0,
+    deceasedAnimals: 0,
+    categoryPista: 0,
+    categoryPasto: 0,
+    categoryReproduction: 0,
+    monthlyRevenue: 0,
+    monthlyExpenses: 0,
+  };
 
   // Dados para gráfico de Status
   const statusData = [
@@ -73,6 +78,29 @@ export function AdvisorDashboardContent({
           Visão geral do escritório - {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
         </p>
       </div>
+
+      {!harasId && (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6">
+          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+            Seu usuário ainda não está vinculado a nenhum Haras.
+          </p>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <span className="ml-3 text-muted-foreground">Carregando dados...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6">
+          <p className="text-sm text-red-600 dark:text-red-400">
+            Não foi possível carregar os dados do dashboard.
+          </p>
+        </div>
+      )}
 
       {/* Alertas de Pendências - DESTAQUE MÁXIMO */}
       {totalPendencies > 0 && (

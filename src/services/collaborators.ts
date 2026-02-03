@@ -9,7 +9,7 @@ export interface CreateCollaboratorInput {
     full_name: string;
     email: string;
     password: string;
-    role: 'acessor' | 'veterinario' | 'peao';
+    role: 'acessor' | 'assessor' | 'veterinario' | 'peao' | 'funcionario';
     haras_id: string;
     permissions?: Record<string, any>;
 }

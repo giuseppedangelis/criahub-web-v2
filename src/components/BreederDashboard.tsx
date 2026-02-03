@@ -1,7 +1,7 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, Users as HorseIcon, Heart, DollarSign, Calendar, Settings, Moon, Sun, Bell, User, Menu, X, FileText, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users as HorseIcon, Users as TeamIcon, Heart, DollarSign, Calendar, Settings, Moon, Sun, Bell, User, Menu, X, FileText, HelpCircle, ClipboardList } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
@@ -13,6 +13,8 @@ import { BreederFinancialContent } from './breeder/BreederFinancialContent';
 import { BreederAgendaContent } from './breeder/BreederAgendaContent';
 import { BreederHelpContent } from './breeder/BreederHelpContent';
 import { BreederSettingsContent } from './breeder/BreederSettingsContent';
+import { AdvisorTasksContent } from './advisor/AdvisorTasksContent';
+import { AdvisorTeamContent } from './advisor/AdvisorTeamContent';
 import { AddAnimalForm } from './breeder/AddAnimalForm';
 import { NotificationsPanel } from './NotificationsPanel';
 import { NotificationsCenter } from './breeder/NotificationsCenter';
@@ -111,6 +113,8 @@ export function BreederDashboard() {
     { id: 'reproduction', label: 'Reprodução', icon: Heart },
     { id: 'financial', label: 'Financeiro', icon: DollarSign },
     { id: 'agenda', label: 'Agenda', icon: Calendar },
+    { id: 'tasks', label: 'Tarefas', icon: ClipboardList },
+    { id: 'team', label: 'Equipe', icon: TeamIcon },
     { id: 'reports', label: 'Relatórios', icon: FileText },
     { id: 'settings', label: 'Configurações', icon: Settings },
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
@@ -410,6 +414,8 @@ export function BreederDashboard() {
           {activeTab === 'reproduction' && <BreederReproductionContent onNavigateToAgenda={() => setActiveTab('agenda')} />}
           {activeTab === 'financial' && <BreederFinancialContent />}
           {activeTab === 'agenda' && <BreederAgendaContent />}
+          {activeTab === 'tasks' && <AdvisorTasksContent showPendingValidation={false} />}
+          {activeTab === 'team' && <AdvisorTeamContent />}
           {activeTab === 'help' && <BreederHelpContent />}
           {activeTab === 'settings' && <BreederSettingsContent />}
           {activeTab === 'profile' && <ProfileView />}

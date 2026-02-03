@@ -1,87 +1,104 @@
-import { Search, Plus, Users, X, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Search, Plus, Users, X, Edit, Trash2, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
+import { useUser } from '@/contexts/UserContext';
+import { useCurrentHaras } from '@/hooks/useHaras';
+import {
+  useCreateTeamRole,
+  useDeleteTeamRole,
+  useRemoveTeamMember,
+  useTeamMembers,
+  useTeamRoles,
+  useUpdateTeamMember,
+  useUpdateTeamRole,
+  useUpsertTeamMember,
+} from '@/hooks/useTeam';
+import { collaboratorsService } from '@/services/collaborators';
+import {
+  DEFAULT_TEAM_PERMISSIONS,
+  normalizeTeamPermissions,
+  teamService,
+  type TeamPermissionKey,
+  type TeamPermissions,
+} from '@/services/team';
+
+const PERMISSION_LABELS: Record<TeamPermissionKey, string> = {
+  viewHerd: 'Plantel',
+  registerActivities: 'Atividades',
+  healthManagement: 'Saúde',
+  reproduction: 'Reprodução',
+  financialManagement: 'Financeiro',
+  trainingManagement: 'Treinamento',
+  teamManagement: 'Equipe',
+  documentManagement: 'Documentos',
+  fullAdministrative: 'Administrativo',
+};
+
+const SYSTEM_ROLE_OPTIONS = [
+  { value: 'acessor', label: 'Acessor' },
+  { value: 'assessor', label: 'Assessor' },
+  { value: 'veterinario', label: 'Veterinário' },
+  { value: 'peao', label: 'Peão' },
+  { value: 'funcionario', label: 'Funcionário' },
+];
+
+const SYSTEM_ROLE_LABELS: Record<string, string> = {
+  criador: 'Criador/Dono de Haras',
+  assessor: 'Assessor Administrativo',
+  acessor: 'Assessor Administrativo',
+  veterinario: 'Veterinário',
+  peao: 'Peão',
+  funcionario: 'Funcionário',
+};
+
+const formatAllowedModules = (permissions: TeamPermissions) => {
+  if (permissions.fullAdministrative) return 'Todos';
+  const selected = Object.entries(PERMISSION_LABELS)
+    .filter(([key]) => key !== 'fullAdministrative' && permissions[key as TeamPermissionKey])
+    .map(([, label]) => label);
+  return selected.length ? selected.join(', ') : 'Nenhum';
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return 'Nunca';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+};
+
+const emptyPermissions = (): TeamPermissions => ({ ...DEFAULT_TEAM_PERMISSIONS });
 
 export function AdvisorTeamContent() {
-  const [activeTab, setActiveTab] = useState('team');
+  const { user, profile } = useUser();
+  const { data: currentHaras } = useCurrentHaras();
+  const harasId = currentHaras?.id || profile?.haras_id || '';
+
+  const isCreator = profile?.role === 'criador';
+
+  const [activeTab, setActiveTab] = useState<'team' | 'roles'>('team');
+  const [searchTerm, setSearchTerm] = useState('');
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
-  const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [showEditUserModal, setShowEditUserModal] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<number | null>(null);
-
-  const [team, setTeam] = useState([
-    { id: 1, name: 'João Silva', email: 'joao@harasvaleverde.com', role: 'Peão', phone: '(35) 99123-4567', lastAccess: '18/11/2024', status: 'Ativo' },
-    { id: 2, name: 'Dra. Maria Santos', email: 'maria@harasvaleverde.com', role: 'Veterinária', phone: '(35) 99234-5678', lastAccess: '18/11/2024', status: 'Ativo' },
-    { id: 3, name: 'Pedro Costa', email: 'pedro@harasvaleverde.com', role: 'Treinador', phone: '(35) 99345-6789', lastAccess: '15/11/2024', status: 'Ativo' },
-    { id: 4, name: 'Patrícia Almeida', email: 'patricia@harasvaleverde.com', role: 'Assessora', phone: '(35) 99456-7890', lastAccess: '18/11/2024', status: 'Ativo' },
-  ]);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: '',
+    password: '',
+    roleId: '',
+    systemRole: 'funcionario',
     phone: '',
     status: 'Ativo',
-    permissions: {
-      viewHerd: false,
-      registerActivities: false,
-      healthManagement: false,
-      reproduction: false,
-      financialManagement: false,
-      trainingManagement: false,
-      teamManagement: false,
-      documentManagement: false,
-      fullAdministrative: false,
-    }
+    permissions: emptyPermissions(),
   });
-
-  const [roles, setRoles] = useState([
-    { 
-      id: 1, 
-      name: 'Peão', 
-      userType: 'Interno',
-      allowedModules: 'Plantel, Saúde',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Não',
-      users: 3 
-    },
-    { 
-      id: 2, 
-      name: 'Veterinária', 
-      userType: 'Interno',
-      allowedModules: 'Saúde, Reprodução',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Sim',
-      users: 2 
-    },
-    { 
-      id: 3, 
-      name: 'Treinador', 
-      userType: 'Interno',
-      allowedModules: 'Plantel, Treinamento',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Não',
-      users: 2 
-    },
-    { 
-      id: 4, 
-      name: 'Assessor', 
-      userType: 'Interno',
-      allowedModules: 'Todos',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Sim',
-      users: 1 
-    },
-  ]);
 
   const [roleFormData, setRoleFormData] = useState({
     name: '',
@@ -90,353 +107,426 @@ export function AdvisorTeamContent() {
     canEdit: 'Sim',
     canView: 'Sim',
     canDelete: 'Não',
-    permissions: {
-      viewHerd: false,
-      registerActivities: false,
-      healthManagement: false,
-      reproduction: false,
-      financialManagement: false,
-      trainingManagement: false,
-      teamManagement: false,
-      documentManagement: false,
-      fullAdministrative: false,
-    }
+    permissions: emptyPermissions(),
   });
 
-  const handleCreateUser = () => {
-    // Validação
-    if (!formData.name || !formData.email || !formData.role) {
+  const { data: membersData = [], isLoading: isLoadingMembers } = useTeamMembers(harasId);
+  const { data: rolesData = [], isLoading: isLoadingRoles } = useTeamRoles(harasId);
+
+  const createRole = useCreateTeamRole();
+  const updateRole = useUpdateTeamRole();
+  const deleteRole = useDeleteTeamRole();
+  const upsertMember = useUpsertTeamMember();
+  const updateMember = useUpdateTeamMember();
+  const removeMember = useRemoveTeamMember();
+
+  const memberCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    membersData.forEach((member) => {
+      if (member.role_id) {
+        counts[member.role_id] = (counts[member.role_id] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [membersData]);
+
+  const roles = useMemo(() => {
+    return rolesData.map((role) => ({
+      id: role.id,
+      name: role.name,
+      userType: role.user_type || 'Interno',
+      allowedModules: formatAllowedModules(role.permissions),
+      canEdit: role.can_edit ? 'Sim' : 'Não',
+      canView: role.can_view ? 'Sim' : 'Não',
+      canDelete: role.can_delete ? 'Sim' : 'Não',
+      users: memberCounts[role.id] || 0,
+      permissions: role.permissions,
+    }));
+  }, [rolesData, memberCounts]);
+
+  const team = useMemo(() => {
+    return membersData.map((member) => {
+      const displayRole = member.role?.name
+        || SYSTEM_ROLE_LABELS[member.profile.role || '']
+        || 'Colaborador';
+
+      return {
+        id: member.user_id,
+        memberId: member.id || null,
+        name: member.profile.full_name || member.profile.email || 'Colaborador',
+        email: member.profile.email || '',
+        role: displayRole,
+        roleId: member.role_id || '',
+        phone: member.profile.phone || '-',
+        lastAccess: formatDate(member.profile.updated_at || member.profile.created_at || undefined),
+        status: member.status || 'Ativo',
+        permissions: normalizeTeamPermissions(member.permissions || member.role?.permissions),
+        systemRole: member.profile.role || 'funcionario',
+        isOwner: member.profile.role === 'criador',
+        isSelf: member.user_id === user?.id,
+      };
+    });
+  }, [membersData, user?.id]);
+
+  const currentMember = useMemo(() => membersData.find((member) => member.user_id === user?.id), [membersData, user?.id]);
+  const currentPermissions = normalizeTeamPermissions(currentMember?.permissions || currentMember?.role?.permissions);
+
+  const canManageRoles = isCreator;
+  const canManageUsers = isCreator || currentPermissions.teamManagement || currentPermissions.fullAdministrative;
+  const canCreateAction = activeTab === 'team' ? canManageUsers : canManageRoles;
+
+  const filteredTeam = useMemo(() => {
+    if (!searchTerm.trim()) return team;
+    const term = searchTerm.toLowerCase();
+    return team.filter((member) =>
+      member.name.toLowerCase().includes(term)
+      || member.email.toLowerCase().includes(term)
+      || member.role.toLowerCase().includes(term)
+    );
+  }, [team, searchTerm]);
+
+  const filteredRoles = useMemo(() => {
+    if (!searchTerm.trim()) return roles;
+    const term = searchTerm.toLowerCase();
+    return roles.filter((role) => role.name.toLowerCase().includes(term));
+  }, [roles, searchTerm]);
+
+  const updatePermissionState = (permissions: TeamPermissions, key: TeamPermissionKey, value: boolean) => {
+    if (key === 'fullAdministrative') {
+      if (value) {
+        return {
+          viewHerd: true,
+          registerActivities: true,
+          healthManagement: true,
+          reproduction: true,
+          financialManagement: true,
+          trainingManagement: true,
+          teamManagement: true,
+          documentManagement: true,
+          fullAdministrative: true,
+        } as TeamPermissions;
+      }
+      return { ...permissions, fullAdministrative: false } as TeamPermissions;
+    }
+
+    const next = { ...permissions, [key]: value } as TeamPermissions;
+    if (!value && permissions.fullAdministrative) {
+      next.fullAdministrative = false;
+    }
+    return next;
+  };
+
+  const resetUserForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      roleId: '',
+      systemRole: 'funcionario',
+      phone: '',
+      status: 'Ativo',
+      permissions: emptyPermissions(),
+    });
+  };
+
+  const resetRoleForm = () => {
+    setRoleFormData({
+      name: '',
+      userType: 'Interno',
+      allowedModules: '',
+      canEdit: 'Sim',
+      canView: 'Sim',
+      canDelete: 'Não',
+      permissions: emptyPermissions(),
+    });
+  };
+
+  const handleCreateUser = async () => {
+    if (!canManageUsers) {
+      toast.error('Você não tem permissão para criar usuários.');
+      return;
+    }
+
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    if (!formData.name || !formData.email || !formData.password) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
-    // Validação básica de email
+    if (!formData.systemRole) {
+      toast.error('Selecione o perfil de acesso');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error('Email inválido');
       return;
     }
 
-    // Criar novo usuário
-    const newUser = {
-      id: team.length + 1,
-      name: formData.name,
-      email: formData.email,
-      role: formData.role,
-      phone: formData.phone || '-',
-      lastAccess: 'Nunca',
-      status: formData.status
-    };
+    setIsSubmitting(true);
+    try {
+      const response = await collaboratorsService.createCollaborator({
+        full_name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.systemRole as any,
+        haras_id: harasId,
+      });
 
-    setTeam([...team, newUser]);
-    
-    // Reset form
-    setFormData({
-      name: '',
-      email: '',
-      role: '',
-      phone: '',
-      status: 'Ativo',
-      permissions: {
-        viewHerd: false,
-        registerActivities: false,
-        healthManagement: false,
-        reproduction: false,
-        financialManagement: false,
-        trainingManagement: false,
-        teamManagement: false,
-        documentManagement: false,
-        fullAdministrative: false,
-      }
-    });
+      await upsertMember.mutateAsync({
+        harasId,
+        userId: response.user_id,
+        roleId: formData.roleId || null,
+        permissions: formData.permissions,
+        status: formData.status as 'Ativo' | 'Inativo',
+        createdBy: profile?.id,
+      });
 
-    setShowNewUserModal(false);
-    toast.success('Usuário criado com sucesso!');
+      await teamService.updateProfile(response.user_id, {
+        phone: formData.phone || null,
+        status: formData.status as 'Ativo' | 'Inativo',
+      });
+
+      toast.success('Usuário criado com sucesso!');
+      resetUserForm();
+      setShowNewUserModal(false);
+    } catch (error: any) {
+      console.error('Erro ao criar usuário:', error);
+      toast.error(error.message || 'Erro ao criar usuário');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreateRole = () => {
-    // Validação
+  const handleCreateRole = async () => {
+    if (!canManageRoles) {
+      toast.error('Apenas o criador pode criar funções.');
+      return;
+    }
+
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
     if (!roleFormData.name) {
       toast.error('Digite o nome da função');
       return;
     }
 
-    if (!roleFormData.allowedModules) {
-      toast.error('Especifique os módulos permitidos');
-      return;
-    }
-
-    // Verificar se pelo menos uma permissão foi selecionada
-    const hasPermissions = Object.values(roleFormData.permissions).some(p => p);
+    const hasPermissions = Object.values(roleFormData.permissions).some((value) => value);
     if (!hasPermissions) {
       toast.error('Selecione pelo menos uma permissão');
       return;
     }
 
-    // Criar string de permissões baseada nas seleções
-    const permissionLabels = {
-      viewHerd: 'Plantel',
-      registerActivities: 'Atividades',
-      healthManagement: 'Saúde',
-      reproduction: 'Reprodução',
-      financialManagement: 'Financeiro',
-      trainingManagement: 'Treinamento',
-      teamManagement: 'Equipe',
-      documentManagement: 'Documentos',
-      fullAdministrative: 'Administrativo',
-    };
-
-    const selectedPermissions = Object.entries(roleFormData.permissions)
-      .filter(([_, value]) => value)
-      .map(([key, _]) => permissionLabels[key as keyof typeof permissionLabels])
-      .join(', ');
-
-    // Criar nova função
-    const newRole = {
-      id: roles.length + 1,
-      name: roleFormData.name,
-      userType: roleFormData.userType,
-      allowedModules: roleFormData.allowedModules || selectedPermissions,
-      canEdit: roleFormData.canEdit,
-      canView: roleFormData.canView,
-      canDelete: roleFormData.canDelete,
-      users: 0
-    };
-
-    setRoles([...roles, newRole]);
-
-    // Reset form
-    setRoleFormData({
-      name: '',
-      userType: 'Interno',
-      allowedModules: '',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Não',
-      permissions: {
-        viewHerd: false,
-        registerActivities: false,
-        healthManagement: false,
-        reproduction: false,
-        financialManagement: false,
-        trainingManagement: false,
-        teamManagement: false,
-        documentManagement: false,
-        fullAdministrative: false,
-      }
-    });
-
-    setShowNewRoleModal(false);
-    toast.success('Função criada com sucesso!');
-  };
-
-  const handleEditRole = () => {
-    if (editingRoleId === null) return;
-
-    // Validação
-    if (!roleFormData.name) {
-      toast.error('Digite o nome da função');
-      return;
-    }
-
-    if (!roleFormData.allowedModules) {
-      toast.error('Especifique os módulos permitidos');
-      return;
-    }
-
-    // Verificar se pelo menos uma permissão foi selecionada
-    const hasPermissions = Object.values(roleFormData.permissions).some(p => p);
-    if (!hasPermissions) {
-      toast.error('Selecione pelo menos uma permissão');
-      return;
-    }
-
-    // Criar string de permissões baseada nas seleções
-    const permissionLabels = {
-      viewHerd: 'Plantel',
-      registerActivities: 'Atividades',
-      healthManagement: 'Saúde',
-      reproduction: 'Reprodução',
-      financialManagement: 'Financeiro',
-      trainingManagement: 'Treinamento',
-      teamManagement: 'Equipe',
-      documentManagement: 'Documentos',
-      fullAdministrative: 'Administrativo',
-    };
-
-    const selectedPermissions = Object.entries(roleFormData.permissions)
-      .filter(([_, value]) => value)
-      .map(([key, _]) => permissionLabels[key as keyof typeof permissionLabels])
-      .join(', ');
-
-    // Atualizar função existente
-    const updatedRoles = roles.map(role => {
-      if (role.id === editingRoleId) {
-        return {
-          ...role,
+    setIsSubmitting(true);
+    try {
+      await createRole.mutateAsync({
+        harasId,
+        createdBy: profile?.id,
+        input: {
           name: roleFormData.name,
-          userType: roleFormData.userType,
-          allowedModules: roleFormData.allowedModules || selectedPermissions,
-          canEdit: roleFormData.canEdit,
-          canView: roleFormData.canView,
-          canDelete: roleFormData.canDelete,
-        };
-      }
-      return role;
-    });
+          user_type: roleFormData.userType,
+          permissions: roleFormData.permissions,
+          can_edit: roleFormData.canEdit === 'Sim',
+          can_view: roleFormData.canView === 'Sim',
+          can_delete: roleFormData.canDelete === 'Sim',
+        },
+      });
 
-    setRoles(updatedRoles);
+      toast.success('Função criada com sucesso!');
+      resetRoleForm();
+      setShowNewRoleModal(false);
+    } catch (error: any) {
+      console.error('Erro ao criar função:', error);
+      toast.error(error.message || 'Erro ao criar função');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    // Reset form
+  const handleEditRoleClick = (roleId: string) => {
+    if (!canManageRoles) {
+      toast.error('Apenas o criador pode editar funções.');
+      return;
+    }
+
+    const role = rolesData.find((item) => item.id === roleId);
+    if (!role) return;
+
     setRoleFormData({
-      name: '',
-      userType: 'Interno',
-      allowedModules: '',
-      canEdit: 'Sim',
-      canView: 'Sim',
-      canDelete: 'Não',
-      permissions: {
-        viewHerd: false,
-        registerActivities: false,
-        healthManagement: false,
-        reproduction: false,
-        financialManagement: false,
-        trainingManagement: false,
-        teamManagement: false,
-        documentManagement: false,
-        fullAdministrative: false,
-      }
+      name: role.name,
+      userType: role.user_type || 'Interno',
+      allowedModules: formatAllowedModules(role.permissions),
+      canEdit: role.can_edit ? 'Sim' : 'Não',
+      canView: role.can_view ? 'Sim' : 'Não',
+      canDelete: role.can_delete ? 'Sim' : 'Não',
+      permissions: normalizeTeamPermissions(role.permissions),
     });
 
-    setShowEditRoleModal(false);
-    toast.success('Função atualizada com sucesso!');
+    setEditingRoleId(roleId);
+    setShowEditRoleModal(true);
   };
 
-  const handleEditRoleClick = (roleId: number) => {
-    const role = roles.find(role => role.id === roleId);
-    if (role) {
-      setRoleFormData({
-        name: role.name,
-        userType: role.userType,
-        allowedModules: role.allowedModules,
-        canEdit: role.canEdit,
-        canView: role.canView,
-        canDelete: role.canDelete,
-        permissions: {
-          viewHerd: role.allowedModules.includes('Plantel'),
-          registerActivities: role.allowedModules.includes('Atividades'),
-          healthManagement: role.allowedModules.includes('Saúde'),
-          reproduction: role.allowedModules.includes('Reprodução'),
-          financialManagement: role.allowedModules.includes('Financeiro'),
-          trainingManagement: role.allowedModules.includes('Treinamento'),
-          teamManagement: role.allowedModules.includes('Equipe'),
-          documentManagement: role.allowedModules.includes('Documentos'),
-          fullAdministrative: role.allowedModules.includes('Administrativo') || role.allowedModules.includes('Todos'),
-        }
+  const handleUpdateRole = async () => {
+    if (!editingRoleId) return;
+    if (!harasId) {
+      toast.error('Haras não identificado.');
+      return;
+    }
+
+    if (!roleFormData.name) {
+      toast.error('Digite o nome da função');
+      return;
+    }
+
+    const hasPermissions = Object.values(roleFormData.permissions).some((value) => value);
+    if (!hasPermissions) {
+      toast.error('Selecione pelo menos uma permissão');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateRole.mutateAsync({
+        roleId: editingRoleId,
+        harasId,
+        input: {
+          name: roleFormData.name,
+          user_type: roleFormData.userType,
+          permissions: roleFormData.permissions,
+          can_edit: roleFormData.canEdit === 'Sim',
+          can_view: roleFormData.canView === 'Sim',
+          can_delete: roleFormData.canDelete === 'Sim',
+        },
       });
-      setEditingRoleId(roleId);
-      setShowEditRoleModal(true);
+
+      toast.success('Função atualizada com sucesso!');
+      resetRoleForm();
+      setEditingRoleId(null);
+      setShowEditRoleModal(false);
+    } catch (error: any) {
+      console.error('Erro ao atualizar função:', error);
+      toast.error(error.message || 'Erro ao atualizar função');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditUserClick = (userId: number) => {
-    const user = team.find(user => user.id === userId);
-    if (user) {
-      setFormData({
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        status: user.status,
-        permissions: {
-          viewHerd: false,
-          registerActivities: false,
-          healthManagement: false,
-          reproduction: false,
-          financialManagement: false,
-          trainingManagement: false,
-          teamManagement: false,
-          documentManagement: false,
-          fullAdministrative: false,
-        }
-      });
-      setEditingUserId(userId);
-      setShowEditUserModal(true);
-    }
+  const handleEditUserClick = (userId: string) => {
+    const member = team.find((item) => item.id === userId);
+    if (!member) return;
+
+    setFormData({
+      name: member.name,
+      email: member.email,
+      password: '',
+      roleId: member.roleId || '',
+      systemRole: member.systemRole || 'funcionario',
+      phone: member.phone === '-' ? '' : member.phone,
+      status: member.status,
+      permissions: normalizeTeamPermissions(member.permissions),
+    });
+
+    setEditingUserId(userId);
+    setEditingMemberId(member.memberId || null);
+    setShowEditUserModal(true);
   };
 
-  const handleDeleteUserClick = (userId: number) => {
+  const handleDeleteUserClick = (userId: string) => {
     setUserToDelete(userId);
     setShowDeleteConfirmModal(true);
   };
 
-  const handleDeleteUser = () => {
-    if (userToDelete === null) return;
+  const handleDeleteUser = async () => {
+    if (!userToDelete || !harasId) return;
 
-    const updatedTeam = team.filter(user => user.id !== userToDelete);
-    setTeam(updatedTeam);
+    if (userToDelete === user?.id) {
+      toast.error('Você não pode remover o próprio acesso.');
+      return;
+    }
 
-    setUserToDelete(null);
-    setShowDeleteConfirmModal(false);
-    toast.success('Usuário excluído com sucesso!');
+    setIsSubmitting(true);
+    try {
+      await removeMember.mutateAsync({ userId: userToDelete, harasId });
+      toast.success('Usuário removido com sucesso!');
+      setUserToDelete(null);
+      setShowDeleteConfirmModal(false);
+    } catch (error: any) {
+      console.error('Erro ao remover usuário:', error);
+      toast.error(error.message || 'Erro ao remover usuário');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleUpdateUser = () => {
-    if (editingUserId === null) return;
+  const handleUpdateUser = async () => {
+    if (!editingUserId || !harasId) return;
 
-    // Validação
-    if (!formData.name || !formData.email || !formData.role) {
+    if (!formData.name || !formData.email) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
-    // Validação básica de email
+    if (!formData.systemRole) {
+      toast.error('Selecione o perfil de acesso');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error('Email inválido');
       return;
     }
 
-    // Atualizar usuário existente
-    const updatedTeam = team.map(user => {
-      if (user.id === editingUserId) {
-        return {
-          ...user,
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-          phone: formData.phone || '-',
-          status: formData.status,
-        };
+    setIsSubmitting(true);
+    try {
+      await teamService.updateProfile(editingUserId, {
+        full_name: formData.name,
+        email: formData.email,
+        phone: formData.phone || null,
+        status: formData.status as 'Ativo' | 'Inativo',
+        role: formData.systemRole,
+      });
+
+      if (editingMemberId) {
+        await updateMember.mutateAsync({
+          memberId: editingMemberId,
+          harasId,
+          input: {
+            role_id: formData.roleId || null,
+            permissions: formData.permissions,
+            status: formData.status as 'Ativo' | 'Inativo',
+          },
+        });
+      } else {
+        await upsertMember.mutateAsync({
+          harasId,
+          userId: editingUserId,
+          roleId: formData.roleId || null,
+          permissions: formData.permissions,
+          status: formData.status as 'Ativo' | 'Inativo',
+          createdBy: profile?.id,
+        });
       }
-      return user;
-    });
 
-    setTeam(updatedTeam);
-
-    // Reset form
-    setFormData({
-      name: '',
-      email: '',
-      role: '',
-      phone: '',
-      status: 'Ativo',
-      permissions: {
-        viewHerd: false,
-        registerActivities: false,
-        healthManagement: false,
-        reproduction: false,
-        financialManagement: false,
-        trainingManagement: false,
-        teamManagement: false,
-        documentManagement: false,
-        fullAdministrative: false,
-      }
-    });
-
-    setEditingUserId(null);
-    setShowEditUserModal(false);
-    toast.success('Usuário atualizado com sucesso!');
+      toast.success('Usuário atualizado com sucesso!');
+      resetUserForm();
+      setEditingUserId(null);
+      setEditingMemberId(null);
+      setShowEditUserModal(false);
+    } catch (error: any) {
+      console.error('Erro ao atualizar usuário:', error);
+      toast.error(error.message || 'Erro ao atualizar usuário');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -472,18 +562,23 @@ export function AdvisorTeamContent() {
           <input
             type="text"
             placeholder={`Buscar ${activeTab === 'team' ? 'usuário' : 'função'}...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
           />
         </div>
         <button 
           onClick={() => {
             if (activeTab === 'team') {
+              resetUserForm();
               setShowNewUserModal(true);
             } else {
+              resetRoleForm();
               setShowNewRoleModal(true);
             }
           }}
-          className="w-full lg:w-auto px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          disabled={!canCreateAction}
+          className={`w-full lg:w-auto px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg transition-opacity flex items-center justify-center gap-2 ${canCreateAction ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'}`}
         >
           <Plus className="w-5 h-5" />
           {activeTab === 'team' ? 'Criar Novo Usuário' : 'Criar Nova Função'}
@@ -506,7 +601,27 @@ export function AdvisorTeamContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border dark:divide-[rgba(255,255,255,0.1)]">
-                {team.map((member) => (
+                {isLoadingMembers && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-6 py-8 text-center text-sm text-muted-foreground dark:text-[#99a1af]"
+                    >
+                      Carregando equipe...
+                    </td>
+                  </tr>
+                )}
+                {!isLoadingMembers && filteredTeam.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-6 py-8 text-center text-sm text-muted-foreground dark:text-[#99a1af]"
+                    >
+                      Nenhum usuário encontrado.
+                    </td>
+                  </tr>
+                )}
+                {!isLoadingMembers && filteredTeam.map((member) => (
                   <tr key={member.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
                     <td className="px-6 py-4 text-foreground dark:text-white">{member.name}</td>
                     <td className="px-6 py-4 text-foreground dark:text-white">{member.email}</td>
@@ -522,20 +637,26 @@ export function AdvisorTeamContent() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditUserClick(member.id)}
-                          className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                        >
-                          <Edit className="w-4 h-4 text-foreground dark:text-white" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUserClick(member.id)}
-                          className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
-                      </div>
+                      {canManageUsers ? (
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleEditUserClick(member.id)}
+                            className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4 text-foreground dark:text-white" />
+                          </button>
+                          {!member.isOwner && (
+                            <button
+                              onClick={() => handleDeleteUserClick(member.id)}
+                              className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground dark:text-[#99a1af]">Sem permissão</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -545,7 +666,17 @@ export function AdvisorTeamContent() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {roles.map((role) => (
+          {isLoadingRoles && (
+            <div className="col-span-full rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] p-6 text-center text-sm text-muted-foreground dark:text-[#99a1af]">
+              Carregando funções...
+            </div>
+          )}
+          {!isLoadingRoles && filteredRoles.length === 0 && (
+            <div className="col-span-full rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] p-6 text-center text-sm text-muted-foreground dark:text-[#99a1af]">
+              Nenhuma função encontrada.
+            </div>
+          )}
+          {!isLoadingRoles && filteredRoles.map((role) => (
             <div
               key={role.id}
               className="bg-card dark:bg-[#1a1a1a] rounded-xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)] hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors relative"
@@ -558,12 +689,14 @@ export function AdvisorTeamContent() {
                   <span className="text-sm text-muted-foreground dark:text-[#99a1af]">
                     {role.users} usuário{role.users > 1 ? 's' : ''}
                   </span>
-                  <button
-                    onClick={() => handleEditRoleClick(role.id)}
-                    className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                  >
-                    <Edit className="w-4 h-4 text-foreground dark:text-white" />
-                  </button>
+                  {canManageRoles && (
+                    <button
+                      onClick={() => handleEditRoleClick(role.id)}
+                      className="p-2 hover:bg-card dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
+                    >
+                      <Edit className="w-4 h-4 text-foreground dark:text-white" />
+                    </button>
+                  )}
                 </div>
               </div>
               <h3 className="text-lg text-foreground dark:text-white mb-2">{role.name}</h3>
@@ -581,7 +714,10 @@ export function AdvisorTeamContent() {
             <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
               <h3 className="text-xl text-foreground dark:text-white">Criar Novo Usuário</h3>
               <button
-                onClick={() => setShowNewUserModal(false)}
+                onClick={() => {
+                  resetUserForm();
+                  setShowNewUserModal(false);
+                }}
                 className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-foreground dark:text-white" />
@@ -619,6 +755,20 @@ export function AdvisorTeamContent() {
                   />
                 </div>
 
+                {/* Senha */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">
+                    Senha *
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Defina uma senha inicial"
+                    className="w-full h-10 px-4 bg-card dark:bg-[#3a3a3a] border border-border dark:border-0 rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                  />
+                </div>
+
                 {/* Função e Status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -626,12 +776,20 @@ export function AdvisorTeamContent() {
                       Função *
                     </label>
                     <NativeSelect
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      value={formData.roleId}
+                      onChange={(e) => {
+                        const roleId = e.target.value;
+                        const role = rolesData.find((item) => item.id === roleId);
+                        setFormData({
+                          ...formData,
+                          roleId,
+                          permissions: role ? normalizeTeamPermissions(role.permissions) : emptyPermissions(),
+                        });
+                      }}
                     >
                       <option value="">Selecione uma função</option>
                       {roles.map((role) => (
-                        <option key={role.id} value={role.name}>
+                        <option key={role.id} value={role.id}>
                           {role.name}
                         </option>
                       ))}
@@ -652,6 +810,23 @@ export function AdvisorTeamContent() {
                   </div>
                 </div>
 
+                {/* Perfil de acesso */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">
+                    Perfil de acesso *
+                  </label>
+                  <NativeSelect
+                    value={formData.systemRole}
+                    onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                  >
+                    {SYSTEM_ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+
                 {/* Telefone */}
                 <div>
                   <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -669,7 +844,7 @@ export function AdvisorTeamContent() {
                 {/* Informação */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                   <p className="text-sm text-blue-600 dark:text-blue-400">
-                    <strong>Nota:</strong> O usuário receberá um email com instruções para criar sua senha e acessar o sistema.
+                    <strong>Nota:</strong> Defina uma senha inicial. O usuário poderá alterá-la após o primeiro acesso.
                   </p>
                 </div>
               </div>
@@ -678,16 +853,27 @@ export function AdvisorTeamContent() {
             {/* Footer */}
             <div className="flex flex-col lg:flex-row gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
               <button
-                onClick={() => setShowNewUserModal(false)}
+                onClick={() => {
+                  resetUserForm();
+                  setShowNewUserModal(false);
+                }}
                 className="flex-1 py-3 px-4 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-xl hover:opacity-90 transition-opacity"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateUser}
-                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSubmitting}
+                className={`flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl transition-opacity ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
               >
-                Criar Usuário
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </span>
+                ) : (
+                  'Criar Usuário'
+                )}
               </button>
             </div>
           </div>
@@ -702,7 +888,10 @@ export function AdvisorTeamContent() {
             <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
               <h3 className="text-xl text-foreground dark:text-white">Criar Nova Função</h3>
               <button
-                onClick={() => setShowNewRoleModal(false)}
+                onClick={() => {
+                  resetRoleForm();
+                  setShowNewRoleModal(false);
+                }}
                 className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-foreground dark:text-white" />
@@ -747,10 +936,9 @@ export function AdvisorTeamContent() {
                   </label>
                   <input
                     type="text"
-                    value={roleFormData.allowedModules}
-                    onChange={(e) => setRoleFormData({ ...roleFormData, allowedModules: e.target.value })}
-                    placeholder="Ex: Plantel, Saúde, Reprodução"
-                    className="w-full h-10 px-4 bg-card dark:bg-[#3a3a3a] border border-border dark:border-0 rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                    value={formatAllowedModules(roleFormData.permissions)}
+                    disabled
+                    className="w-full h-10 px-4 bg-muted dark:bg-[#2a2a2a] border border-border dark:border-0 rounded-xl text-foreground dark:text-white opacity-80 focus:outline-none"
                   />
                 </div>
 
@@ -808,7 +996,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.viewHerd}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, viewHerd: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'viewHerd', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -821,7 +1009,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.registerActivities}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, registerActivities: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'registerActivities', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -834,7 +1022,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.healthManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, healthManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'healthManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -847,7 +1035,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.reproduction}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, reproduction: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'reproduction', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -860,7 +1048,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.financialManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, financialManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'financialManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -873,7 +1061,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.trainingManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, trainingManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'trainingManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -886,7 +1074,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.teamManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, teamManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'teamManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -899,7 +1087,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.documentManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, documentManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'documentManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -912,7 +1100,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.fullAdministrative}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, fullAdministrative: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'fullAdministrative', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -933,16 +1121,27 @@ export function AdvisorTeamContent() {
             {/* Footer */}
             <div className="flex flex-col lg:flex-row gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
               <button
-                onClick={() => setShowNewRoleModal(false)}
+                onClick={() => {
+                  resetRoleForm();
+                  setShowNewRoleModal(false);
+                }}
                 className="flex-1 py-3 px-4 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-xl hover:opacity-90 transition-opacity"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateRole}
-                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSubmitting}
+                className={`flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl transition-opacity ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
               >
-                Criar Função
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </span>
+                ) : (
+                  'Criar Função'
+                )}
               </button>
             </div>
           </div>
@@ -957,7 +1156,11 @@ export function AdvisorTeamContent() {
             <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
               <h3 className="text-xl text-foreground dark:text-white">Editar Função</h3>
               <button
-                onClick={() => setShowEditRoleModal(false)}
+                onClick={() => {
+                  resetRoleForm();
+                  setEditingRoleId(null);
+                  setShowEditRoleModal(false);
+                }}
                 className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-foreground dark:text-white" />
@@ -1002,10 +1205,9 @@ export function AdvisorTeamContent() {
                   </label>
                   <input
                     type="text"
-                    value={roleFormData.allowedModules}
-                    onChange={(e) => setRoleFormData({ ...roleFormData, allowedModules: e.target.value })}
-                    placeholder="Ex: Plantel, Saúde, Reprodução"
-                    className="w-full h-10 px-4 bg-card dark:bg-[#3a3a3a] border border-border dark:border-0 rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                    value={formatAllowedModules(roleFormData.permissions)}
+                    disabled
+                    className="w-full h-10 px-4 bg-muted dark:bg-[#2a2a2a] border border-border dark:border-0 rounded-xl text-foreground dark:text-white opacity-80 focus:outline-none"
                   />
                 </div>
 
@@ -1063,7 +1265,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.viewHerd}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, viewHerd: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'viewHerd', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1076,7 +1278,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.registerActivities}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, registerActivities: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'registerActivities', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1089,7 +1291,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.healthManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, healthManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'healthManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1102,7 +1304,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.reproduction}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, reproduction: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'reproduction', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1115,7 +1317,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.financialManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, financialManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'financialManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1128,7 +1330,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.trainingManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, trainingManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'trainingManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1141,7 +1343,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.teamManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, teamManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'teamManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1154,7 +1356,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.documentManagement}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, documentManagement: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'documentManagement', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1167,7 +1369,7 @@ export function AdvisorTeamContent() {
                         checked={roleFormData.permissions.fullAdministrative}
                         onChange={(e) => setRoleFormData({
                           ...roleFormData,
-                          permissions: { ...roleFormData.permissions, fullAdministrative: e.target.checked }
+                          permissions: updatePermissionState(roleFormData.permissions, 'fullAdministrative', e.target.checked)
                         })}
                         className="w-4 h-4 rounded border-border dark:border-[rgba(255,255,255,0.1)] text-primary dark:text-white focus:ring-primary dark:focus:ring-white"
                       />
@@ -1188,16 +1390,28 @@ export function AdvisorTeamContent() {
             {/* Footer */}
             <div className="flex flex-col lg:flex-row gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
               <button
-                onClick={() => setShowEditRoleModal(false)}
+                onClick={() => {
+                  resetRoleForm();
+                  setEditingRoleId(null);
+                  setShowEditRoleModal(false);
+                }}
                 className="flex-1 py-3 px-4 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-xl hover:opacity-90 transition-opacity"
               >
                 Cancelar
               </button>
               <button
-                onClick={handleEditRole}
-                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                onClick={handleUpdateRole}
+                disabled={isSubmitting}
+                className={`flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl transition-opacity ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
               >
-                Atualizar Função
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </span>
+                ) : (
+                  'Atualizar Função'
+                )}
               </button>
             </div>
           </div>
@@ -1212,7 +1426,12 @@ export function AdvisorTeamContent() {
             <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
               <h3 className="text-xl text-foreground dark:text-white">Editar Usuário</h3>
               <button
-                onClick={() => setShowEditUserModal(false)}
+                onClick={() => {
+                  resetUserForm();
+                  setEditingUserId(null);
+                  setEditingMemberId(null);
+                  setShowEditUserModal(false);
+                }}
                 className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-foreground dark:text-white" />
@@ -1257,12 +1476,20 @@ export function AdvisorTeamContent() {
                       Função *
                     </label>
                     <NativeSelect
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      value={formData.roleId}
+                      onChange={(e) => {
+                        const roleId = e.target.value;
+                        const role = rolesData.find((item) => item.id === roleId);
+                        setFormData({
+                          ...formData,
+                          roleId,
+                          permissions: role ? normalizeTeamPermissions(role.permissions) : emptyPermissions(),
+                        });
+                      }}
                     >
                       <option value="">Selecione uma função</option>
                       {roles.map((role) => (
-                        <option key={role.id} value={role.name}>
+                        <option key={role.id} value={role.id}>
                           {role.name}
                         </option>
                       ))}
@@ -1283,6 +1510,23 @@ export function AdvisorTeamContent() {
                   </div>
                 </div>
 
+                {/* Perfil de acesso */}
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">
+                    Perfil de acesso *
+                  </label>
+                  <NativeSelect
+                    value={formData.systemRole}
+                    onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                  >
+                    {SYSTEM_ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+
                 {/* Telefone */}
                 <div>
                   <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -1300,7 +1544,7 @@ export function AdvisorTeamContent() {
                 {/* Informação */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                   <p className="text-sm text-blue-600 dark:text-blue-400">
-                    <strong>Nota:</strong> O usuário receberá um email com instruções para criar sua senha e acessar o sistema.
+                    <strong>Nota:</strong> A senha deve ser atualizada pelo próprio usuário.
                   </p>
                 </div>
               </div>
@@ -1309,16 +1553,29 @@ export function AdvisorTeamContent() {
             {/* Footer */}
             <div className="flex flex-col lg:flex-row gap-3 p-6 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
               <button
-                onClick={() => setShowEditUserModal(false)}
+                onClick={() => {
+                  resetUserForm();
+                  setEditingUserId(null);
+                  setEditingMemberId(null);
+                  setShowEditUserModal(false);
+                }}
                 className="flex-1 py-3 px-4 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-xl hover:opacity-90 transition-opacity"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleUpdateUser}
-                className="flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSubmitting}
+                className={`flex-1 py-3 px-4 bg-primary dark:bg-white text-white dark:text-black rounded-xl transition-opacity ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
               >
-                Atualizar Usuário
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </span>
+                ) : (
+                  'Atualizar Usuário'
+                )}
               </button>
             </div>
           </div>
@@ -1359,9 +1616,17 @@ export function AdvisorTeamContent() {
               </button>
               <button
                 onClick={handleDeleteUser}
-                className="flex-1 py-3 px-4 bg-red-500 dark:bg-red-500 text-white dark:text-black rounded-xl hover:opacity-90 transition-opacity"
+                disabled={isSubmitting}
+                className={`flex-1 py-3 px-4 bg-red-500 dark:bg-red-500 text-white dark:text-black rounded-xl transition-opacity ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
               >
-                Excluir
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Excluindo...
+                  </span>
+                ) : (
+                  'Excluir'
+                )}
               </button>
             </div>
           </div>

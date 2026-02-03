@@ -1,20 +1,20 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, User, Menu, X, Check, Trash2, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, User, Menu, X, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
 import { AdvisorDashboardContent } from './advisor/AdvisorDashboardContent';
-import { AdvisorHerdContent } from './advisor/AdvisorHerdContent';
-import { AdvisorReproductionContentNew } from './advisor/AdvisorReproductionContentNew';
+import { BreederPlantelContent } from './breeder/BreederPlantelContent';
+import { BreederReproductionContent } from './breeder/BreederReproductionContent';
 import { AdvisorFinanceContent } from './advisor/AdvisorFinanceContent';
 import { AdvisorTasksContent } from './advisor/AdvisorTasksContent';
 import { AdvisorTeamContent } from './advisor/AdvisorTeamContent';
-import { AdvisorCalendarContent } from './advisor/AdvisorCalendarContent';
+import { BreederAgendaContent } from './breeder/BreederAgendaContent';
+import { BreederSettingsContent } from './breeder/BreederSettingsContent';
+import { BreederHelpContent } from './breeder/BreederHelpContent';
 import { AdvisorDocumentsContent } from './advisor/AdvisorDocumentsContent';
-import { AdvisorSettingsContent } from './advisor/AdvisorSettingsContent';
-import { AdvisorHelpContent } from './advisor/AdvisorHelpContent';
 import { UserDropdown } from './shared/UserDropdown';
 import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
@@ -186,7 +186,9 @@ export function AdvisorDashboard() {
         <div className="h-[101px] px-6 flex items-center justify-between border-b border-border dark:border-[#1a1a1a]">
           <div>
             <h1 className="text-foreground dark:text-white mb-2">CriaHub</h1>
-            <p className="text-muted-foreground dark:text-[#99a1af]">Assessor Administrativo</p>
+            <p className="text-muted-foreground dark:text-[#99a1af]">
+              {currentHaras?.name || 'Haras'}
+            </p>
           </div>
           {isMobile && (
             <button
@@ -408,7 +410,7 @@ export function AdvisorDashboard() {
         {/* Content */}
         <main className="flex-1 overflow-auto mobile-scroll-hidden bg-background dark:bg-[#0d0d0d] p-4 md:p-8">
           {activeMenu === 'profile' && <ProfileView />}
-          {activeMenu === 'settings' && <AdvisorSettingsContent />}
+          {activeMenu === 'settings' && <BreederSettingsContent />}
           {activeMenu === 'dashboard' && (
             <AdvisorDashboardContent
               onNavigateToPendencies={() => setActiveMenu('tasks')}
@@ -417,14 +419,16 @@ export function AdvisorDashboard() {
               onNavigateToDocuments={() => setActiveMenu('documents')}
             />
           )}
-          {activeMenu === 'herd' && <AdvisorHerdContent />}
-          {activeMenu === 'reproduction' && <AdvisorReproductionContentNew />}
+          {activeMenu === 'herd' && <BreederPlantelContent />}
+          {activeMenu === 'reproduction' && (
+            <BreederReproductionContent onNavigateToAgenda={() => setActiveMenu('calendar')} />
+          )}
           {activeMenu === 'finance' && <AdvisorFinanceContent />}
           {activeMenu === 'tasks' && <AdvisorTasksContent />}
           {activeMenu === 'team' && <AdvisorTeamContent />}
-          {activeMenu === 'calendar' && <AdvisorCalendarContent />}
+          {activeMenu === 'calendar' && <BreederAgendaContent />}
           {activeMenu === 'documents' && <AdvisorDocumentsContent />}
-          {activeMenu === 'help' && <AdvisorHelpContent />}
+          {activeMenu === 'help' && <BreederHelpContent />}
           {activeMenu === 'pending-validation' && <AdvisorPendingValidation onBack={() => setActiveMenu('dashboard')} />}
         </main>
       </div>

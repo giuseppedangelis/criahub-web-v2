@@ -1,165 +1,122 @@
-import { TrendingUp, TrendingDown, DollarSign, Plus, Search, Filter, FileText, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { TrendingUp, TrendingDown, DollarSign, Plus, Search, Filter, AlertCircle, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { AdvisorTransactionModal } from './AdvisorTransactionModal';
 import { NativeSelect } from '../ui/native-select';
-import { toast } from 'sonner';
-
-interface Transaction {
-  id: number;
-  type: 'Entrada' | 'Saída';
-  description: string;
-  date: string;
-  value: string;
-  status: string;
-  animal: string;
-  category: string;
-  linkedAnimals?: { id: number; name: string }[]; // Animais vinculados à OS
-  urgency?: 'Normal' | 'Alta'; // Urgência da OS
-}
+import { useCurrentHaras } from '@/hooks/useHaras';
+import { useAnimals } from '@/hooks/useAnimals';
+import { useCreateTransaction, useFinancialSummary, useTransactions } from '@/hooks/useFinancial';
+import type { CreateTransactionInput, Transaction } from '@/types';
+import {
+  formatCurrency,
+  formatDate,
+  getCategoryLabel,
+  transactionCategoryOptions,
+  transactionTypeLabels,
+} from '../breeder/financialUtils';
 
 export function AdvisorFinanceContent() {
+  const { data: currentHaras } = useCurrentHaras();
+  const harasId = currentHaras?.id || '';
+
   const [showNewTransaction, setShowNewTransaction] = useState(false);
   const [filterCategory, setFilterCategory] = useState('todos');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [filterType, setFilterType] = useState('todos');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    { 
-      id: 1, 
-      type: 'Entrada', 
-      description: 'Venda - Sol Nascente', 
-      date: '15/11/2024', 
-      value: 'R$ 8.000', 
-      status: 'Pago', 
-      animal: 'Sol Nascente', 
-      category: 'Venda de Cavalo',
-      linkedAnimals: [{ id: 1, name: 'Sol Nascente' }],
-      urgency: 'Normal'
-    },
-    { 
-      id: 2, 
-      type: 'Saída', 
-      description: 'OS #001 - Vacina em Lote', 
-      date: '10/11/2024', 
-      value: 'R$ 1.200', 
-      status: 'Pago', 
-      animal: 'Múltiplos (5)', 
-      category: 'Veterinário',
-      linkedAnimals: [
-        { id: 1, name: 'Estrela Mangalarga' },
-        { id: 2, name: 'Relâmpago Negro' },
-        { id: 3, name: 'Bella Vista' },
-        { id: 4, name: 'Sol Nascente' },
-        { id: 5, name: 'Lua Prateada' },
-      ],
-      urgency: 'Normal'
-    },
-    { 
-      id: 3, 
-      type: 'Entrada', 
-      description: 'Venda de Sêmen', 
-      date: '05/11/2024', 
-      value: 'R$ 3.500', 
-      status: 'Pendente', 
-      animal: 'Relâmpago Negro', 
-      category: 'Venda de Sêmen',
-      linkedAnimals: [{ id: 2, name: 'Relâmpago Negro' }],
-      urgency: 'Normal'
-    },
-    { 
-      id: 4, 
-      type: 'Saída', 
-      description: 'OS #002 - Atendimento Emergencial Cólica', 
-      date: '01/11/2024', 
-      value: 'R$ 850', 
-      status: 'Pago', 
-      animal: 'Trovão', 
-      category: 'Veterinário',
-      linkedAnimals: [{ id: 10, name: 'Trovão' }],
-      urgency: 'Alta'
-    },
-    { 
-      id: 5, 
-      type: 'Saída', 
-      description: 'OS #003 - Ração Premium (Estoque Mensal)', 
-      date: '28/10/2024', 
-      value: 'R$ 3.200', 
-      status: 'Pago', 
-      animal: '-', 
-      category: 'Ração',
-      linkedAnimals: [], // Despesa geral sem animal específico
-      urgency: 'Normal'
-    },
-    { 
-      id: 6, 
-      type: 'Saída', 
-      description: 'OS #004 - Transporte para Exposição', 
-      date: '20/10/2024', 
-      value: 'R$ 1.500', 
-      status: 'Pendente', 
-      animal: 'Múltiplos (2)', 
-      category: 'Transporte',
-      linkedAnimals: [
-        { id: 1, name: 'Estrela Mangalarga' },
-        { id: 2, name: 'Relâmpago Negro' },
-      ],
-      urgency: 'Normal'
-    },
-  ]);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleSaveTransaction = (transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction: Transaction = {
-      id: transactions.length + 1,
-      ...transaction,
-    };
-    setTransactions([newTransaction, ...transactions]);
-    toast.success('Ordem de Serviço criada com sucesso!');
+  const { data: animalsResponse } = useAnimals(
+    { haras_id: harasId },
+    { page: 1, limit: 200 },
+    !!harasId
+  );
+  const animals = animalsResponse?.data || [];
+
+  const { data: transactionsResponse, isLoading: isLoadingTransactions } = useTransactions(
+    { haras_id: harasId },
+    { page: 1, limit: 50 },
+    !!harasId
+  );
+  const transactions = transactionsResponse?.data || [];
+
+  const { data: totalSummary } = useFinancialSummary(harasId);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const { data: monthSummary } = useFinancialSummary(harasId, monthStart, monthEnd);
+
+  const { mutateAsync: createTransaction, isPending: isCreating } = useCreateTransaction();
+
+  const handleSaveTransaction = async (input: CreateTransactionInput) => {
+    await createTransaction(input);
   };
 
-  // Filtrar transações
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesCategory = filterCategory === 'todos' || t.category === filterCategory;
-    const matchesStatus = filterStatus === 'todos' || t.status === filterStatus;
-    const matchesType = filterType === 'todos' || t.type === filterType;
-    return matchesCategory && matchesStatus && matchesType;
-  });
+  const allCategories = useMemo(() => {
+    const combined = transactionCategoryOptions.receita.concat(transactionCategoryOptions.despesa);
+    const unique = new Map<string, string>();
+    combined.forEach((item) => {
+      unique.set(item.value, item.label);
+    });
+    return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
+  }, []);
 
-  // Calcular custo total por animal (exemplo)
-  const calculateAnimalCost = (animalName: string) => {
-    const animalTransactions = transactions.filter(t => 
-      t.linkedAnimals?.some(a => a.name === animalName) && t.type === 'Saída'
-    );
-    const total = animalTransactions.reduce((sum, t) => {
-      const value = parseFloat(t.value.replace('R$', '').replace('.', '').replace(',', '.').trim());
-      return sum + value;
-    }, 0);
-    return total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const todayIso = new Date().toISOString().split('T')[0];
+  const getStatusLabel = (transaction: Transaction) => {
+    const dateValue = (transaction.date || '').split('T')[0];
+    if (dateValue && dateValue > todayIso) return 'Pendente';
+    return 'Pago';
   };
+
+  const filteredTransactions = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return transactions.filter((transaction) => {
+      const matchesCategory = filterCategory === 'todos' || transaction.category === filterCategory;
+      const matchesType = filterType === 'todos' || transaction.type === filterType;
+      const matchesStatus = filterStatus === 'todos' || getStatusLabel(transaction) === filterStatus;
+      const matchesSearch =
+        !query ||
+        transaction.description.toLowerCase().includes(query) ||
+        transaction.animal?.name?.toLowerCase().includes(query) ||
+        getCategoryLabel(transaction.category).toLowerCase().includes(query);
+
+      return matchesCategory && matchesType && matchesStatus && matchesSearch;
+    });
+  }, [transactions, filterCategory, filterType, filterStatus, searchTerm]);
+
+  const totalBalance = totalSummary?.balance ?? 0;
+  const monthRevenue = monthSummary?.totalRevenue ?? 0;
+  const monthExpenses = monthSummary?.totalExpenses ?? 0;
 
   return (
     <div className="space-y-6">
-      {/* Info sobre RN-003 */}
       <div className="bg-blue-500/10 dark:bg-gray-500/10 border border-blue-500/20 dark:border-gray-500/20 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 bg-blue-500/10 dark:bg-gray-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
             <AlertCircle className="w-5 h-5 text-blue-600 dark:text-gray-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-foreground dark:text-white mb-2">Gestão Financeira Operacional</h3>
+            <h3 className="text-foreground dark:text-white mb-2">Gestao Financeira Operacional</h3>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-              Este módulo permite lançar <strong>Ordens de Serviço (OS)</strong> vinculando despesas e receitas a animais específicos ou lotes. Com isso, você pode:
+              Este modulo permite registrar receitas e despesas vinculando valores a animais especificos quando necessario.
             </p>
             <ul className="text-sm text-muted-foreground dark:text-[#99a1af] space-y-1 ml-4">
               <li>• Rastrear quanto cada animal custou ao haras (RN-003)</li>
-              <li>• Gerar relatórios de rentabilidade por animal</li>
-              <li>• Diferenciar despesas gerais (ex: luz) de despesas específicas</li>
+              <li>• Gerar relatorios de rentabilidade por animal</li>
+              <li>• Diferenciar despesas gerais de despesas especificas</li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* Indicators */}
+      {!harasId && (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6">
+          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+            Seu usuario ainda nao esta vinculado a nenhum Haras.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <div className="flex items-center justify-between mb-4">
@@ -167,7 +124,7 @@ export function AdvisorFinanceContent() {
               <DollarSign className="w-6 h-6 text-white" />
             </div>
           </div>
-          <p className="text-3xl text-foreground dark:text-white mb-2">R$ 45.280</p>
+          <p className="text-3xl text-foreground dark:text-white mb-2">{formatCurrency(totalBalance)}</p>
           <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Saldo Total</p>
         </div>
 
@@ -177,8 +134,8 @@ export function AdvisorFinanceContent() {
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
           </div>
-          <p className="text-3xl text-foreground dark:text-white mb-2">R$ 28.500</p>
-          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Entradas (Mês)</p>
+          <p className="text-3xl text-foreground dark:text-white mb-2">{formatCurrency(monthRevenue)}</p>
+          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Entradas (Mes)</p>
         </div>
 
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
@@ -187,31 +144,40 @@ export function AdvisorFinanceContent() {
               <TrendingDown className="w-6 h-6 text-white" />
             </div>
           </div>
-          <p className="text-3xl text-foreground dark:text-white mb-2">R$ 12.420</p>
-          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Saídas (Mês)</p>
+          <p className="text-3xl text-foreground dark:text-white mb-2">{formatCurrency(monthExpenses)}</p>
+          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Saidas (Mes)</p>
         </div>
       </div>
 
-      {/* Header Actions */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
           <input
             type="text"
-            placeholder="Buscar transação..."
+            placeholder="Buscar transacao..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
           />
         </div>
-        <button
-          onClick={() => setShowNewTransaction(true)}
-          className="w-full lg:w-auto px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Transação
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="w-full sm:w-auto px-4 py-3 bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white rounded-lg hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors flex items-center justify-center gap-2"
+          >
+            <Filter className="w-5 h-5" />
+            Filtros
+          </button>
+          <button
+            onClick={() => setShowNewTransaction(true)}
+            className="w-full sm:w-auto px-4 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Transacao
+          </button>
+        </div>
       </div>
 
-      {/* Advanced Filters */}
       {showAdvancedFilters && (
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <NativeSelect
@@ -220,12 +186,11 @@ export function AdvisorFinanceContent() {
             className="w-full lg:w-auto px-4 py-3 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
           >
             <option value="todos">Todas Categorias</option>
-            <option value="Venda de Cavalo">Venda de Cavalo</option>
-            <option value="Veterinário">Veterinário</option>
-            <option value="Venda de Sêmen">Venda de Sêmen</option>
-            <option value="Medicamentos">Medicamentos</option>
-            <option value="Ração">Ração</option>
-            <option value="Transporte">Transporte</option>
+            {allCategories.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
           </NativeSelect>
           <NativeSelect
             value={filterStatus}
@@ -242,20 +207,19 @@ export function AdvisorFinanceContent() {
             className="w-full lg:w-auto px-4 py-3 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
           >
             <option value="todos">Todos Tipos</option>
-            <option value="Entrada">Entrada</option>
-            <option value="Saída">Saída</option>
+            <option value="receita">{transactionTypeLabels.receita}</option>
+            <option value="despesa">{transactionTypeLabels.despesa}</option>
           </NativeSelect>
         </div>
       )}
 
-      {/* Table */}
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl border border-border dark:border-[rgba(255,255,255,0.1)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted dark:bg-[#0d0d0d]">
               <tr>
                 <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Tipo</th>
-                <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Descrição</th>
+                <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Descricao</th>
                 <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Data</th>
                 <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Valor</th>
                 <th className="text-left px-6 py-4 text-sm text-muted-foreground dark:text-[#99a1af]">Status</th>
@@ -264,39 +228,75 @@ export function AdvisorFinanceContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border dark:divide-[rgba(255,255,255,0.1)]">
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      transaction.type === 'Entrada' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
-                    }`}>
-                      {transaction.type}
-                    </span>
+              {isLoadingTransactions && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando transacoes...
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-foreground dark:text-white">{transaction.description}</td>
-                  <td className="px-6 py-4 text-foreground dark:text-white">{transaction.date}</td>
-                  <td className="px-6 py-4 text-foreground dark:text-white">{transaction.value}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      transaction.status === 'Pago' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'
-                    }`}>
-                      {transaction.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">{transaction.animal}</td>
-                  <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">{transaction.category}</td>
                 </tr>
-              ))}
+              )}
+
+              {!isLoadingTransactions && filteredTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-6 text-center text-sm text-muted-foreground">
+                    Nenhuma transacao encontrada.
+                  </td>
+                </tr>
+              )}
+
+              {filteredTransactions.map((transaction) => {
+                const statusLabel = getStatusLabel(transaction);
+                return (
+                  <tr key={transaction.id} className="hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors">
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          transaction.type === 'receita'
+                            ? 'bg-green-500/20 text-green-500'
+                            : 'bg-red-500/20 text-red-500'
+                        }`}
+                      >
+                        {transaction.type === 'receita' ? transactionTypeLabels.receita : transactionTypeLabels.despesa}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-foreground dark:text-white">{transaction.description}</td>
+                    <td className="px-6 py-4 text-foreground dark:text-white">{formatDate(transaction.date)}</td>
+                    <td className="px-6 py-4 text-foreground dark:text-white">{formatCurrency(transaction.amount)}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          statusLabel === 'Pago'
+                            ? 'bg-green-500/20 text-green-500'
+                            : 'bg-yellow-500/20 text-yellow-500'
+                        }`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">
+                      {transaction.animal?.name || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">
+                      {getCategoryLabel(transaction.category)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Transaction Modal */}
       <AdvisorTransactionModal
         isOpen={showNewTransaction}
         onClose={() => setShowNewTransaction(false)}
-        onSave={handleSaveTransaction}
+        onCreate={handleSaveTransaction}
+        harasId={harasId}
+        animals={animals}
+        isSaving={isCreating}
       />
     </div>
   );

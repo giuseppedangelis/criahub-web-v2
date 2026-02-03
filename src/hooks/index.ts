@@ -13,6 +13,10 @@ export * from './useReports'
 export * from './useHarasSettings'
 export * from './useProfileSettings'
 export * from './useSessions'
+export * from './useAdvisorDashboard'
+export * from './useTasks'
+export * from './useTeam'
+export * from './useDocuments'
 
 // Hooks utilitários
 export * from './useResponsive'
