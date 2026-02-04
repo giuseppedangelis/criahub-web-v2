@@ -51,7 +51,6 @@ const SYSTEM_ROLE_OPTIONS = [
   { value: 'acessor', label: 'Acessor' },
   { value: 'veterinario', label: 'Veterinário' },
   { value: 'peao', label: 'Peão' },
-  { value: 'funcionario', label: 'Funcionário' },
 ];
 
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
@@ -110,7 +109,7 @@ export function AdvisorTeamContent() {
     email: '',
     password: '',
     roleId: '',
-    systemRole: 'funcionario',
+    systemRole: isAdvisor && !isCreator ? 'peao' : 'acessor',
     phone: '',
     status: 'Ativo',
     permissions: emptyPermissions(),
@@ -256,6 +255,7 @@ export function AdvisorTeamContent() {
   const selectableRoles = useMemo(() => {
     return rolesData.filter((role) => isRoleDelegable(normalizeTeamPermissions(role.permissions)));
   }, [isCreator, rolesData, currentPermissions]);
+  const hasSelectableRoles = selectableRoles.length > 0;
 
   const normalizeName = useCallback((value?: string | null) => (
     (value || '')
@@ -353,7 +353,7 @@ export function AdvisorTeamContent() {
   };
 
   const resetUserForm = () => {
-    const defaultSystemRole = isAdvisor && !isCreator ? 'peao' : 'funcionario';
+    const defaultSystemRole = isAdvisor && !isCreator ? 'peao' : 'acessor';
     const defaultRoleId = !isCreator ? getDefaultRoleIdForSystemRole(defaultSystemRole) : '';
     const defaultPermissions = !isCreator ? resolvePermissionsForRole(defaultRoleId) : emptyPermissions();
     setFormData({
@@ -378,6 +378,13 @@ export function AdvisorTeamContent() {
       canDelete: 'Não',
       permissions: emptyPermissions(),
     });
+  };
+
+  const handleOpenRoleCreator = () => {
+    setShowNewUserModal(false);
+    setShowEditUserModal(false);
+    setActiveTab('roles');
+    setShowNewRoleModal(true);
   };
 
   const handleCreateUser = async () => {
@@ -1059,7 +1066,7 @@ export function AdvisorTeamContent() {
                             : resolvePermissionsForRole(roleId),
                         });
                       }}
-                      disabled={selectableRoles.length === 0 || !canDelegatePermissions}
+                      disabled={!canDelegatePermissions}
                     >
                       <option value="">Selecione uma função</option>
                       {selectableRoles.length === 0 && (
@@ -1071,6 +1078,18 @@ export function AdvisorTeamContent() {
                         </option>
                       ))}
                     </NativeSelect>
+                    {canDelegatePermissions && !hasSelectableRoles && (
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border dark:border-[rgba(255,255,255,0.1)] bg-muted/40 dark:bg-[#0d0d0d] px-3 py-2 text-xs text-muted-foreground dark:text-[#99a1af]">
+                        <span>Nenhuma função criada ainda.</span>
+                        <button
+                          type="button"
+                          onClick={handleOpenRoleCreator}
+                          className="text-primary dark:text-white hover:underline"
+                        >
+                          Criar função
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1650,7 +1669,7 @@ export function AdvisorTeamContent() {
                             : resolvePermissionsForRole(roleId),
                         });
                       }}
-                      disabled={selectableRoles.length === 0 || !canDelegatePermissions}
+                      disabled={!canDelegatePermissions}
                     >
                       <option value="">Selecione uma função</option>
                       {selectableRoles.length === 0 && (
@@ -1662,6 +1681,18 @@ export function AdvisorTeamContent() {
                         </option>
                       ))}
                     </NativeSelect>
+                    {canDelegatePermissions && !hasSelectableRoles && (
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border dark:border-[rgba(255,255,255,0.1)] bg-muted/40 dark:bg-[#0d0d0d] px-3 py-2 text-xs text-muted-foreground dark:text-[#99a1af]">
+                        <span>Nenhuma função criada ainda.</span>
+                        <button
+                          type="button"
+                          onClick={handleOpenRoleCreator}
+                          className="text-primary dark:text-white hover:underline"
+                        >
+                          Criar função
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>

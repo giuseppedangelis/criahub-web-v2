@@ -2,7 +2,7 @@
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings, Moon, Sun, Bell, User, LogOut, HelpCircle, UserCog, UserCircle, Menu, X, TrendingUp, TrendingDown, Users, Repeat } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
 import { UserDropdown } from './shared/UserDropdown';
@@ -14,6 +14,7 @@ import { AdminHelpContent } from './admin/AdminHelpContent';
 import { NotificationsPanel } from './NotificationsPanel';
 import { toast } from 'sonner';
 import type { Notification } from '@/types';
+import { notificationsService } from '@/services/notifications';
 
 const formatNotificationTime = (dateValue?: string | null) => {
   if (!dateValue) return '';
@@ -45,60 +46,23 @@ export function AdminDashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      user_id: '',
-      type: 'geral',
-      title: 'Nova assinatura',
-      message: 'Haras do Sol contratou plano Premium',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '2',
-      user_id: '',
-      type: 'financeiro',
-      title: 'Pagamento recebido',
-      message: 'R$ 499 - Haras Vale Verde',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '3',
-      user_id: '',
-      type: 'sistema',
-      title: 'Alerta de uso',
-      message: 'Servidor atingiu 80% de capacidade',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '4',
-      user_id: '',
-      type: 'sistema',
-      title: 'Sistema atualizado',
-      message: 'Versão 2.1.0 implantada com sucesso',
-      read: true,
-      data: null,
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '5',
-      user_id: '',
-      type: 'geral',
-      title: 'Novo feedback de usuário',
-      message: 'Haras Boa Vista deixou uma avaliação',
-      read: true,
-      data: null,
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const loadNotifications = useCallback(async () => {
+    setIsLoadingNotifications(true);
+    try {
+      const response = await notificationsService.list({ page: 1, limit: 50 });
+      setNotifications(response.data);
+    } catch (error: any) {
+      console.error('Erro ao carregar notificações:', error);
+      toast.error(error.message || 'Erro ao carregar notificações.');
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
 
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
@@ -106,6 +70,10 @@ export function AdminDashboard() {
       setIsSidebarOpen(false);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -116,18 +84,36 @@ export function AdminDashboard() {
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsService.markAllAsRead();
+      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const handleMarkAsRead = (ids: string[]) => {
-    setNotifications(notifications.map(n =>
-      ids.includes(n.id) ? { ...n, read: true } : n
-    ));
+  const handleMarkAsRead = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.markAsRead(id)));
+      setNotifications((prev) =>
+        prev.map((item) => (ids.includes(item.id) ? { ...item, read: true } : item))
+      );
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const handleDelete = (ids: string[]) => {
-    setNotifications(notifications.filter(n => !ids.includes(n.id)));
+  const handleDelete = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.delete(id)));
+      setNotifications((prev) => prev.filter((item) => !ids.includes(item.id)));
+    } catch (error: any) {
+      console.error('Erro ao excluir notificações:', error);
+      toast.error(error.message || 'Erro ao excluir notificações.');
+    }
   };
 
   const handleLogout = async () => {
@@ -298,7 +284,17 @@ export function AdminDashboard() {
                     </button>
                   </div>
                   <div className="max-h-96 overflow-y-auto mobile-scroll-hidden">
-                    {notifications.map((notif) => (
+                    {isLoadingNotifications && (
+                      <div className="p-4 text-sm text-muted-foreground dark:text-[#99a1af]">
+                        Carregando notificações...
+                      </div>
+                    )}
+                    {!isLoadingNotifications && notifications.length === 0 && (
+                      <div className="p-4 text-sm text-muted-foreground dark:text-[#99a1af]">
+                        Nenhuma notificação.
+                      </div>
+                    )}
+                    {!isLoadingNotifications && notifications.map((notif) => (
                       <div
                         key={notif.id}
                         className={`p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] last:border-0 hover:bg-muted dark:hover:bg-[#0d0d0d] cursor-pointer ${!notif.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''

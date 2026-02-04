@@ -229,6 +229,10 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
       toast.error('Preencha todos os campos obrigatorios');
       return;
     }
+    if (isAdvisor && currentUserId && formData.responsible_id === currentUserId) {
+      toast.error('Atribua a tarefa para outro membro da equipe.');
+      return;
+    }
 
     try {
       await createTask({
@@ -289,6 +293,14 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
     if (!formData.due_date || !formData.title || !formData.responsible_id) {
       toast.error('Preencha todos os campos obrigatorios');
       return;
+    }
+    if (isAdvisor && currentUserId && formData.responsible_id === currentUserId) {
+      const originalTask = tasks.find((item) => item.id === editingTaskId);
+      const originalResponsibleId = originalTask?.responsible_id || originalTask?.responsible?.id || '';
+      if (!originalResponsibleId || originalResponsibleId !== currentUserId) {
+        toast.error('Atribua a tarefa para outro membro da equipe.');
+        return;
+      }
     }
 
     try {
@@ -656,11 +668,11 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
                     onChange={(e) => setFormData({ ...formData, responsible_id: e.target.value })}
                   >
                     <option value="">Selecione o responsavel</option>
-                    {assignableMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.full_name || member.email || 'Sem nome'}
-                      </option>
-                    ))}
+                  {assignableMembers.map((member) => (
+                    <option key={member.id} value={member.id} disabled={isAdvisor && member.id === currentUserId}>
+                      {member.full_name || member.email || 'Sem nome'}
+                    </option>
+                  ))}
                   </NativeSelect>
                 </div>
 
@@ -865,7 +877,7 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
                   >
                     <option value="">Selecione o responsavel</option>
                     {assignableMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
+                      <option key={member.id} value={member.id} disabled={isAdvisor && member.id === currentUserId}>
                         {member.full_name || member.email || 'Sem nome'}
                       </option>
                     ))}

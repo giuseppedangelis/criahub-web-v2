@@ -19,6 +19,7 @@ import { UserDropdown } from './shared/UserDropdown';
 import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
 import type { Notification } from '@/types';
+import { notificationsService } from '@/services/notifications';
 import { useCurrentHaras } from '@/hooks/useHaras';
 import { useAccessControl, type AccessModule } from '@/hooks/useAccessControl';
 import { toast } from 'sonner';
@@ -66,88 +67,54 @@ export function AdvisorDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      user_id: '',
-      type: 'geral',
-      title: 'Documento Assinado',
-      message: 'GIA - Estrela Mangalarga foi assinado',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '2',
-      user_id: '',
-      type: 'geral',
-      title: 'Evento Próximo',
-      message: 'Vistoria ABCCMM agendada para amanhã às 10:00',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '3',
-      user_id: '',
-      type: 'geral',
-      title: 'Tarefa Atribuída',
-      message: 'Atualizar registro de Vento Sul no ABCCMM',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '4',
-      user_id: '',
-      type: 'financeiro',
-      title: 'Pagamento Pendente',
-      message: 'Fatura de veterinário vence em 3 dias',
-      read: false,
-      data: null,
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '5',
-      user_id: '',
-      type: 'geral',
-      title: 'Novo Membro da Equipe',
-      message: 'Carlos Silva foi adicionado à equipe',
-      read: true,
-      data: null,
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
   const unreadNotifications = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const loadNotifications = useCallback(async () => {
+    setIsLoadingNotifications(true);
+    try {
+      const response = await notificationsService.list({ page: 1, limit: 50 });
+      setNotifications(response.data);
+    } catch (error: any) {
+      console.error('Erro ao carregar notificações:', error);
+      toast.error(error.message || 'Erro ao carregar notificações.');
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationsService.markAllAsRead();
+      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleMarkAsRead = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.markAsRead(id)));
+      setNotifications((prev) =>
+        prev.map((item) => (ids.includes(item.id) ? { ...item, read: true } : item))
+      );
+    } catch (error: any) {
+      console.error('Erro ao marcar notificações:', error);
+      toast.error(error.message || 'Erro ao marcar notificações.');
+    }
   };
 
-  const handleMarkAsRead = (ids: string[]) => {
-    setNotifications(notifications.map(n =>
-      ids.includes(n.id) ? { ...n, read: true } : n
-    ));
-  };
-
-  const handleDelete = (ids: string[]) => {
-    setNotifications(notifications.filter(n => !ids.includes(n.id)));
-  };
-
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter(n => n.id !== id));
-  };
-
-  const clearAllNotifications = () => {
-    setNotifications([]);
-    setShowNotifications(false);
+  const handleDelete = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => notificationsService.delete(id)));
+      setNotifications((prev) => prev.filter((item) => !ids.includes(item.id)));
+    } catch (error: any) {
+      console.error('Erro ao excluir notificações:', error);
+      toast.error(error.message || 'Erro ao excluir notificações.');
+    }
   };
 
   const handleLogout = async () => {
@@ -182,6 +149,10 @@ export function AdvisorDashboard() {
       setIsSidebarOpen(false);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   const menuItems = useMemo(
     () => BASE_MENU_ITEMS.filter((item) => canAccessModule(item.id as AccessModule)),
@@ -338,7 +309,7 @@ export function AdvisorDashboard() {
                   <div className="p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)] flex items-center justify-between">
                     <h3 className="text-foreground dark:text-white">Notificações</h3>
                     <button
-                      onClick={markAllAsRead}
+                      onClick={handleMarkAllAsRead}
                       className="text-sm text-primary dark:text-white hover:underline"
                     >
                       Marcar todas como lidas
@@ -347,7 +318,11 @@ export function AdvisorDashboard() {
 
                   {/* Notifications List */}
                   <div className="flex-1 overflow-y-auto">
-                    {notifications.length === 0 ? (
+                    {isLoadingNotifications ? (
+                      <div className="p-4 text-sm text-muted-foreground dark:text-[#99a1af]">
+                        Carregando notificações...
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="p-8 text-center">
                         <Bell className="w-12 h-12 text-muted-foreground dark:text-[#99a1af] mx-auto mb-3 opacity-50" />
                         <p className="text-muted-foreground dark:text-[#99a1af]">
