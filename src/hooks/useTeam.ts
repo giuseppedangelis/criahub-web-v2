@@ -21,11 +21,11 @@ export function useTeamRoles(harasId: string) {
   })
 }
 
-export function useTeamMembers(harasId: string) {
+export function useTeamMembers(harasId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: teamKeys.members(harasId),
     queryFn: () => teamService.listMembers(harasId),
-    enabled: !!harasId,
+    enabled: !!harasId && enabled,
   })
 }
 

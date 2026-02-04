@@ -12,7 +12,8 @@ function makeQueryClient() {
                 staleTime: 60 * 1000, // 1 minuto
                 gcTime: 5 * 60 * 1000, // 5 minutos (garbage collection)
                 retry: 1,
-                refetchOnWindowFocus: false,
+                refetchOnWindowFocus: true,
+                refetchOnReconnect: true,
             },
             mutations: {
                 retry: 1,

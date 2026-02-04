@@ -36,16 +36,16 @@ const MODULE_PERMISSIONS: Partial<Record<AccessModule, TeamPermissionKey[]>> = {
 }
 
 export function useAccessControl() {
-  const { user, profile } = useUser()
+  const { user, profile, stableHarasId, isSessionReady } = useUser()
   const { data: currentHaras } = useCurrentHaras()
-  const harasId = currentHaras?.id || profile?.haras_id || ''
+  const harasId = currentHaras?.id || stableHarasId || ''
 
   const roleKey = normalizeRole(profile?.role)
   const isAdmin = isAdminRole(roleKey)
   const isOwner = Boolean(currentHaras?.owner_id && profile?.id === currentHaras.owner_id)
   const isCreator = isOwner || (!currentHaras?.owner_id && isCreatorRole(roleKey))
 
-  const { data: members = [], isLoading } = useTeamMembers(harasId)
+  const { data: members = [], isLoading } = useTeamMembers(harasId, !!harasId && isSessionReady)
 
   const currentMember = useMemo(
     () => members.find((member) => member.user_id === user?.id),

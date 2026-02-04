@@ -7,6 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { harasService } from '@/services/haras'
+import { useUser } from '@/contexts/UserContext'
 import type { Haras, HarasMember } from '@/types'
 
 // Query Keys
@@ -22,9 +23,13 @@ export const harasKeys = {
  * Hook para buscar haras atual do usuário logado
  */
 export function useCurrentHaras() {
+    const { stableHarasId, isSessionReady } = useUser()
+    const harasId = stableHarasId
+
     return useQuery({
-        queryKey: harasKeys.current(),
-        queryFn: () => harasService.getCurrentUserHaras(),
+        queryKey: [...harasKeys.current(), harasId],
+        queryFn: () => (harasId ? harasService.getById(harasId) : null),
+        enabled: !!harasId && isSessionReady,
     })
 }
 

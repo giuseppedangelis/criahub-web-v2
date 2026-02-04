@@ -15,8 +15,8 @@ interface HealthReportModalProps {
 }
 
 export function HealthReportModal({ isOpen, onClose }: HealthReportModalProps) {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady, profile } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const { data: haras } = useHaras(harasId);
   const [reportPeriod, setReportPeriod] = useState('year');
   const [customStartDate, setCustomStartDate] = useState('');

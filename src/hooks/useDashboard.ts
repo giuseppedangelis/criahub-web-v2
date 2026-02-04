@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { dashboardService, DashboardStats, CategoryDistribution, PelagemDistribution, GrowthData, UpcomingEvent, RecentActivity, AgeDistribution } from '@/services/dashboard';
-import { supabase } from '@/services/base';
+import { useUser } from '@/contexts/UserContext';
 
 interface UseDashboardReturn {
     stats: DashboardStats | null;
@@ -28,6 +28,7 @@ interface DashboardOptions {
 }
 
 export function useDashboard(harasId?: string, options: DashboardOptions = {}): UseDashboardReturn {
+    const { stableHarasId, isSessionReady } = useUser();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
     const [pelagemDistribution, setPelagemDistribution] = useState<PelagemDistribution[]>([]);
@@ -42,45 +43,27 @@ export function useDashboard(harasId?: string, options: DashboardOptions = {}): 
 
     // Buscar haras_id do usuário logado se não foi fornecido
     useEffect(() => {
-        async function fetchHarasId() {
-            if (harasId) {
-                setCurrentHarasId(harasId);
-                setHasNoHaras(false);
-                return;
-            }
-
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    setIsLoading(false);
-                    setHasNoHaras(true);
-                    return;
-                }
-
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('haras_id')
-                    .eq('id', user.id)
-                    .single();
-
-                if (profile?.haras_id) {
-                    setCurrentHarasId(profile.haras_id);
-                    setHasNoHaras(false);
-                } else {
-                    // Usuário não tem haras vinculado - parar loading
-                    setIsLoading(false);
-                    setHasNoHaras(true);
-                    console.log('Usuário não possui haras vinculado');
-                }
-            } catch (err) {
-                console.error('Error fetching haras_id:', err);
-                setIsLoading(false);
-                setHasNoHaras(true);
-            }
+        if (harasId) {
+            setCurrentHarasId(harasId);
+            setHasNoHaras(false);
+            return;
         }
 
-        fetchHarasId();
-    }, [harasId]);
+        if (stableHarasId) {
+            setCurrentHarasId(stableHarasId);
+            setHasNoHaras(false);
+            return;
+        }
+
+        if (!isSessionReady) {
+            return;
+        }
+
+        if (isSessionReady) {
+            setIsLoading(false);
+            setHasNoHaras(true);
+        }
+    }, [harasId, stableHarasId, isSessionReady]);
 
     const months = Math.max(1, options.months ?? 6);
     const eventsLimit = options.eventsLimit ?? 5;

@@ -15,8 +15,8 @@ interface FinancialReportModalProps {
 }
 
 export function FinancialReportModal({ isOpen, onClose }: FinancialReportModalProps) {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady, profile } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const { data: haras } = useHaras(harasId);
   const currentYear = new Date().getFullYear();
   const [reportPeriod, setReportPeriod] = useState('year');

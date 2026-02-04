@@ -1,6 +1,6 @@
 
 import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2 } from 'lucide-react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
@@ -10,7 +10,7 @@ import { QuickGenealogyModal } from './QuickGenealogyModal';
 import { AnimalCard } from './AnimalCard';
 import { AdvancedFiltersModal } from './AdvancedFiltersModal';
 import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
-import { supabase } from '@/services/base';
+import { useUser } from '@/contexts/UserContext';
 import { toast } from 'sonner';
 
 // Função auxiliar para formatar data de nascimento
@@ -117,23 +117,17 @@ export function BreederPlantelContent() {
   const [filterFilhos, setFilterFilhos] = useState('todos');
   const [filterPremiacoes, setFilterPremiacoes] = useState('todos');
 
-  // Buscar Haras ID do usuário
-  const [harasId, setHarasId] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from('profiles').select('haras_id').eq('id', user.id).single().then(({ data }) => {
-          if (data?.haras_id) setHarasId(data.haras_id);
-        });
-      }
-    });
-  }, []);
+  const { stableHarasId, isLoading: isUserLoading, isSessionReady } = useUser();
+  const harasId = isSessionReady ? stableHarasId || undefined : undefined;
 
   // Hook de Animais
   const { data: animalsData, isLoading, refetch } = useAnimals(
     { haras_id: harasId },
-    { page: 1, limit: 1000 } // Buscando 1000 para permitir filtro client-side de idade/filhos
+    { page: 1, limit: 1000 }, // Buscando 1000 para permitir filtro client-side de idade/filhos
+    !!harasId && isSessionReady && !isUserLoading
   );
+
+  const isHarasLoading = !harasId && (isUserLoading || !isSessionReady);
 
   const { mutateAsync: deleteAnimal } = useDeleteAnimal();
 
@@ -307,10 +301,10 @@ export function BreederPlantelContent() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <SummaryCard title="Total" value={String(animalsList.length)} />
-            <SummaryCard title="Machos" value={String(animalsList.filter(a => a.sex === 'Macho').length)} />
-            <SummaryCard title="Fêmeas" value={String(animalsList.filter(a => a.sex === 'Fêmea').length)} />
-            <SummaryCard title="Ativos" value={String(animalsList.filter(a => a.statusAtividade === 'Ativo').length)} />
+            <SummaryCard title="Total" value={isHarasLoading ? '...' : String(animalsList.length)} />
+            <SummaryCard title="Machos" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.sex === 'Macho').length)} />
+            <SummaryCard title="Fêmeas" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.sex === 'Fêmea').length)} />
+            <SummaryCard title="Ativos" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.statusAtividade === 'Ativo').length)} />
           </div>
 
           {/* Actions and Filters */}
@@ -457,7 +451,7 @@ export function BreederPlantelContent() {
 
             {filteredAnimals.length === 0 && (
               <div className="flex flex-col items-center justify-center p-10 text-muted-foreground">
-                <p>Nenhum animal encontrado.</p>
+                <p>{isHarasLoading ? 'Carregando dados do haras...' : 'Nenhum animal encontrado.'}</p>
               </div>
             )}
           </div>

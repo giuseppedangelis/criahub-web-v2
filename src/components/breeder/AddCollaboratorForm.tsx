@@ -3,8 +3,8 @@ import { Shield, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
 import { collaboratorsService } from '@/services/collaborators';
-import { supabase } from '@/services/base';
 import { DEFAULT_TEAM_PERMISSIONS, teamService } from '@/services/team';
+import { useUser } from '@/contexts/UserContext';
 
 interface AddCollaboratorFormProps {
   onClose: () => void;
@@ -12,6 +12,7 @@ interface AddCollaboratorFormProps {
 }
 
 export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormProps) {
+  const { stableHarasId, user } = useUser();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -57,20 +58,12 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
       return;
     }
 
-    // Buscar haras_id do usuário logado
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error('Usuário não autenticado');
       return;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('haras_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.haras_id) {
+    if (!stableHarasId) {
       toast.error('Haras não vinculado ao usuário');
       return;
     }
@@ -82,12 +75,12 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
         email: formData.email,
         password: formData.password,
         role: formData.role as 'acessor' | 'veterinario' | 'peao',
-        haras_id: profile.haras_id,
+        haras_id: stableHarasId,
         permissions
       });
 
       await teamService.upsertMember({
-        harasId: profile.haras_id,
+        harasId: stableHarasId,
         userId: response.user_id,
         roleId: null,
         permissions: mapPermissionsToTeam(),

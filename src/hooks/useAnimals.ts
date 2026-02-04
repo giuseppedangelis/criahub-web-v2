@@ -37,10 +37,12 @@ export function useAnimals(
     pagination: PaginationParams = { page: 1, limit: 20 },
     enabled: boolean = true
 ) {
+    const hasHarasFilter = !!filters.haras_id
+
     return useQuery({
         queryKey: animalKeys.list(filters, pagination),
         queryFn: () => animalsService.list(filters, pagination),
-        enabled,
+        enabled: enabled && hasHarasFilter,
     })
 }
 

@@ -20,11 +20,13 @@ interface UserProfile {
 interface UserContextType {
   user: User | null;
   profile: UserProfile | null;
+  stableHarasId: string | null;
   userRole: UserRole | null;
   userName: string | null;
   userEmail: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSessionReady: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -38,12 +40,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stableHarasId, setStableHarasId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSessionReady, setIsSessionReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Ref to track which user profile is currently being fetched to prevent duplicates
   const fetchingForUserId = useRef<string | null>(null);
+  const lastUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string) => {
     // If we are already fetching for this exact user, skip
@@ -70,6 +75,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
             if (mappedRole === 'criador') mappedRole = 'breeder' as UserRole;
             if (mappedRole === 'assessor' || mappedRole === 'acessor') mappedRole = 'advisor' as UserRole;
             setUserRole(mappedRole);
+            if (cachedProfile.haras_id) {
+              setStableHarasId(cachedProfile.haras_id);
+            }
             // Stop loading immediately if we found cache
             setIsLoading(false);
           }
@@ -112,6 +120,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setProfile(profileData);
         if (typeof window !== 'undefined') {
           localStorage.setItem(cacheKey, JSON.stringify(profileData));
+        }
+        if (profileData.haras_id) {
+          setStableHarasId(profileData.haras_id);
         }
 
         // Map database roles to component roles
@@ -168,8 +179,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setProfile(null);
+      setStableHarasId(null);
       setUserRole(null);
       setError(null);
+      lastUserIdRef.current = null;
     }
   };
 
@@ -186,6 +199,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         if (mounted) {
           if (session?.user) {
+            if (lastUserIdRef.current && lastUserIdRef.current !== session.user.id) {
+              setProfile(null);
+              setUserRole(null);
+              setStableHarasId(null);
+            }
+            lastUserIdRef.current = session.user.id;
+
             // Use functional update to avoid stale closure issues
             setUser((currentUser) => {
               if (currentUser?.id === session.user.id) return currentUser;
@@ -204,7 +224,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
               return currentUser;
             });
             setProfile(null);
+            setStableHarasId(null);
             setUserRole(null);
+            lastUserIdRef.current = null;
           }
         }
       } catch (error: any) {
@@ -219,6 +241,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       } finally {
         if (mounted) {
           setIsLoading(false);
+          setIsSessionReady(true);
         }
       }
     };
@@ -233,11 +256,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
           if (mounted) {
             setUser(null);
             setProfile(null);
+            setStableHarasId(null);
             setUserRole(null);
             setIsLoading(false);
+            setIsSessionReady(true);
           }
           fetchingForUserId.current = null;
+          lastUserIdRef.current = null;
         } else if (session?.user) {
+          if (lastUserIdRef.current && lastUserIdRef.current !== session.user.id) {
+            setProfile(null);
+            setUserRole(null);
+            setStableHarasId(null);
+          }
+          lastUserIdRef.current = session.user.id;
+
           setUser((curr) => {
             // Avoid re-render if same user
             if (curr?.id === session.user.id) return curr;
@@ -251,15 +284,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
             try {
               await fetchProfile(session.user.id);
             } finally {
-              if (mounted) setIsLoading(false);
+              if (mounted) {
+                setIsLoading(false);
+                setIsSessionReady(true);
+              }
             }
           } else {
             // User exists, profile exists or is fetching => stop loading
-            if (mounted) setIsLoading(false);
+            if (mounted) {
+              setIsLoading(false);
+              setIsSessionReady(true);
+            }
           }
         } else if (event === 'INITIAL_SESSION' && !session) {
           // Initial session returned nothing -> stop loading
-          if (mounted) setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+            setIsSessionReady(true);
+          }
         }
       }
     );
@@ -274,11 +316,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
     <UserContext.Provider value={{
       user,
       profile,
+      stableHarasId,
       userRole,
       userName: profile?.full_name || user?.email?.split('@')[0] || null,
       userEmail: profile?.email || user?.email || null,
       isAuthenticated: user !== null, // Mantemos simples, page.tsx trata o role null
       isLoading,
+      isSessionReady,
       error,
       login,
       logout,

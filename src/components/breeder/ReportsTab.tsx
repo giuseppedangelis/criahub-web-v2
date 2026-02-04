@@ -109,13 +109,13 @@ export function ReportsTab({
   onGenerateHealthReport 
 }: ReportsTabProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
 
   const { data: reportsResponse } = useReports(
     { haras_id: harasId },
     { page: 1, limit: 200 },
-    !!harasId
+    isSessionReady && !!harasId
   );
   const { data: summary } = useReportsSummary(harasId);
 

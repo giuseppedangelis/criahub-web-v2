@@ -16,8 +16,8 @@ interface AnimalReportModalProps {
 }
 
 export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: AnimalReportModalProps) {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady, profile } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const { data: haras } = useHaras(harasId);
   const [selectedAnimal, setSelectedAnimal] = useState('');
   const [reportSections, setReportSections] = useState({
@@ -39,7 +39,7 @@ export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: An
   const { data: animalsResponse, isLoading: isLoadingAnimals } = useAnimals(
     { haras_id: harasId },
     { page: 1, limit: 200 },
-    !!harasId
+    !!harasId && isSessionReady
   );
   const animals = animalsResponse?.data || [];
   const { mutateAsync: createReport, isPending: isCreating } = useCreateReport();

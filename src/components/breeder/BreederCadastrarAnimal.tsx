@@ -1,10 +1,12 @@
 import { ArrowLeft, Upload, Camera, X, Video, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NativeSelect } from '../ui/native-select';
-import { useCreateAnimal } from '@/hooks/useAnimals';
+import { useCreateAnimal, useUpdateAnimal } from '@/hooks/useAnimals';
+import { useUser } from '@/contexts/UserContext';
+import { useCurrentHaras } from '@/hooks/useHaras';
 import { toast } from 'sonner';
-import { supabase } from '@/services/base';
 import type { CreateAnimalInput, AnimalSex, AnimalCategory } from '@/types';
+import { createClient } from '@/lib/supabase/client';
 
 interface BreederCadastrarAnimalProps {
   onBack: () => void;
@@ -60,47 +62,33 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
   const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
   const [userHarasName, setUserHarasName] = useState('');
+  const { stableHarasId, user } = useUser();
+  const { data: currentHaras } = useCurrentHaras();
 
   useEffect(() => {
     async function loadInitialData() {
-      // Buscar haras_id do usuário logado
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const harasId = stableHarasId;
+      if (!harasId) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('haras_id')
-        .eq('id', user.id)
-        .single();
+      const harasName = currentHaras?.name || '';
+      setUserHarasName(harasName);
 
-      if (profile?.haras_id) {
-        // Buscar nome do Haras separadamente
-        const { data: harasData } = await supabase
-          .from('haras')
-          .select('nome')
-          .eq('id', profile.haras_id)
-          .single();
-
-        const harasName = harasData?.nome || '';
-        setUserHarasName(harasName);
-
-        // Se for nascimento, preencher haras de origem
-        if (entryType === 'nascimento') {
-          setFormData(prev => ({ ...prev, harasOrigem: harasName }));
-        }
-
-        import('@/services/animals').then(async ({ animalsService }) => {
-          const [stallionsData, maresData] = await Promise.all([
-            animalsService.getStallions(profile.haras_id!),
-            animalsService.getMares(profile.haras_id!)
-          ]);
-          setStallions(stallionsData);
-          setMares(maresData);
-        });
+      // Se for nascimento, preencher haras de origem
+      if (entryType === 'nascimento') {
+        setFormData(prev => ({ ...prev, harasOrigem: harasName }));
       }
+
+      import('@/services/animals').then(async ({ animalsService }) => {
+        const [stallionsData, maresData] = await Promise.all([
+          animalsService.getStallions(harasId, { includeInactive: true, includeAllCategories: true }),
+          animalsService.getMares(harasId, { includeInactive: true, includeAllCategories: true })
+        ]);
+        setStallions(stallionsData);
+        setMares(maresData);
+      });
     }
     loadInitialData();
-  }, [entryType]);
+  }, [entryType, stableHarasId, currentHaras?.name]);
 
   // Atualizar campos ao trocar tipo de entrada
   useEffect(() => {
@@ -177,6 +165,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   };
 
   const createAnimalMutation = useCreateAnimal();
+  const updateAnimalMutation = useUpdateAnimal();
 
   // Helpers para visibilidade de campos
   const isGenealogy = entryType === 'genealogia';
@@ -187,6 +176,39 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   const showLocationInfo = !isGenealogy;
   const isBirthDateRequired = !isGenealogy;
 
+  const uploadFiles = async (animalId: string, files: File[], folder: 'media' | 'documents') => {
+    if (files.length === 0) return [];
+    const client = createClient();
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split('.').pop() || 'bin';
+        const fileName = `${animalId}/${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { error: uploadError } = await client.storage
+          .from('animals')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          toast.error(`Erro ao enviar ${file.name}: ${uploadError.message}`);
+          continue;
+        }
+
+        const { data: { publicUrl } } = client.storage
+          .from('animals')
+          .getPublicUrl(fileName);
+
+        uploadedUrls.push(publicUrl);
+      } catch (error) {
+        console.error('Erro no upload de arquivo:', error);
+        toast.error(`Erro ao enviar ${file.name}`);
+      }
+    }
+
+    return uploadedUrls;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -196,25 +218,12 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
       return;
     }
 
-    // Buscar haras_id do usuário logado
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error('Usuário não autenticado');
       return;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('haras_id')
-      .eq('id', user.id)
-      .single() as { data: { haras_id: string } | null, error: any };
-
-    if (!profile) {
-      toast.error('Erro ao carregar perfil');
-      return;
-    }
-
-    if (!profile?.haras_id) {
+    if (!stableHarasId) {
       toast.error('Haras não vinculado ao usuário');
       return;
     }
@@ -231,7 +240,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
 
     // Mapear campos para CreateAnimalInput
     const animalInput: CreateAnimalInput = {
-      haras_id: profile.haras_id,
+      haras_id: stableHarasId,
       name: formData.nome,
       sex: formData.sexo as AnimalSex,
       birth_date: formData.dataNascimento || undefined,
@@ -255,7 +264,41 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     };
 
     try {
-      await createAnimalMutation.mutateAsync(animalInput);
+      const createdAnimal = await createAnimalMutation.mutateAsync(animalInput);
+
+      const hasMedia = selectedImages.length > 0;
+      const hasDocs = selectedDocuments.length > 0;
+
+      if (hasMedia || hasDocs) {
+        let mediaUrls: string[] = [];
+        let documentUrls: string[] = [];
+
+        if (hasMedia) toast.info('Fazendo upload das fotos/vídeos...');
+        const mediaFiles = selectedImages.map(item => item.file);
+        if (mediaFiles.length > 0) {
+          mediaUrls = await uploadFiles(createdAnimal.id, mediaFiles, 'media');
+        }
+
+        if (hasDocs) toast.info('Fazendo upload dos documentos...');
+        if (selectedDocuments.length > 0) {
+          documentUrls = await uploadFiles(createdAnimal.id, selectedDocuments, 'documents');
+        }
+
+        if (mediaUrls.length > 0 || documentUrls.length > 0) {
+          try {
+            await updateAnimalMutation.mutateAsync({
+              id: createdAnimal.id,
+              images: mediaUrls,
+              main_image_url: mediaUrls[0],
+              documents: documentUrls,
+            });
+          } catch (updateError) {
+            console.error('Erro ao salvar mídias do animal:', updateError);
+            toast.error('Animal criado, mas não foi possível salvar as mídias.');
+          }
+        }
+      }
+
       toast.success('Animal cadastrado com sucesso!');
       onBack();
     } catch (error) {

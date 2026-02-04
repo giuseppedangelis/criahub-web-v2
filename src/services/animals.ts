@@ -118,6 +118,10 @@ export const animalsService = {
         filters: AnimalFilters = {},
         pagination: PaginationParams = { page: 1, limit: 20 }
     ): Promise<PaginatedResponse<Animal>> {
+        if (!filters.haras_id) {
+            return formatPaginatedResponse([], 0, pagination);
+        }
+
         let query = supabase
             .from('animals')
             .select(`
@@ -412,6 +416,13 @@ export const animalsService = {
      * Cria um novo animal
      */
     async create(input: CreateAnimalInput): Promise<Animal> {
+        const resolvedStatus = input.status
+            ? (REVERSE_STATUS_MAPPING[input.status] ?? input.status)
+            : 'Ativo';
+
+        const normalizedImages = input.images && input.images.length > 0 ? input.images : undefined;
+        const mainImageUrl = input.main_image_url || (normalizedImages ? normalizedImages[0] : undefined);
+
         const dbInput = {
             haras_id: input.haras_id,
             nome: input.name,
@@ -422,7 +433,7 @@ export const animalsService = {
             categoria: CATEGORY_MAPPING[input.category] || input.category,
             data_nascimento: input.birth_date,
             pelagem: input.coat_color,
-            status: (REVERSE_STATUS_MAPPING[input.status || 'ativo'] || 'Ativo'),
+            status: resolvedStatus,
             pai_id: input.father_id,
             mae_id: input.mother_id,
             localizacao: input.location,
@@ -430,7 +441,11 @@ export const animalsService = {
             height: input.height,
             haras_origem: input.origin_haras,
             tipo_servico: input.service_type,
-            foto_url: input.main_image_url,
+            status_manejo: input.management_status,
+            andamento: input.gait,
+            images: normalizedImages,
+            documents: input.documents,
+            foto_url: mainImageUrl,
             father_name: input.father_name,
             mother_name: input.mother_name,
             observacoes: input.observations
@@ -570,15 +585,27 @@ export const animalsService = {
     /**
      * Busca machos disponíveis para reprodução
      */
-    async getStallions(harasId: string): Promise<Animal[]> {
-        const { data, error } = await supabase
+    async getStallions(
+        harasId: string,
+        options?: { includeInactive?: boolean; includeAllCategories?: boolean }
+    ): Promise<Animal[]> {
+        const { includeInactive = false, includeAllCategories = false } = options || {};
+
+        let query = supabase
             .from('animals')
             .select('id, nome, registro')
             .eq('haras_id', harasId)
-            .eq('sexo', 'Macho')
-            .in('categoria', ['Garanhão'])
-            .eq('status', 'Ativo')
-            .order('nome');
+            .eq('sexo', 'Macho');
+
+        if (!includeAllCategories) {
+            query = query.in('categoria', ['Garanhão']);
+        }
+
+        if (!includeInactive) {
+            query = query.eq('status', 'Ativo');
+        }
+
+        const { data, error } = await query.order('nome');
 
         if (error) handleSupabaseError(error);
 
@@ -592,15 +619,27 @@ export const animalsService = {
     /**
      * Busca fêmeas disponíveis para reprodução
      */
-    async getMares(harasId: string): Promise<Animal[]> {
-        const { data, error } = await supabase
+    async getMares(
+        harasId: string,
+        options?: { includeInactive?: boolean; includeAllCategories?: boolean }
+    ): Promise<Animal[]> {
+        const { includeInactive = false, includeAllCategories = false } = options || {};
+
+        let query = supabase
             .from('animals')
             .select('id, nome, registro')
             .eq('haras_id', harasId)
-            .eq('sexo', 'Fêmea')
-            .in('categoria', ['Égua'])
-            .eq('status', 'Ativo')
-            .order('nome');
+            .eq('sexo', 'Fêmea');
+
+        if (!includeAllCategories) {
+            query = query.in('categoria', ['Égua']);
+        }
+
+        if (!includeInactive) {
+            query = query.eq('status', 'Ativo');
+        }
+
+        const { data, error } = await query.order('nome');
 
         if (error) handleSupabaseError(error);
 

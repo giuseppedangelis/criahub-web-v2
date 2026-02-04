@@ -15,7 +15,7 @@ import { BreederHelpContent } from './breeder/BreederHelpContent';
 import { BreederSettingsContent } from './breeder/BreederSettingsContent';
 import { AdvisorTasksContent } from './advisor/AdvisorTasksContent';
 import { AdvisorTeamContent } from './advisor/AdvisorTeamContent';
-import { AddAnimalForm } from './breeder/AddAnimalForm';
+import { BreederCadastrarAnimal } from './breeder/BreederCadastrarAnimal';
 import { NotificationsPanel } from './NotificationsPanel';
 import { NotificationsCenter } from './breeder/NotificationsCenter';
 import { ReportsTab } from './breeder/ReportsTab';
@@ -431,7 +431,7 @@ export function BreederDashboard() {
         {/* Content Area */}
         <div className="flex-1 overflow-auto mobile-scroll-hidden bg-background dark:bg-[#0d0d0d] p-4 md:p-8">
           {activeTab === 'dashboard' && <BreederDashboardContent onNavigate={handleSelectTab} />}
-          {activeTab === 'add-animal' && <AddAnimalForm onBack={() => setActiveTab('dashboard')} />}
+          {activeTab === 'add-animal' && <BreederCadastrarAnimal onBack={() => setActiveTab('dashboard')} />}
           {activeTab === 'plantel' && <BreederPlantelContent />}
           {activeTab === 'reproduction' && <BreederReproductionContent onNavigateToAgenda={() => handleSelectTab('agenda')} />}
           {activeTab === 'financial' && <BreederFinancialContent />}

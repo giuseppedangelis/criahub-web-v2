@@ -14,8 +14,8 @@ import { toast } from 'sonner';
 type FinancialView = 'dashboard' | 'receitas' | 'despesas' | 'relatorios';
 
 export function BreederFinancialContent() {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const [currentView, setCurrentView] = useState<FinancialView>('dashboard');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactionType, setTransactionType] = useState<TransactionType>('receita');
@@ -23,7 +23,7 @@ export function BreederFinancialContent() {
   const { data: animalsResponse } = useAnimals(
     { haras_id: harasId },
     { page: 1, limit: 200 },
-    !!harasId
+    !!harasId && isSessionReady
   );
   const animals = animalsResponse?.data || [];
 

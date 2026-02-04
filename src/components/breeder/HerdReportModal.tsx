@@ -17,15 +17,15 @@ interface HerdReportModalProps {
 }
 
 export function HerdReportModal({ isOpen, onClose, reportType = 'plantel' }: HerdReportModalProps) {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady, profile } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const { data: haras } = useHaras(harasId);
   const { data: dashboardStats } = useDashboardStats(harasId);
   const { data: reproductionStats } = useReproductionStats(harasId);
   const { data: animalsResponse } = useAnimals(
     { haras_id: harasId },
     { page: 1, limit: 200 },
-    !!harasId
+    !!harasId && isSessionReady
   );
   const [reportPeriod, setReportPeriod] = useState('current');
   const [customStartDate, setCustomStartDate] = useState('');

@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
 import { useUpdateAnimal } from '@/hooks/useAnimals';
+import { useUser } from '@/contexts/UserContext';
 import { createClient } from '@/lib/supabase/client';
-import { supabase } from '@/services/base';
 
 interface Animal {
   id: string;
@@ -74,6 +74,7 @@ interface DocumentItem {
 
 export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAnimalProps) {
   const updateAnimalMutation = useUpdateAnimal();
+  const { stableHarasId } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
   const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
@@ -135,26 +136,14 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     let isMounted = true;
 
     async function loadParents() {
-      let effectiveHarasId = animal.haras_id;
-
-      if (!effectiveHarasId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('haras_id')
-            .eq('id', user.id)
-            .single();
-          effectiveHarasId = profile?.haras_id || null;
-        }
-      }
+      const effectiveHarasId = animal.haras_id || stableHarasId || null;
 
       if (!effectiveHarasId) return;
 
       const { animalsService } = await import('@/services/animals');
       const [stallionsData, maresData] = await Promise.all([
-        animalsService.getStallions(effectiveHarasId),
-        animalsService.getMares(effectiveHarasId),
+        animalsService.getStallions(effectiveHarasId, { includeInactive: true, includeAllCategories: true }),
+        animalsService.getMares(effectiveHarasId, { includeInactive: true, includeAllCategories: true }),
       ]);
 
       if (!isMounted) return;

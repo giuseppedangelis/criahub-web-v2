@@ -12,8 +12,8 @@ import { getCategoryConfig } from './agendaUtils';
 type AgendaTab = 'services' | 'events' | 'awards';
 
 export function BreederAgendaContent() {
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { stableHarasId, isSessionReady } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
   const today = new Date();
   const [activeTab, setActiveTab] = useState<AgendaTab>('services');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -27,7 +27,7 @@ export function BreederAgendaContent() {
   const { data: animalsResponse } = useAnimals(
     { haras_id: harasId },
     { page: 1, limit: 200 },
-    !!harasId
+    !!harasId && isSessionReady
   );
   const animals = animalsResponse?.data || [];
   const animalsById = useMemo(() => {
@@ -47,7 +47,7 @@ export function BreederAgendaContent() {
     ? ['Evento']
     : ['Serviço', 'Veterinário', 'Casqueamento', 'Dentista', 'Aplicação P4', 'Coleta Embrião', 'Diagnóstico Gestação', 'Outro'];
 
-  const shouldLoadAgenda = !!harasId && activeTab !== 'awards';
+  const shouldLoadAgenda = isSessionReady && !!harasId && activeTab !== 'awards';
 
   const { data: eventsResponse } = useAgendaEvents(
     {

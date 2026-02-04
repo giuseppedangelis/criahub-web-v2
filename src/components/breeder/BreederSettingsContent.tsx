@@ -32,7 +32,7 @@ interface TeamMember {
 
 export function BreederSettingsContent() {
   const supabase = createClient();
-  const { user, profile, refreshProfile } = useUser();
+  const { user, profile, refreshProfile, stableHarasId, isSessionReady } = useUser();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +46,7 @@ export function BreederSettingsContent() {
 
   const { data: currentHaras } = useCurrentHaras();
   const updateHaras = useUpdateHaras();
-  const harasId = currentHaras?.id || profile?.haras_id || '';
+  const harasId = isSessionReady ? (currentHaras?.id || stableHarasId || '') : '';
 
   const { data: harasSettings } = useHarasSettings(harasId);
   const updateHarasSettings = useUpdateHarasSettings();

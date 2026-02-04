@@ -82,9 +82,9 @@ const formatDate = (value?: string | null) => {
 const emptyPermissions = (): TeamPermissions => ({ ...DEFAULT_TEAM_PERMISSIONS });
 
 export function AdvisorTeamContent() {
-  const { user, profile } = useUser();
+  const { user, profile, stableHarasId, isSessionReady } = useUser();
   const { data: currentHaras } = useCurrentHaras();
-  const harasId = currentHaras?.id || profile?.haras_id || '';
+  const harasId = isSessionReady ? (currentHaras?.id || stableHarasId || '') : '';
 
   const currentRole = normalizeRole(profile?.role);
   const isAdmin = isAdminRole(currentRole);
@@ -126,7 +126,7 @@ export function AdvisorTeamContent() {
     permissions: emptyPermissions(),
   });
 
-  const { data: membersData = [], isLoading: isLoadingMembers } = useTeamMembers(harasId);
+  const { data: membersData = [], isLoading: isLoadingMembers } = useTeamMembers(harasId, isSessionReady);
   const { data: rolesData = [], isLoading: isLoadingRoles } = useTeamRoles(harasId);
 
   const createRole = useCreateTeamRole();

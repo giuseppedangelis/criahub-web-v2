@@ -99,8 +99,9 @@ interface BreederReproductionContentProps {
 
 export function BreederReproductionContent({ onNavigateToAgenda }: BreederReproductionContentProps = {}) {
   const supabase = useMemo(() => createClient(), []);
-  const { profile } = useUser();
-  const harasId = profile?.haras_id || '';
+  const { profile, stableHarasId, isSessionReady } = useUser();
+  const harasId = isSessionReady ? (stableHarasId || '') : '';
+  const isHarasReady = isSessionReady && !!harasId;
 
   const [activeTab, setActiveTab] = useState<ReproductionTab>('automacao');
   const [selectedAnimal, setSelectedAnimal] = useState('');
@@ -131,14 +132,14 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
   const shouldLoadOvules = activeTab === 'ovulos';
   const shouldLoadEmbryos = activeTab === 'embrioes';
 
-  const { data: eventsResponse } = useReproductiveEvents(harasId, { page: 1, limit: 50 }, shouldLoadEvents);
-  const { data: coveringsResponse } = useCoverings(harasId, { page: 1, limit: 50 });
-  const { data: gestationsResponse, isLoading: isLoadingGestations } = useGestations({ haras_id: harasId }, { page: 1, limit: 50 });
-  const { data: ovulesResponse } = useOvules(harasId, { page: 1, limit: 50 }, shouldLoadOvules);
-  const { data: embryosResponse } = useEmbryos(harasId, { page: 1, limit: 50 }, shouldLoadEmbryos);
-  const { data: documentsData } = useReproductionDocuments(harasId, shouldLoadDocuments);
-  const { data: protocolsData, isLoading: isLoadingProtocols } = useReproductionProtocols(harasId, shouldLoadProtocols);
-  const { data: protocolApplications } = useReproductionProtocolApplications(harasId, shouldLoadProtocols);
+  const { data: eventsResponse } = useReproductiveEvents(harasId, { page: 1, limit: 50 }, isHarasReady && shouldLoadEvents);
+  const { data: coveringsResponse } = useCoverings(harasId, { page: 1, limit: 50 }, isHarasReady);
+  const { data: gestationsResponse, isLoading: isLoadingGestations } = useGestations({ haras_id: harasId }, { page: 1, limit: 50 }, isHarasReady);
+  const { data: ovulesResponse } = useOvules(harasId, { page: 1, limit: 50 }, isHarasReady && shouldLoadOvules);
+  const { data: embryosResponse } = useEmbryos(harasId, { page: 1, limit: 50 }, isHarasReady && shouldLoadEmbryos);
+  const { data: documentsData } = useReproductionDocuments(harasId, isHarasReady && shouldLoadDocuments);
+  const { data: protocolsData, isLoading: isLoadingProtocols } = useReproductionProtocols(harasId, isHarasReady && shouldLoadProtocols);
+  const { data: protocolApplications } = useReproductionProtocolApplications(harasId, isHarasReady && shouldLoadProtocols);
 
   const { mutateAsync: createCovering } = useCreateCovering();
   const { mutateAsync: createGestation, isPending: isSavingGestation } = useCreateGestation();
