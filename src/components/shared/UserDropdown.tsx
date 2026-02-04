@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { User, UserCog, UserCircle, HelpCircle, LogOut, Loader2 } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface UserDropdownProps {
   userName?: string | null
   userEmail?: string | null
   userRole?: string | null
+  userAvatarUrl?: string | null
   isLoggingOut?: boolean
   onProfileClick: () => void
   onSettingsClick: () => void
@@ -21,6 +22,7 @@ export function UserDropdown({
   userName,
   userEmail,
   userRole,
+  userAvatarUrl,
   isLoggingOut = false,
   onProfileClick,
   onSettingsClick,
@@ -62,14 +64,27 @@ export function UserDropdown({
     }
   }
 
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'U'
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
   return (
     <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] md:w-64 max-w-sm bg-card dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-border dark:border-[rgba(255,255,255,0.1)] z-50">
       {/* Header do Usuário */}
       <div className="p-4 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary dark:bg-white rounded-full flex items-center justify-center">
-            <User className="w-6 h-6 text-white dark:text-black" />
-          </div>
+          <Avatar className="h-12 w-12">
+            <AvatarImage src={userAvatarUrl || undefined} alt={userName || 'Usuário'} />
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {getInitials(userName)}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-foreground dark:text-white font-medium truncate">
               {userName || 'Usuário'}

@@ -141,13 +141,24 @@ export function Header({ title, onMenuClick }: HeaderProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuLabel className="font-normal">
-                            <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium leading-none">
-                                    {profile?.full_name || 'Usuário'}
-                                </p>
-                                <p className="text-xs leading-none text-muted-foreground">
-                                    {getRoleLabel(profile?.role)}
-                                </p>
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                    <AvatarImage
+                                        src={profile?.avatar_url || undefined}
+                                        alt={profile?.full_name || 'User'}
+                                    />
+                                    <AvatarFallback className="bg-primary text-primary-foreground">
+                                        {getInitials(profile?.full_name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">
+                                        {profile?.full_name || 'Usuário'}
+                                    </p>
+                                    <p className="text-xs leading-none text-muted-foreground">
+                                        {getRoleLabel(profile?.role)}
+                                    </p>
+                                </div>
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />

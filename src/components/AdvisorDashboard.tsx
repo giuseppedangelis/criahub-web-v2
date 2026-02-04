@@ -55,7 +55,7 @@ const BASE_MENU_ITEMS = [
 
 export function AdvisorDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userName, userEmail, logout } = useUser();
+  const { userRole, userName, userEmail, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
   const { canAccessModule, isReady: isAccessReady } = useAccessControl();
@@ -414,6 +414,7 @@ export function AdvisorDashboard() {
                     userName={userName}
                     userEmail={userEmail}
                     userRole={userRole}
+                    userAvatarUrl={profile?.avatar_url}
                     isLoggingOut={isLoggingOut}
                     onProfileClick={() => setActiveMenu('profile')}
                     onSettingsClick={() => setActiveMenu('settings')}

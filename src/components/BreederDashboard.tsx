@@ -62,7 +62,7 @@ const BASE_MENU_ITEMS = [
 
 export function BreederDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userEmail, userName, logout } = useUser();
+  const { userRole, userEmail, userName, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
   const { canAccessModule, isReady: isAccessReady } = useAccessControl();
@@ -413,6 +413,7 @@ export function BreederDashboard() {
                   userName={userName}
                   userEmail={userEmail}
                   userRole={userRole}
+                  userAvatarUrl={profile?.avatar_url}
                   isLoggingOut={isLoggingOut}
                   onProfileClick={() => setActiveTab('profile')}
                   onSettingsClick={() => setActiveTab('settings')}

@@ -37,7 +37,7 @@ const revenueChartPath = "M4.91813e-08 57.7594C17.774 57.7594 17.774 11.9184 35.
 
 export function AdminDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userName, userEmail, logout } = useUser();
+  const { userRole, userName, userEmail, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -355,6 +355,7 @@ export function AdminDashboard() {
                   userName={userName}
                   userEmail={userEmail}
                   userRole={userRole}
+                  userAvatarUrl={profile?.avatar_url}
                   isLoggingOut={isLoggingOut}
                   onProfileClick={() => setActiveTab('profile')}
                   onSettingsClick={() => setActiveTab('settings')}
