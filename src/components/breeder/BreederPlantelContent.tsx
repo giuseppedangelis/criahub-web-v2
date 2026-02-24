@@ -11,6 +11,7 @@ import { AnimalCard } from './AnimalCard';
 import { AdvancedFiltersModal } from './AdvancedFiltersModal';
 import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
+import { animalsService } from '@/services/animals';
 import { toast } from 'sonner';
 
 // Função auxiliar para formatar data de nascimento
@@ -460,6 +461,8 @@ export function BreederPlantelContent() {
           {showImportModal && (
             <ImportModal
               onClose={() => setShowImportModal(false)}
+              harasId={harasId}
+              onSuccess={refetch}
             />
           )}
 
@@ -622,7 +625,7 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
   );
 }
 
-function ImportModal({ onClose }: any) {
+function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, harasId?: string, onSuccess: () => void }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -640,6 +643,41 @@ function ImportModal({ onClose }: any) {
 
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
+  };
+
+  const handleImport = () => {
+    if (!selectedFile) {
+      toast.error('Selecione um arquivo para importar');
+      return;
+    }
+
+    if (!harasId) {
+      toast.error('Não foi possível identificar o haras para importação');
+      return;
+    }
+
+    const toastId = toast.loading('Iniciando importação...', { duration: Infinity });
+
+    const importPromise = animalsService.importABCCMMData({
+      file: selectedFile,
+      harasId,
+      onProgress: (percent, msg) => {
+        toast.loading(`${msg} (${percent}%)`, { id: toastId, duration: Infinity });
+      },
+    });
+
+    onClose();
+
+    importPromise
+      .then((result) => {
+        toast.success(`Importação concluída: ${result.newAnimals} novos, ${result.updatedAnimals} atualizados`, { id: toastId });
+        onSuccess();
+      })
+      .catch((error) => {
+        console.error(error);
+        const message = error instanceof Error ? error.message : 'Erro ao importar planilha';
+        toast.error(message, { id: toastId });
+      });
   };
 
   return (
@@ -740,6 +778,7 @@ function ImportModal({ onClose }: any) {
             Cancelar
           </button>
           <button
+            onClick={handleImport}
             disabled={!selectedFile}
             className="px-8 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >

@@ -4,15 +4,19 @@
 // ============================================
 
 import { supabase, applyPagination, formatPaginatedResponse, handleSupabaseError } from './base';
+import * as XLSX from 'xlsx';
+import { decode } from 'html-entities';
 import type {
     Animal,
+    AnimalSex,
     AnimalGenealogy,
     AnimalFilters,
     CreateAnimalInput,
     UpdateAnimalInput,
     PaginationParams,
     PaginatedResponse,
-    GenealogyNode
+    GenealogyNode,
+    ABCCMMImportResult
 } from '@/types';
 
 const CATEGORY_MAPPING: Record<string, string> = {
@@ -76,6 +80,190 @@ const REVERSE_STATUS_MAPPING: Record<string, string> = Object.entries(STATUS_MAP
 const GENEALOGY_SELECT_FIELDS = `
     id, nome, registro, foto_url, images, pai_id, mae_id, father_name, mother_name
 `;
+
+const ABCCMM_BATCH_SIZE = 400;
+
+type SpreadsheetRow = Record<string, unknown>;
+
+interface NormalizedABCCMMRow {
+    registro: string;
+    nome: string;
+    sexo: AnimalSex;
+    dataNascimento: string | null;
+    chip: string | null;
+    pelagem: string | null;
+    paiRegistro: string | null;
+    maeRegistro: string | null;
+}
+
+interface ParsedABCCMMRow {
+    line: number;
+    data: NormalizedABCCMMRow;
+}
+
+interface AnimalSeed {
+    registro: string;
+    nome: string;
+    sexo: AnimalSex;
+}
+
+interface GenealogyLinkSeed {
+    registro: string;
+    paiRegistro: string | null;
+    maeRegistro: string | null;
+    dataNascimento?: string | null;
+    chip?: string | null;
+    pelagem?: string | null;
+}
+
+function normalizeSpaces(value: string): string {
+    return value.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeOfficialText(value: unknown): string {
+    if (typeof value !== 'string') return '';
+    const decoded = decode(decode(String(value)));
+    const normalized = normalizeSpaces(decoded);
+    return normalized ? normalized.toUpperCase() : '';
+}
+
+function normalizeRegistro(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    const raw = typeof value === 'string' ? value : String(value);
+    return normalizeSpaces(raw).toUpperCase();
+}
+
+function isValidRegistro(registro: string | null | undefined): registro is string {
+    return Boolean(registro && registro !== '-');
+}
+
+function normalizeColumnName(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeSex(value: unknown): AnimalSex {
+    const raw = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return raw === 'F' ? 'Fêmea' : 'Macho';
+}
+
+function parseAbccmmDate(value: unknown): string | null {
+    if (value === null || value === undefined || value === '') return null;
+
+    if (typeof value === 'number') {
+        const parsed = XLSX.SSF.parse_date_code(value);
+        if (!parsed) return null;
+        const month = String(parsed.m).padStart(2, '0');
+        const day = String(parsed.d).padStart(2, '0');
+        return `${parsed.y}-${month}-${day}`;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        const ddmmyyyy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (ddmmyyyy) {
+            const [, dd, mm, yyyy] = ddmmyyyy;
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (iso) return trimmed;
+
+        const parsedDate = new Date(trimmed);
+        if (!Number.isNaN(parsedDate.getTime())) {
+            return parsedDate.toISOString().slice(0, 10);
+        }
+    }
+
+    return null;
+}
+
+function getCategoryBySex(sex: AnimalSex): string {
+    return sex === 'Fêmea' ? 'Égua' : 'Garanhão';
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+}
+
+function mergeSeed(current: AnimalSeed | undefined, incoming: AnimalSeed): AnimalSeed {
+    if (!current) return incoming;
+    return {
+        registro: current.registro,
+        nome: incoming.nome || current.nome,
+        sexo: incoming.sexo || current.sexo,
+    };
+}
+
+function mergeLinkSeed(current: GenealogyLinkSeed | undefined, incoming: GenealogyLinkSeed): GenealogyLinkSeed {
+    if (!current) return incoming;
+    return {
+        registro: current.registro,
+        paiRegistro: current.paiRegistro || incoming.paiRegistro,
+        maeRegistro: current.maeRegistro || incoming.maeRegistro,
+        dataNascimento: current.dataNascimento ?? incoming.dataNascimento ?? null,
+        chip: current.chip ?? incoming.chip ?? null,
+        pelagem: current.pelagem ?? incoming.pelagem ?? null,
+    };
+}
+
+function normalizeRowKeys(row: SpreadsheetRow): Record<string, unknown> {
+    return Object.entries(row).reduce((acc, [key, value]) => {
+        acc[normalizeColumnName(key)] = value;
+        return acc;
+    }, {} as Record<string, unknown>);
+}
+
+function parseMainRow(normalized: Record<string, unknown>): NormalizedABCCMMRow | null {
+    const registro = normalizeRegistro(normalized.registro);
+    if (!registro) return null;
+
+    const nome = normalizeOfficialText(normalized.nomeanimal ?? normalized.nome) || registro;
+    const sexo = normalizeSex(normalized.sexo);
+    const dataNascimento = parseAbccmmDate(normalized.datanascto ?? normalized.datanascimento);
+    const chipRaw = normalizeSpaces(String(normalized.chip ?? '').trim());
+    const pelagemRaw = normalizeOfficialText(normalized.pelagem);
+
+    return {
+        registro,
+        nome,
+        sexo,
+        dataNascimento,
+        chip: chipRaw || null,
+        pelagem: pelagemRaw || null,
+        paiRegistro: normalizeRegistro(normalized.pairegistro) || null,
+        maeRegistro: normalizeRegistro(normalized.maeregistro) || null,
+    };
+}
+
+function inferSexByPath(path: string, fallback: AnimalSex): AnimalSex {
+    if (path.includes('mae')) return 'Fêmea';
+    if (path.includes('pai')) return 'Macho';
+    return fallback;
+}
+
+function extractRegistroPaths(normalized: Record<string, unknown>): Map<string, string> {
+    const paths = new Map<string, string>();
+    Object.keys(normalized)
+        .filter((column) => column.endsWith('registro'))
+        .forEach((registroColumn) => {
+            const registro = normalizeRegistro(normalized[registroColumn]);
+            if (!registro) return;
+            const path = registroColumn.slice(0, -'registro'.length);
+            paths.set(path, registro);
+        });
+
+    return paths;
+}
 
 function mapGenealogyNode(row: any): GenealogyNode {
     const images = Array.isArray(row.images) ? row.images : [];
@@ -648,6 +836,326 @@ export const animalsService = {
             name: item.nome,
             registry_number: item.registro,
         })) as unknown as Animal[];
+    },
+
+    /**
+     * Importa planilha ABCCMM (Excel/CSV) e reconstrói vínculos genealógicos por registro.
+     * Estratégia em dois passos:
+     * 1) salvar/atualizar animais citados (animal + ancestrais) para garantir UUIDs;
+     * 2) vinculação pai_id/mae_id dos animais principais.
+     */
+    async importABCCMMData(params: {
+        file: File;
+        harasId: string;
+        onProgress?: (progress: number, message: string) => void;
+    }): Promise<ABCCMMImportResult> {
+        const { file, harasId, onProgress } = params;
+        if (!harasId) {
+            throw new Error('Haras não identificado para importação.');
+        }
+
+        const reportProgress = (progress: number, message: string) => {
+            if (!onProgress) return;
+            const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+            onProgress(clamped, message);
+        };
+
+        reportProgress(10, 'Processando planilha...');
+
+        console.log('[animalsService.importABCCMMData] Starting import', {
+            fileName: file?.name,
+            fileSize: file?.size,
+            fileType: file?.type,
+            harasId,
+            xlsxReadAvailable: typeof XLSX.read === 'function',
+            xlsxSheetToJsonAvailable: typeof XLSX.utils?.sheet_to_json === 'function',
+        });
+
+        const warnings: string[] = [];
+        const errors: string[] = [];
+
+        let fileBuffer: ArrayBuffer;
+        let workbook: XLSX.WorkBook | null = null;
+        let firstSheetName: string | undefined;
+
+        try {
+            fileBuffer = await file.arrayBuffer();
+            workbook = XLSX.read(fileBuffer, { type: 'array', raw: false, cellDates: false });
+            firstSheetName = workbook.SheetNames[0];
+            console.log('[animalsService.importABCCMMData] Workbook parsed', {
+                bufferBytes: fileBuffer.byteLength,
+                sheetNames: workbook.SheetNames,
+                firstSheetName: firstSheetName ?? null,
+            });
+            reportProgress(20, 'Lendo linhas da planilha...');
+        } catch (parseError) {
+            console.error('[animalsService.importABCCMMData] Failed to parse workbook', parseError);
+            throw new Error('Erro ao ler arquivo Excel/CSV. Verifique se o arquivo está íntegro.');
+        }
+
+        if (!firstSheetName || !workbook) {
+            throw new Error('A planilha não contém abas válidas.');
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+        let rows: SpreadsheetRow[];
+        try {
+            rows = XLSX.utils.sheet_to_json<SpreadsheetRow>(worksheet, {
+                defval: '',
+                raw: false,
+                blankrows: false,
+            });
+        } catch (sheetError) {
+            console.error('[animalsService.importABCCMMData] Failed to convert sheet to json', sheetError);
+            throw new Error('Erro ao processar linhas da planilha.');
+        }
+
+        console.log('[animalsService.importABCCMMData] Rows extracted', {
+            totalRows: rows.length,
+        });
+        reportProgress(30, 'Preparando dados para importação...');
+
+        if (rows.length === 0) {
+            throw new Error('A planilha está vazia.');
+        }
+
+        const parsedRows: ParsedABCCMMRow[] = [];
+        const seedMap = new Map<string, AnimalSeed>();
+        const linkSeedMap = new Map<string, GenealogyLinkSeed>();
+
+        rows.forEach((rawRow, index) => {
+            const line = index + 2;
+            const normalized = normalizeRowKeys(rawRow);
+            const parsedMain = parseMainRow(normalized);
+
+            if (!parsedMain) {
+                warnings.push(`Linha ${line}: registro principal não informado, linha ignorada.`);
+                return;
+            }
+
+            parsedRows.push({ line, data: parsedMain });
+
+            const registroPaths = extractRegistroPaths(normalized);
+            registroPaths.forEach((registro, path) => {
+                const nome = normalizeOfficialText(
+                    normalized[`${path}nomeanimal`] ??
+                    normalized[`${path}nome`] ??
+                    (path === '' ? normalized.nomeanimal ?? normalized.nome : undefined)
+                ) || registro;
+                const sexo = normalizeSex(
+                    normalized[`${path}sexo`] ?? inferSexByPath(path, parsedMain.sexo)
+                );
+
+                seedMap.set(
+                    registro,
+                    mergeSeed(seedMap.get(registro), { registro, nome, sexo })
+                );
+
+                const paiRegistro = registroPaths.get(`${path}pai`) || null;
+                const maeRegistro = registroPaths.get(`${path}mae`) || null;
+                const isMainAnimal = path === '';
+
+                linkSeedMap.set(
+                    registro,
+                    mergeLinkSeed(linkSeedMap.get(registro), {
+                        registro,
+                        paiRegistro,
+                        maeRegistro,
+                        dataNascimento: isMainAnimal ? parsedMain.dataNascimento : null,
+                        chip: isMainAnimal ? parsedMain.chip : null,
+                        pelagem: isMainAnimal ? parsedMain.pelagem : null,
+                    })
+                );
+            });
+        });
+
+        if (parsedRows.length === 0 || seedMap.size === 0 || linkSeedMap.size === 0) {
+            throw new Error('Nenhum animal válido foi encontrado para importação.');
+        }
+
+        const allRegistros = Array.from(seedMap.keys());
+        const validRegistros = Array.from(new Set(allRegistros.filter(isValidRegistro)));
+        const existingByRegistro = new Map<string, string>();
+
+        reportProgress(35, 'Validando registros existentes...');
+        if (validRegistros.length > 0) {
+            const { data: existingRows, error: existingError } = await supabase
+                .from('animals')
+                .select('id, registro')
+                .eq('haras_id', harasId)
+                .in('registro', validRegistros);
+
+            if (existingError) handleSupabaseError(existingError);
+
+            (existingRows || []).forEach((item: { id: string; registro: string | null }) => {
+                if (item.registro && !existingByRegistro.has(item.registro)) {
+                    existingByRegistro.set(item.registro, item.id);
+                }
+            });
+        }
+
+        const toInsert: Array<{
+            haras_id: string;
+            nome: string;
+            registro: string;
+            sexo: AnimalSex;
+            categoria: string;
+            status: string;
+        }> = [];
+        const toUpdate: Array<{
+            id: string;
+            payload: {
+                nome: string;
+                registro: string;
+                sexo: AnimalSex;
+                categoria: string;
+                status: string;
+            };
+        }> = [];
+
+        Array.from(seedMap.values()).forEach((seed) => {
+            const payload = {
+                nome: seed.nome || seed.registro,
+                registro: seed.registro,
+                sexo: seed.sexo,
+                categoria: getCategoryBySex(seed.sexo),
+                status: 'Ativo',
+            };
+
+            const existingId = isValidRegistro(seed.registro) ? existingByRegistro.get(seed.registro) : undefined;
+
+            if (existingId) {
+                toUpdate.push({ id: existingId, payload });
+                return;
+            }
+
+            toInsert.push({
+                haras_id: harasId,
+                ...payload,
+            });
+        });
+
+        const idsByRegistro = new Map<string, string>(existingByRegistro);
+        let insertedCount = 0;
+        let updatedCount = 0;
+        const insertChunks = chunkArray(toInsert, ABCCMM_BATCH_SIZE);
+        if (insertChunks.length === 0) {
+            reportProgress(69, 'Salvando novos animais...');
+        }
+        for (let index = 0; index < insertChunks.length; index++) {
+            const chunk = insertChunks[index];
+            const { data, error } = await supabase
+                .from('animals')
+                .insert(chunk)
+                .select('id, registro');
+
+            if (error) handleSupabaseError(error);
+
+            insertedCount += chunk.length;
+            (data || []).forEach((item: { id: string; registro: string | null }) => {
+                if (item.registro) idsByRegistro.set(item.registro, item.id);
+            });
+            reportProgress(40 + ((index + 1) / insertChunks.length) * 29, 'Salvando novos animais...');
+        }
+
+        const updateChunks = chunkArray(toUpdate, ABCCMM_BATCH_SIZE);
+        if (updateChunks.length === 0) {
+            reportProgress(89, 'Atualizando dados existentes...');
+        }
+        for (let chunkIndex = 0; chunkIndex < updateChunks.length; chunkIndex++) {
+            const chunk = updateChunks[chunkIndex];
+            for (let itemIndex = 0; itemIndex < chunk.length; itemIndex++) {
+                const item = chunk[itemIndex];
+                const { error } = await supabase
+                    .from('animals')
+                    .update(item.payload)
+                    .eq('id', item.id)
+                    .eq('haras_id', harasId);
+
+                if (error) handleSupabaseError(error);
+                updatedCount += 1;
+                idsByRegistro.set(item.payload.registro, item.id);
+            }
+            reportProgress(70 + ((chunkIndex + 1) / updateChunks.length) * 19, 'Atualizando dados existentes...');
+        }
+
+        const linkUpdates = Array.from(linkSeedMap.values()).map((seed) => {
+            const baseSeed = seedMap.get(seed.registro);
+            const paiId = seed.paiRegistro ? idsByRegistro.get(seed.paiRegistro) ?? null : null;
+            const maeId = seed.maeRegistro ? idsByRegistro.get(seed.maeRegistro) ?? null : null;
+            const animalId = idsByRegistro.get(seed.registro);
+
+            if (!animalId) {
+                warnings.push(`Animal ${seed.registro} não localizado para atualização de genealogia.`);
+                return null;
+            }
+
+            if (seed.paiRegistro && !paiId) {
+                warnings.push(`Pai ${seed.paiRegistro} não localizado para vínculo de ${seed.registro}.`);
+            }
+            if (seed.maeRegistro && !maeId) {
+                warnings.push(`Mãe ${seed.maeRegistro} não localizada para vínculo de ${seed.registro}.`);
+            }
+
+            return {
+                id: animalId,
+                payload: {
+                    nome: baseSeed?.nome || seed.registro,
+                    sexo: baseSeed?.sexo || 'Macho',
+                    categoria: getCategoryBySex(baseSeed?.sexo || 'Macho'),
+                    status: 'Ativo',
+                    data_nascimento: seed.dataNascimento ?? null,
+                    chip: seed.chip ?? null,
+                    pelagem: seed.pelagem ?? null,
+                    pai_id: paiId,
+                    mae_id: maeId,
+                },
+            };
+        }).filter((item): item is {
+            id: string;
+            payload: {
+                nome: string;
+                sexo: AnimalSex;
+                categoria: string;
+                status: string;
+                data_nascimento: string | null;
+                chip: string | null;
+                pelagem: string | null;
+                pai_id: string | null;
+                mae_id: string | null;
+            };
+        } => Boolean(item));
+
+        const linkChunks = chunkArray(linkUpdates, ABCCMM_BATCH_SIZE);
+        if (linkChunks.length === 0) {
+            reportProgress(99, 'Construindo árvore genealógica...');
+        }
+        for (let chunkIndex = 0; chunkIndex < linkChunks.length; chunkIndex++) {
+            const chunk = linkChunks[chunkIndex];
+            for (let itemIndex = 0; itemIndex < chunk.length; itemIndex++) {
+                const item = chunk[itemIndex];
+                const { error } = await supabase
+                    .from('animals')
+                    .update(item.payload)
+                    .eq('id', item.id)
+                    .eq('haras_id', harasId);
+
+                if (error) handleSupabaseError(error);
+            }
+            reportProgress(90 + ((chunkIndex + 1) / linkChunks.length) * 9, 'Construindo árvore genealógica...');
+        }
+
+        const linkedAnimals = linkUpdates.filter((item) => Boolean(item.payload.pai_id || item.payload.mae_id)).length;
+        reportProgress(100, 'Importação concluída');
+
+        return {
+            newAnimals: insertedCount,
+            updatedAnimals: updatedCount,
+            linkedAnimals,
+            totalRows: parsedRows.length,
+            warnings,
+            errors,
+        };
     },
 
     /**

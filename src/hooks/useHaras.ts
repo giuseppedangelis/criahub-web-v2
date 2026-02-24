@@ -30,6 +30,8 @@ export function useCurrentHaras() {
         queryKey: [...harasKeys.current(), harasId],
         queryFn: () => (harasId ? harasService.getById(harasId) : null),
         enabled: !!harasId && isSessionReady,
+        staleTime: Infinity,
+        refetchOnWindowFocus: false,
     })
 }
 

@@ -21,9 +21,10 @@ interface Animal {
   importedFromABCCMM?: boolean;
 }
 
+type AdvisorHerdView = 'list' | 'import' | 'details';
+
 export function AdvisorHerdContent() {
-  const [showImportABCCMM, setShowImportABCCMM] = useState(false);
-  const [showAnimalDetails, setShowAnimalDetails] = useState(false);
+  const [activeView, setActiveView] = useState<AdvisorHerdView>('list');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -104,7 +105,7 @@ export function AdvisorHerdContent() {
 
   const handleViewAnimal = (animal: Animal) => {
     setSelectedAnimal(animal);
-    setShowAnimalDetails(true);
+    setActiveView('details');
   };
 
   const exportToExcel = () => {
@@ -113,10 +114,10 @@ export function AdvisorHerdContent() {
   };
 
   // Se está mostrando importação
-  if (showImportABCCMM) {
+  if (activeView === 'import') {
     return (
       <AdvisorImportABCCMM 
-        onBack={() => setShowImportABCCMM(false)}
+        onBack={() => setActiveView('list')}
         onImportComplete={(result) => {
           console.log('Import result:', result);
           toast.success(`Importação concluída: ${result.newAnimals} novos, ${result.updatedAnimals} atualizados`);
@@ -126,12 +127,12 @@ export function AdvisorHerdContent() {
   }
 
   // Se está mostrando detalhes
-  if (showAnimalDetails && selectedAnimal) {
+  if (activeView === 'details' && selectedAnimal) {
     return (
       <AdvisorAnimalDetails
         animal={selectedAnimal}
         onBack={() => {
-          setShowAnimalDetails(false);
+          setActiveView('list');
           setSelectedAnimal(null);
         }}
         onEdit={() => {
@@ -177,7 +178,7 @@ export function AdvisorHerdContent() {
               Exportar Excel
             </button>
             <button
-              onClick={() => setShowImportABCCMM(true)}
+              onClick={() => setActiveView('import')}
               className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl transition-colors flex items-center gap-2"
             >
               <Upload className="w-5 h-5" />

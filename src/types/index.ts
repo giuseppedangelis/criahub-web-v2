@@ -34,6 +34,15 @@ export type AnimalStatus =
     | 'emprestado'
     | 'em_servico';
 
+export interface ABCCMMImportResult {
+    newAnimals: number;
+    updatedAnimals: number;
+    linkedAnimals: number;
+    totalRows: number;
+    errors: string[];
+    warnings: string[];
+}
+
 export type ReproductiveEventType =
     | 'cobertura'
     | 'inseminacao'

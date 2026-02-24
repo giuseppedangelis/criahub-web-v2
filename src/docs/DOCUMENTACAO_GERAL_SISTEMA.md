@@ -2531,17 +2531,21 @@ shouldShowNotification(notification): boolean
     - Corrigir erros na planilha e reupar
     - Prosseguir ignorando erros
 13. Clica em "Importar"
-14. Sistema:
-    - Importa dados
-    - Cria animais no plantel
-    - Gera log detalhado
-    - Exibe resultado final:
+14. Sistema (importação oficial ABCCMM em dois passos):
+    - **Passo 1 (Criação):** extrai todos os registros citados na planilha (animal principal + ancestrais) e executa `upsert` por `registro` para garantir UUID para cada animal.
+    - **Passo 2 (Vinculação):** percorre novamente os animais principais e atualiza `pai_id`/`mae_id` usando os UUIDs obtidos via `registro` de pai e mãe.
+    - Normaliza campos oficiais antes de persistir:
+      - Nome em maiúsculo e sem espaços extras
+      - Sexo (`M` -> `Macho`, `F` -> `Fêmea`)
+      - Data de nascimento (`DD/MM/YYYY` -> `YYYY-MM-DD`)
+      - Campos adicionais (`chip`, `pelagem`)
+    - Define `status = Ativo` para todos os registros importados.
+    - Gera log detalhado e exibe resultado final:
       ```
-      ✅ 45 animais importados com sucesso
-      ⚠️ 3 animais já existentes (ignorados)
-      ❌ 2 animais com erro (não importados)
-      
-      [Download do log completo]
+      ✅ novos animais criados
+      🔄 animais existentes atualizados
+      🔗 vínculos genealógicos atualizados
+      ⚠️ avisos de inconsistência (quando houver)
       ```
 15. Notifica criador
 16. Fecha modal
