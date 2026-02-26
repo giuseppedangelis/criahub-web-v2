@@ -1,4 +1,4 @@
-import { ArrowLeft, Upload, X, Camera, FileText, Plus, Video, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, X, Camera, FileText, Plus, Video, Loader2, Lock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 
 interface Animal {
   id: string;
+  abccmm_rowid?: string | null;
   name: string;
   registry: string;
   registry_number?: string;
@@ -78,6 +79,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   const [isLoading, setIsLoading] = useState(false);
   const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
   const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
+  const isOfficialDataLocked = Boolean(animal.abccmm_rowid);
 
   // Initialize form data with actual animal data from the database
   const [formData, setFormData] = useState({
@@ -470,6 +472,9 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
 
   // Função para determinar se deve mostrar sub-opções de serviço
   const mostrarSubOpcoesServico = formData.localizacao === 'Serviço';
+  const lockedFieldClasses = isOfficialDataLocked
+    ? 'disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-zinc-200/60 dark:disabled:bg-zinc-800/60'
+    : '';
 
   return (
     <div className="space-y-6">
@@ -512,6 +517,17 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
       {/* Formulário */}
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
         <div className="space-y-8">
+          {isOfficialDataLocked && (
+            <div className="rounded-xl border border-amber-300/70 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Lock className="w-5 h-5 mt-0.5 text-amber-700 dark:text-amber-300 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+                  Os dados vitais deste animal foram importados do registro oficial da ABCCMM e nao podem ser alterados manualmente. Apenas informacoes de manejo e localizacao estao liberadas para edicao.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Informações Básicas */}
           <div>
             <h3 className="text-lg text-foreground dark:text-white mb-4">Informações Básicas</h3>
@@ -522,7 +538,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="text"
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                   placeholder="Ex: Relâmpago"
                 />
               </div>
@@ -533,7 +550,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="text"
                   value={formData.registro}
                   onChange={(e) => setFormData({ ...formData, registro: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                   placeholder="Ex: MM-2022-4321"
                 />
               </div>
@@ -544,7 +562,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="text"
                   value={formData.chip}
                   onChange={(e) => setFormData({ ...formData, chip: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                   placeholder="Ex: 1234567890"
                 />
               </div>
@@ -555,7 +574,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="text"
                   value={formData.marca}
                   onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                   placeholder="Ex: Marca XYZ"
                 />
               </div>
@@ -565,7 +585,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                 <NativeSelect
                   value={formData.categoria}
                   onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                  className="w-full"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full ${lockedFieldClasses}`}
                 >
                   <option value="">Selecione...</option>
                   <option value="egua">Égua</option>
@@ -581,7 +602,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                 <NativeSelect
                   value={formData.sexo}
                   onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
-                  className="w-full"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full ${lockedFieldClasses}`}
                 >
                   <option value="Macho">Macho</option>
                   <option value="Fêmea">Fêmea</option>
@@ -594,7 +616,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="date"
                   value={formData.dataNascimento}
                   onChange={(e) => setFormData({ ...formData, dataNascimento: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                 />
               </div>
 
@@ -620,7 +643,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                 <NativeSelect
                   value={formData.pelagem}
                   onChange={(e) => setFormData({ ...formData, pelagem: e.target.value })}
-                  className="w-full"
+                  disabled={isOfficialDataLocked}
+                  className={`w-full ${lockedFieldClasses}`}
                 >
                   <option value="">Selecione...</option>
                   <option value="Alazã">Alazã</option>

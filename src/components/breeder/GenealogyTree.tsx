@@ -1,12 +1,20 @@
-import { X, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, RefreshCw, User } from 'lucide-react';
 import { useState } from 'react';
 import type { GenealogyView } from '@/lib/genealogy';
 
 interface GenealogyTreeProps {
   genealogy: GenealogyView;
   onClose: () => void;
-  onViewAnimal?: (animalId: number) => void;
+  onViewAnimal?: (animalId: string) => void;
   isLoading?: boolean;
+}
+
+function isHistoricalNodeId(id?: string): boolean {
+  return Boolean(id && id.startsWith('historical:'));
+}
+
+function isNodeNavigable(id: string | undefined, isHistorical: boolean | undefined): id is string {
+  return Boolean(id && !isHistorical && !isHistoricalNodeId(id));
 }
 
 export function GenealogyTree({ genealogy, onClose, onViewAnimal, isLoading }: GenealogyTreeProps) {
@@ -99,6 +107,7 @@ export function GenealogyTree({ genealogy, onClose, onViewAnimal, isLoading }: G
                 image={root.imageUrl}
                 isMain={true}
                 isPlaceholder={root.isPlaceholder}
+                isHistorical={root.isHistorical}
               />
             </div>
 
@@ -108,17 +117,20 @@ export function GenealogyTree({ genealogy, onClose, onViewAnimal, isLoading }: G
             </div>
 
             {/* Nível 2 - Pais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              {parents.map((parent, index) => (
-                <GenealogyCard
-                  key={`parent-${index}`}
-                  name={parent.name}
-                  registry={parent.registry}
-                  image={parent.imageUrl}
-                  isPlaceholder={parent.isPlaceholder}
-                  onViewDetails={parent.id ? () => onViewAnimal?.(Number(parent.id)) : undefined}
-                />
-              ))}
+            <div className="flex justify-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-fit">
+                {parents.map((parent, index) => (
+                  <GenealogyCard
+                    key={`parent-${index}`}
+                    name={parent.name}
+                    registry={parent.registry}
+                    image={parent.imageUrl}
+                    isPlaceholder={parent.isPlaceholder}
+                    isHistorical={parent.isHistorical}
+                    onViewDetails={isNodeNavigable(parent.id, parent.isHistorical) ? () => onViewAnimal?.(parent.id!) : undefined}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Título Avós */}
@@ -127,18 +139,21 @@ export function GenealogyTree({ genealogy, onClose, onViewAnimal, isLoading }: G
             </div>
 
             {/* Nível 3 - Avós */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {grandparents.map((grandparent, index) => (
-                <GenealogyCard
-                  key={`grandparent-${index}`}
-                  name={grandparent.name}
-                  registry={grandparent.registry}
-                  image={grandparent.imageUrl}
-                  isSmall={true}
-                  isPlaceholder={grandparent.isPlaceholder}
-                  onViewDetails={grandparent.id ? () => onViewAnimal?.(Number(grandparent.id)) : undefined}
-                />
-              ))}
+            <div className="flex justify-center">
+              <div className="grid grid-cols-4 gap-5 w-fit">
+                {grandparents.map((grandparent, index) => (
+                  <GenealogyCard
+                    key={`grandparent-${index}`}
+                    name={grandparent.name}
+                    registry={grandparent.registry}
+                    image={grandparent.imageUrl}
+                    isSmall={true}
+                    isPlaceholder={grandparent.isPlaceholder}
+                    isHistorical={grandparent.isHistorical}
+                    onViewDetails={isNodeNavigable(grandparent.id, grandparent.isHistorical) ? () => onViewAnimal?.(grandparent.id!) : undefined}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Título Bisavós */}
@@ -147,18 +162,21 @@ export function GenealogyTree({ genealogy, onClose, onViewAnimal, isLoading }: G
             </div>
 
             {/* Nível 4 - Bisavós */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-              {greatGrandparents.map((greatGrandparent, index) => (
-                <GenealogyCard
-                  key={`great-grandparent-${index}`}
-                  name={greatGrandparent.name}
-                  registry={greatGrandparent.registry}
-                  image={greatGrandparent.imageUrl}
-                  isTiny={true}
-                  isPlaceholder={greatGrandparent.isPlaceholder}
-                  onViewDetails={greatGrandparent.id ? () => onViewAnimal?.(Number(greatGrandparent.id)) : undefined}
-                />
-              ))}
+            <div className="flex justify-center">
+              <div className="grid grid-cols-8 gap-4 w-fit">
+                {greatGrandparents.map((greatGrandparent, index) => (
+                  <GenealogyCard
+                    key={`great-grandparent-${index}`}
+                    name={greatGrandparent.name}
+                    registry={greatGrandparent.registry}
+                    image={greatGrandparent.imageUrl}
+                    isTiny={true}
+                    isPlaceholder={greatGrandparent.isPlaceholder}
+                    isHistorical={greatGrandparent.isHistorical}
+                    onViewDetails={isNodeNavigable(greatGrandparent.id, greatGrandparent.isHistorical) ? () => onViewAnimal?.(greatGrandparent.id!) : undefined}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -189,14 +207,16 @@ interface GenealogyCardProps {
   isSmall?: boolean;
   isTiny?: boolean;
   isPlaceholder?: boolean;
+  isHistorical?: boolean;
   onViewDetails?: () => void;
 }
 
-function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlaceholder, onViewDetails }: GenealogyCardProps) {
+function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlaceholder, isHistorical, onViewDetails }: GenealogyCardProps) {
+  const canOpenDetails = Boolean(onViewDetails) && !isHistorical;
   const cardClasses = isTiny
-    ? 'w-20 h-24'
+    ? 'w-28 h-36'
     : isSmall
-    ? 'w-32 h-40'
+    ? 'w-40 h-48'
     : isMain
     ? 'w-48 h-56'
     : 'w-40 h-48';
@@ -204,30 +224,45 @@ function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlace
   return (
     <div
       className={`${cardClasses} bg-card dark:bg-[#0d0d0d] rounded-xl border-2 ${
-        isMain ? 'border-primary dark:border-white' : 'border-border dark:border-[rgba(255,255,255,0.1)]'
-      } overflow-hidden flex flex-col hover:shadow-lg transition-shadow ${onViewDetails ? 'cursor-pointer' : ''} ${isPlaceholder ? 'opacity-70' : ''}`}
-      onClick={onViewDetails}
+        isMain
+          ? 'border-primary dark:border-white'
+          : isHistorical
+            ? 'border-dashed border-zinc-400 dark:border-zinc-500 bg-zinc-100/60 dark:bg-zinc-900/70'
+            : 'border-border dark:border-[rgba(255,255,255,0.1)]'
+      } overflow-hidden flex flex-col transition-shadow ${canOpenDetails ? 'cursor-pointer hover:shadow-lg' : ''} ${isPlaceholder ? 'opacity-70' : ''} ${isHistorical ? 'opacity-90' : ''}`}
+      onClick={canOpenDetails ? onViewDetails : undefined}
     >
-      <div className={`${isTiny ? 'h-12' : isSmall ? 'h-24' : isMain ? 'h-32' : 'h-28'} overflow-hidden flex-shrink-0`}>
-        <img
-          src={image}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      {isHistorical ? (
+        <div className={`${isTiny ? 'h-20' : isSmall ? 'h-28' : isMain ? 'h-32' : 'h-28'} flex-shrink-0 flex items-center justify-center bg-zinc-200/70 dark:bg-zinc-800/70`}>
+          <User className={`${isTiny ? 'w-7 h-7' : isSmall ? 'w-8 h-8' : 'w-6 h-6'} text-zinc-500 dark:text-zinc-400`} />
+        </div>
+      ) : (
+        <div className={`${isTiny ? 'h-20' : isSmall ? 'h-28' : isMain ? 'h-32' : 'h-28'} overflow-hidden flex-shrink-0`}>
+          <img
+            src={image}
+            alt={name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
       <div className="p-2 flex-1 flex flex-col justify-center">
-        <p className={`${isTiny ? 'text-xs' : 'text-sm'} text-foreground dark:text-white truncate`}>
+        <p className={`${isTiny || isSmall ? 'text-sm' : 'text-sm'} text-foreground dark:text-white truncate`}>
           {name}
         </p>
         <p className="text-xs text-muted-foreground dark:text-[#99a1af] truncate">
           {registry}
         </p>
-        {onViewDetails && !isTiny && (
+        {isHistorical && !isTiny && (
+          <span className="mt-1 inline-flex items-center rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200/70 dark:bg-zinc-800/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+            Registro historico
+          </span>
+        )}
+        {canOpenDetails && !isTiny && (
           <button
             className="mt-2 text-xs text-primary dark:text-white hover:underline"
             onClick={(e) => {
               e.stopPropagation();
-              onViewDetails();
+              onViewDetails?.();
             }}
           >
             Ver Detalhes

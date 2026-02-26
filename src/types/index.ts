@@ -176,6 +176,7 @@ export interface HarasMember {
 
 export interface Animal {
     id: string;
+    abccmm_rowid?: string | null;
     haras_id: string;
     name: string;
     registry_number: string | null;
@@ -224,6 +225,7 @@ export interface AnimalVideo {
 
 export interface GenealogyNode {
     id: string;
+    abccmm_rowid?: string | null;
     name: string;
     registry_number: string | null;
     main_image_url: string | null;
@@ -231,6 +233,8 @@ export interface GenealogyNode {
     mother_id: string | null;
     father_name?: string | null;
     mother_name?: string | null;
+    dados_genealogicos?: unknown;
+    is_historical?: boolean;
 }
 
 export interface AnimalGenealogy {

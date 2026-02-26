@@ -1,4 +1,4 @@
-import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle, Clock, Stethoscope, Syringe, Heart } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle, Clock, Stethoscope, Syringe, Heart, User } from 'lucide-react';
 import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from './GenealogyTree';
@@ -285,8 +285,15 @@ interface BreederAnimalDetailsProps {
   animal: Animal;
   onBack: () => void;
   onEdit: () => void;
-  onViewAnimal?: (animalId: number) => void;
+  onViewAnimal?: (animalId: string) => void;
   initialTab?: string; // Aba inicial a ser exibida
+}
+
+interface HistoricalNodeData {
+  id?: string;
+  name: string;
+  registry: string;
+  rowId: string | null;
 }
 
 export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, initialTab = 'overview' }: BreederAnimalDetailsProps) {
@@ -302,6 +309,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{ name: string; type: string; size: string; date: string } | null>(null);
+  const [selectedHistoricalNode, setSelectedHistoricalNode] = useState<HistoricalNodeData | null>(null);
   const [selectedFilters, setSelectedFilters] = useState({
     filhos: true,
     pais: true,
@@ -417,12 +425,25 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   const currentAnimalId = String(fullAnimal.id || animal.id);
   const resolvedLocationType = normalizeLocationType(fullAnimal.localizacao);
   const resolvedServiceType = normalizeServiceType(fullAnimal.servicoTipo);
+  const isHistoricalNodeId = (id?: string) => Boolean(id && id.startsWith('historical:'));
+  const extractHistoricalRowId = (id?: string) => {
+    if (!id || !isHistoricalNodeId(id)) return null;
+    return id.slice('historical:'.length);
+  };
   const genealogyView = buildGenealogyView(genealogyData, {
     id: fullAnimal.id || animal.id,
     name: fullAnimal.name,
     registry: fullAnimal.registry,
     imageUrl: fullAnimal.image || (fullAnimal.images && fullAnimal.images[0]) || null,
   });
+  const handleHistoricalNodeOpen = (node: { id?: string; name: string; registry: string }) => {
+    setSelectedHistoricalNode({
+      id: node.id,
+      name: node.name,
+      registry: node.registry,
+      rowId: extractHistoricalRowId(node.id),
+    });
+  };
 
   const formatEventDate = (value?: string | null) => {
     if (!value) return '-';
@@ -1472,11 +1493,14 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   {/* Nível 1 - Animal Principal */}
                   <div className="flex justify-center">
                     <GenealogyCard
+                      id={genealogyView.root.id}
                       name={genealogyView.root.name}
                       registry={genealogyView.root.registry}
                       image={genealogyView.root.imageUrl}
                       isMain={true}
                       isPlaceholder={genealogyView.root.isPlaceholder}
+                      isHistorical={genealogyView.root.isHistorical}
+                      onOpenHistoricalDetails={handleHistoricalNodeOpen}
                     />
                   </div>
 
@@ -1490,11 +1514,14 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                         {genealogyView.parents.map((parent, index) => (
                           <GenealogyCard
                             key={`parent-${index}`}
+                            id={parent.id}
                             name={parent.name}
                             registry={parent.registry}
                             image={parent.imageUrl}
                             isPlaceholder={parent.isPlaceholder}
-                            onViewDetails={parent.id ? () => onViewAnimal?.(Number(parent.id)) : undefined}
+                            isHistorical={parent.isHistorical}
+                            onViewDetails={parent.id && !isHistoricalNodeId(parent.id) ? () => onViewAnimal?.(String(parent.id)) : undefined}
+                            onOpenHistoricalDetails={handleHistoricalNodeOpen}
                           />
                         ))}
                       </div>
@@ -1511,12 +1538,15 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                         {genealogyView.grandparents.map((grandparent, index) => (
                           <GenealogyCard
                             key={`grandparent-${index}`}
+                            id={grandparent.id}
                             name={grandparent.name}
                             registry={grandparent.registry}
                             image={grandparent.imageUrl}
                             isSmall={true}
                             isPlaceholder={grandparent.isPlaceholder}
-                            onViewDetails={grandparent.id ? () => onViewAnimal?.(Number(grandparent.id)) : undefined}
+                            isHistorical={grandparent.isHistorical}
+                            onViewDetails={grandparent.id && !isHistoricalNodeId(grandparent.id) ? () => onViewAnimal?.(String(grandparent.id)) : undefined}
+                            onOpenHistoricalDetails={handleHistoricalNodeOpen}
                           />
                         ))}
                       </div>
@@ -1533,12 +1563,15 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                         {genealogyView.greatGrandparents.map((greatGrandparent, index) => (
                           <GenealogyCard
                             key={`great-grandparent-${index}`}
+                            id={greatGrandparent.id}
                             name={greatGrandparent.name}
                             registry={greatGrandparent.registry}
                             image={greatGrandparent.imageUrl}
                             isTiny={true}
                             isPlaceholder={greatGrandparent.isPlaceholder}
-                            onViewDetails={greatGrandparent.id ? () => onViewAnimal?.(Number(greatGrandparent.id)) : undefined}
+                            isHistorical={greatGrandparent.isHistorical}
+                            onViewDetails={greatGrandparent.id && !isHistoricalNodeId(greatGrandparent.id) ? () => onViewAnimal?.(String(greatGrandparent.id)) : undefined}
+                            onOpenHistoricalDetails={handleHistoricalNodeOpen}
                           />
                         ))}
                       </div>
@@ -1608,7 +1641,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     <div
                       key={child.id}
                       className="bg-muted dark:bg-[#0d0d0d] rounded-xl p-4 border border-border dark:border-[rgba(255,255,255,0.1)] hover:border-primary dark:hover:border-white transition-colors cursor-pointer"
-                      onClick={() => onViewAnimal?.(Number(child.id))}
+                      onClick={() => onViewAnimal?.(String(child.id))}
                     >
                       <div className="flex items-center gap-4">
                         <img
@@ -2134,6 +2167,13 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
           isLoading={isLoadingGenealogy}
           onClose={() => setShowFullGenealogyTree(false)}
           onViewAnimal={onViewAnimal}
+        />
+      )}
+
+      {selectedHistoricalNode && (
+        <HistoricalNodeModal
+          node={selectedHistoricalNode}
+          onClose={() => setSelectedHistoricalNode(null)}
         />
       )}
 
@@ -2904,6 +2944,7 @@ function LocationBadge({ localizacao, servicoTipo }: { localizacao?: string; ser
 
 // Componente de Card para Genealogia
 interface GenealogyCardProps {
+  id?: string;
   name: string;
   registry: string;
   image: string;
@@ -2911,18 +2952,43 @@ interface GenealogyCardProps {
   isSmall?: boolean;
   isTiny?: boolean;
   isPlaceholder?: boolean;
+  isHistorical?: boolean;
   onViewDetails?: () => void;
+  onOpenHistoricalDetails?: (node: { id?: string; name: string; registry: string }) => void;
 }
 
-function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlaceholder, onViewDetails }: GenealogyCardProps) {
+function GenealogyCard({ id, name, registry, image, isMain, isSmall, isTiny, isPlaceholder, isHistorical, onViewDetails, onOpenHistoricalDetails }: GenealogyCardProps) {
+  const isHistoricalNode = Boolean(isHistorical || (id && id.startsWith('historical:')));
+  const canNavigate = Boolean(id && !isHistoricalNode && onViewDetails);
+  const canOpenHistoricalModal = isHistoricalNode && Boolean(onOpenHistoricalDetails);
+
+  const handleCardClick = () => {
+    if (canNavigate) {
+      onViewDetails?.();
+      return;
+    }
+    if (canOpenHistoricalModal) {
+      onOpenHistoricalDetails?.({ id, name, registry });
+    }
+  };
+
   if (isTiny) {
     return (
-      <div className={`text-center ${isPlaceholder ? 'opacity-70' : ''}`}>
-        <img
-          src={image}
-          alt={name}
-          className="w-12 h-12 rounded-full mx-auto mb-1 object-cover"
-        />
+      <div
+        className={`text-center ${isPlaceholder ? 'opacity-70' : ''} ${canNavigate || canOpenHistoricalModal ? 'cursor-pointer' : ''}`}
+        onClick={canNavigate || canOpenHistoricalModal ? handleCardClick : undefined}
+      >
+        {isHistoricalNode ? (
+          <div className="w-12 h-12 rounded-full mx-auto mb-1 border border-dashed border-zinc-400 dark:border-zinc-600 bg-zinc-200/70 dark:bg-zinc-800/70 flex items-center justify-center">
+            <User className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+          </div>
+        ) : (
+          <img
+            src={image}
+            alt={name}
+            className="w-12 h-12 rounded-full mx-auto mb-1 object-cover"
+          />
+        )}
         <p className="text-xs text-foreground dark:text-white truncate">{name}</p>
         <p className="text-[10px] text-muted-foreground dark:text-[#99a1af] truncate">{registry}</p>
       </div>
@@ -2930,23 +2996,95 @@ function GenealogyCard({ name, registry, image, isMain, isSmall, isTiny, isPlace
   }
 
   return (
-    <div className={`bg-muted dark:bg-[#0d0d0d] rounded-xl overflow-hidden border border-border dark:border-[rgba(255,255,255,0.1)] ${isMain ? 'ring-2 ring-primary dark:ring-white' : ''} ${isPlaceholder ? 'opacity-70' : ''}`}>
-      <img
-        src={image}
-        alt={name}
-        className={`w-full object-cover ${isSmall ? 'h-24' : 'h-32'}`}
-      />
+    <div
+      className={`${isHistoricalNode ? 'bg-zinc-100/70 dark:bg-zinc-900/70 border-zinc-400 dark:border-zinc-600 border-dashed' : 'bg-muted dark:bg-[#0d0d0d] border-border dark:border-[rgba(255,255,255,0.1)]'} rounded-xl overflow-hidden border ${isMain ? 'ring-2 ring-primary dark:ring-white' : ''} ${isPlaceholder ? 'opacity-70' : ''} ${canNavigate || canOpenHistoricalModal ? 'cursor-pointer transition-colors hover:bg-accent/50 dark:hover:bg-zinc-800/70' : ''}`}
+      onClick={canNavigate || canOpenHistoricalModal ? handleCardClick : undefined}
+    >
+      {isHistoricalNode ? (
+        <div className={`w-full ${isSmall ? 'h-24' : 'h-32'} bg-zinc-200/80 dark:bg-zinc-800/80 flex items-center justify-center`}>
+          <User className="w-8 h-8 text-zinc-500 dark:text-zinc-400" />
+        </div>
+      ) : (
+        <img
+          src={image}
+          alt={name}
+          className={`w-full object-cover ${isSmall ? 'h-24' : 'h-32'}`}
+        />
+      )}
       <div className={`p-3 ${isSmall ? 'p-2' : ''}`}>
+        <div className="mb-2 flex flex-wrap gap-1">
+          {isHistoricalNode ? (
+            <span className="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200/70 dark:bg-zinc-800/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+              Registro Historico
+            </span>
+          ) : (
+            <>
+              <span className="inline-flex items-center rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300">
+                Plantel
+              </span>
+              <span className="inline-flex items-center rounded border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-300 opacity-60">
+                Condominio
+              </span>
+            </>
+          )}
+        </div>
         <p className={`font-medium text-foreground dark:text-white truncate ${isSmall ? 'text-sm' : ''}`}>{name}</p>
         <p className={`text-muted-foreground dark:text-[#99a1af] truncate ${isSmall ? 'text-xs' : 'text-sm'}`}>{registry}</p>
-        {onViewDetails && !isSmall && (
+        {canNavigate && !isSmall && (
           <button
-            onClick={onViewDetails}
+            onClick={(event) => {
+              event.stopPropagation();
+              onViewDetails?.();
+            }}
             className="mt-2 text-xs text-primary dark:text-white hover:underline"
           >
             Ver Detalhes
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function HistoricalNodeModal({ node, onClose }: { node: HistoricalNodeData; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] bg-card dark:bg-[#1a1a1a] p-5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h4 className="text-lg text-foreground dark:text-white">Registro Historico</h4>
+            <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Dados de ancestral sem ficha ativa</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground dark:text-[#99a1af] hover:text-foreground dark:hover:text-white"
+            aria-label="Fechar modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <InfoRow label="Nome" value={node.name || '-'} />
+          <InfoRow label="Registro" value={node.registry || '-'} />
+          <InfoRow label="RowID" value={node.rowId || '-'} />
+        </div>
+
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground dark:text-[#99a1af]">
+          Este e um registro historico extraido da genealogia da ABCCMM. Este animal nao possui ficha ativa no seu sistema.
+        </p>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
       </div>
     </div>
   );

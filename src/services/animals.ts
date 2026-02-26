@@ -78,7 +78,7 @@ const REVERSE_STATUS_MAPPING: Record<string, string> = Object.entries(STATUS_MAP
 }, {} as Record<string, string>);
 
 const GENEALOGY_SELECT_FIELDS = `
-    id, nome, registro, foto_url, images, pai_id, mae_id, father_name, mother_name
+    id, abccmm_rowid, nome, registro, foto_url, images, pai_id, mae_id, father_name, mother_name, dados_genealogicos
 `;
 
 const ABCCMM_BATCH_SIZE = 400;
@@ -86,14 +86,51 @@ const ABCCMM_BATCH_SIZE = 400;
 type SpreadsheetRow = Record<string, unknown>;
 
 interface NormalizedABCCMMRow {
-    registro: string;
+    rowid: string;
     nome: string;
     sexo: AnimalSex;
     dataNascimento: string | null;
-    chip: string | null;
+    registro: string;
     pelagem: string | null;
+    chip: string | null;
+    criador: string | null;
+    proprietario: string | null;
+    paiRowId: string | null;
+    maeRowId: string | null;
+    paiNome: string | null;
     paiRegistro: string | null;
+    maeNome: string | null;
     maeRegistro: string | null;
+    dadosGenealogicos: ExtendedGenealogyData | null;
+}
+
+interface AncestralNode {
+    rowid: string | null;
+    nome: string | null;
+    registro: string | null;
+}
+
+interface ExtendedGenealogyData {
+    pais: {
+        paterno_pai: AncestralNode | null;
+        materno_mae: AncestralNode | null;
+    };
+    avos: {
+        paterno_pai: AncestralNode | null;
+        paterno_mae: AncestralNode | null;
+        materno_pai: AncestralNode | null;
+        materno_mae: AncestralNode | null;
+    };
+    bisavos: {
+        paipai_pai: AncestralNode | null;
+        paipai_mae: AncestralNode | null;
+        maepai_pai: AncestralNode | null;
+        maepai_mae: AncestralNode | null;
+        paimae_pai: AncestralNode | null;
+        paimae_mae: AncestralNode | null;
+        maemae_pai: AncestralNode | null;
+        maemae_mae: AncestralNode | null;
+    };
 }
 
 interface ParsedABCCMMRow {
@@ -102,18 +139,27 @@ interface ParsedABCCMMRow {
 }
 
 interface AnimalSeed {
+    rowid: string;
     registro: string;
     nome: string;
     sexo: AnimalSex;
 }
 
 interface GenealogyLinkSeed {
+    rowid: string;
     registro: string;
+    paiRowId: string | null;
+    maeRowId: string | null;
+    paiNome: string | null;
+    maeNome: string | null;
     paiRegistro: string | null;
     maeRegistro: string | null;
     dataNascimento?: string | null;
     chip?: string | null;
     pelagem?: string | null;
+    criador?: string | null;
+    proprietario?: string | null;
+    dadosGenealogicos?: ExtendedGenealogyData | null;
 }
 
 function normalizeSpaces(value: string): string {
@@ -125,6 +171,12 @@ function normalizeOfficialText(value: unknown): string {
     const decoded = decode(decode(String(value)));
     const normalized = normalizeSpaces(decoded);
     return normalized ? normalized.toUpperCase() : '';
+}
+
+function normalizeEntityName(value: unknown): string | null {
+    const decoded = decode(String(value ?? ''));
+    const normalized = normalizeSpaces(decoded).toUpperCase();
+    return normalized || null;
 }
 
 function normalizeRegistro(value: unknown): string {
@@ -146,8 +198,79 @@ function normalizeColumnName(value: string): string {
 }
 
 function normalizeSex(value: unknown): AnimalSex {
-    const raw = typeof value === 'string' ? value.trim().toUpperCase() : '';
-    return raw === 'F' ? 'Fêmea' : 'Macho';
+    const raw = normalizeSpaces(String(value ?? '')).toUpperCase();
+    if (raw.startsWith('F')) return 'Fêmea';
+    if (raw.startsWith('M')) return 'Macho';
+    return 'Macho';
+}
+
+function normalizeChip(value: unknown): string | null {
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) return null;
+        return Math.trunc(value).toLocaleString('fullwide', { useGrouping: false });
+    }
+
+    const raw = normalizeSpaces(String(value ?? '').trim());
+    if (!raw) return null;
+
+    if (/[eE]\+/.test(raw)) {
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return null;
+        return numeric.toLocaleString('fullwide', { useGrouping: false });
+    }
+
+    return raw;
+}
+
+function extractAncestorNode(normalized: Record<string, unknown>, baseColumn: string): AncestralNode | null {
+    const rowid = normalizeSpaces(String(normalized[baseColumn] ?? '').trim()) || null;
+    const nome = normalizeEntityName(normalized[`${baseColumn}nome`]);
+    const registro = normalizeRegistro(normalized[`${baseColumn}registro`]) || null;
+
+    if (!rowid && !nome && !registro) return null;
+
+    return {
+        rowid,
+        nome,
+        registro,
+    };
+}
+
+function buildExtendedGenealogyData(normalized: Record<string, unknown>): ExtendedGenealogyData | null {
+    const pais = {
+        paterno_pai: extractAncestorNode(normalized, 'pai'),
+        materno_mae: extractAncestorNode(normalized, 'mae'),
+    };
+
+    const avos = {
+        paterno_pai: extractAncestorNode(normalized, 'paipai'),
+        paterno_mae: extractAncestorNode(normalized, 'maepai'),
+        materno_pai: extractAncestorNode(normalized, 'paimae'),
+        materno_mae: extractAncestorNode(normalized, 'maemae'),
+    };
+
+    const bisavos = {
+        paipai_pai: extractAncestorNode(normalized, 'paipaipai'),
+        paipai_mae: extractAncestorNode(normalized, 'maepaipai'),
+        maepai_pai: extractAncestorNode(normalized, 'paimaepai'),
+        maepai_mae: extractAncestorNode(normalized, 'maemaepai'),
+        paimae_pai: extractAncestorNode(normalized, 'paipaimae'),
+        paimae_mae: extractAncestorNode(normalized, 'maepaimae'),
+        maemae_pai: extractAncestorNode(normalized, 'paimaemae'),
+        maemae_mae: extractAncestorNode(normalized, 'maemaemae'),
+    };
+
+    const hasAnyPais = Object.values(pais).some(Boolean);
+    const hasAnyAvos = Object.values(avos).some(Boolean);
+    const hasAnyBisavos = Object.values(bisavos).some(Boolean);
+
+    if (!hasAnyPais && !hasAnyAvos && !hasAnyBisavos) return null;
+
+    return {
+        pais,
+        avos,
+        bisavos,
+    };
 }
 
 function parseAbccmmDate(value: unknown): string | null {
@@ -198,6 +321,7 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 function mergeSeed(current: AnimalSeed | undefined, incoming: AnimalSeed): AnimalSeed {
     if (!current) return incoming;
     return {
+        rowid: current.rowid,
         registro: current.registro,
         nome: incoming.nome || current.nome,
         sexo: incoming.sexo || current.sexo,
@@ -207,12 +331,20 @@ function mergeSeed(current: AnimalSeed | undefined, incoming: AnimalSeed): Anima
 function mergeLinkSeed(current: GenealogyLinkSeed | undefined, incoming: GenealogyLinkSeed): GenealogyLinkSeed {
     if (!current) return incoming;
     return {
+        rowid: current.rowid,
         registro: current.registro,
+        paiRowId: current.paiRowId || incoming.paiRowId,
+        maeRowId: current.maeRowId || incoming.maeRowId,
+        paiNome: current.paiNome || incoming.paiNome,
+        maeNome: current.maeNome || incoming.maeNome,
         paiRegistro: current.paiRegistro || incoming.paiRegistro,
         maeRegistro: current.maeRegistro || incoming.maeRegistro,
         dataNascimento: current.dataNascimento ?? incoming.dataNascimento ?? null,
         chip: current.chip ?? incoming.chip ?? null,
         pelagem: current.pelagem ?? incoming.pelagem ?? null,
+        criador: current.criador ?? incoming.criador ?? null,
+        proprietario: current.proprietario ?? incoming.proprietario ?? null,
+        dadosGenealogicos: current.dadosGenealogicos ?? incoming.dadosGenealogicos ?? null,
     };
 }
 
@@ -224,45 +356,40 @@ function normalizeRowKeys(row: SpreadsheetRow): Record<string, unknown> {
 }
 
 function parseMainRow(normalized: Record<string, unknown>): NormalizedABCCMMRow | null {
-    const registro = normalizeRegistro(normalized.registro);
-    if (!registro) return null;
+    const rowid = normalizeSpaces(String(normalized.rowid ?? normalized._rowid ?? '').trim());
+    if (!rowid) return null;
 
-    const nome = normalizeOfficialText(normalized.nomeanimal ?? normalized.nome) || registro;
+    const registro = normalizeRegistro(normalized.registro);
+    const nomeDecoded = decode(String(normalized.nomeanimal ?? normalized.nome ?? ''));
+    const nome = normalizeSpaces(nomeDecoded).toUpperCase() || registro || rowid;
     const sexo = normalizeSex(normalized.sexo);
     const dataNascimento = parseAbccmmDate(normalized.datanascto ?? normalized.datanascimento);
-    const chipRaw = normalizeSpaces(String(normalized.chip ?? '').trim());
+    const chipRaw = normalizeChip(normalized.chip);
     const pelagemRaw = normalizeOfficialText(normalized.pelagem);
+    const criador = normalizeOfficialText(normalized.criador ?? normalized._criador) || null;
+    const proprietario = normalizeOfficialText(normalized.proprietario ?? normalized._proprietario) || null;
+    const paiNomeDecoded = decode(String(normalized.painome ?? ''));
+    const maeNomeDecoded = decode(String(normalized.maenome ?? ''));
+    const dadosGenealogicos = buildExtendedGenealogyData(normalized);
 
     return {
+        rowid,
         registro,
         nome,
         sexo,
         dataNascimento,
-        chip: chipRaw || null,
+        chip: chipRaw,
         pelagem: pelagemRaw || null,
+        criador,
+        proprietario,
+        paiRowId: normalizeSpaces(String(normalized.pai ?? normalized._pai ?? '').trim()) || null,
+        maeRowId: normalizeSpaces(String(normalized.mae ?? normalized._mae ?? '').trim()) || null,
+        paiNome: normalizeSpaces(paiNomeDecoded).toUpperCase() || null,
         paiRegistro: normalizeRegistro(normalized.pairegistro) || null,
+        maeNome: normalizeSpaces(maeNomeDecoded).toUpperCase() || null,
         maeRegistro: normalizeRegistro(normalized.maeregistro) || null,
+        dadosGenealogicos,
     };
-}
-
-function inferSexByPath(path: string, fallback: AnimalSex): AnimalSex {
-    if (path.includes('mae')) return 'Fêmea';
-    if (path.includes('pai')) return 'Macho';
-    return fallback;
-}
-
-function extractRegistroPaths(normalized: Record<string, unknown>): Map<string, string> {
-    const paths = new Map<string, string>();
-    Object.keys(normalized)
-        .filter((column) => column.endsWith('registro'))
-        .forEach((registroColumn) => {
-            const registro = normalizeRegistro(normalized[registroColumn]);
-            if (!registro) return;
-            const path = registroColumn.slice(0, -'registro'.length);
-            paths.set(path, registro);
-        });
-
-    return paths;
 }
 
 function mapGenealogyNode(row: any): GenealogyNode {
@@ -271,31 +398,109 @@ function mapGenealogyNode(row: any): GenealogyNode {
 
     return {
         id: row.id,
+        abccmm_rowid: row.abccmm_rowid ?? null,
         name: row.nome,
         registry_number: row.registro ?? null,
         main_image_url: mainImage,
         father_id: row.pai_id ?? null,
         mother_id: row.mae_id ?? null,
         father_name: row.father_name ?? null,
-        mother_name: row.mother_name ?? null
+        mother_name: row.mother_name ?? null,
+        dados_genealogicos: row.dados_genealogicos ?? null,
+        is_historical: false,
     };
 }
 
-async function fetchGenealogyNodesByIds(ids: string[]): Promise<GenealogyNode[]> {
-    if (!ids.length) return [];
-
-    const { data, error } = await supabase
-        .from('animals')
-        .select(GENEALOGY_SELECT_FIELDS)
-        .in('id', ids);
-
-    if (error) handleSupabaseError(error);
-
-    return (data || []).map(mapGenealogyNode);
+interface GenealogyJsonData {
+    pais?: {
+        paterno_pai?: AncestralNode | null;
+        materno_mae?: AncestralNode | null;
+    };
+    avos?: {
+        paterno_pai?: AncestralNode | null;
+        paterno_mae?: AncestralNode | null;
+        materno_pai?: AncestralNode | null;
+        materno_mae?: AncestralNode | null;
+    };
+    bisavos?: {
+        paipai_pai?: AncestralNode | null;
+        paipai_mae?: AncestralNode | null;
+        maepai_pai?: AncestralNode | null;
+        maepai_mae?: AncestralNode | null;
+        paimae_pai?: AncestralNode | null;
+        paimae_mae?: AncestralNode | null;
+        maemae_pai?: AncestralNode | null;
+        maemae_mae?: AncestralNode | null;
+    };
 }
 
-function getUniqueIds(ids: Array<string | null | undefined>): string[] {
-    return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+interface GenealogySlotConfig {
+    ancestor: AncestralNode | null | undefined;
+    fatherSlot?: string;
+    motherSlot?: string;
+    fallbackName: string;
+}
+
+function parseGenealogyJson(data: unknown): GenealogyJsonData | null {
+    if (!data || typeof data !== 'object') return null;
+    return data as GenealogyJsonData;
+}
+
+function normalizeAncestorNode(entry: AncestralNode | null | undefined): AncestralNode | null {
+    if (!entry) return null;
+    const rowid = normalizeSpaces(String(entry.rowid ?? '').trim()) || null;
+    const nome = normalizeEntityName(entry.nome);
+    const registro = normalizeRegistro(entry.registro) || null;
+    if (!rowid && !nome && !registro) return null;
+    return { rowid, nome, registro };
+}
+
+function collectGenealogyRowIds(genealogy: GenealogyJsonData | null): string[] {
+    if (!genealogy) return [];
+
+    const buckets: Array<Record<string, AncestralNode | null | undefined> | undefined> = [
+        genealogy.pais,
+        genealogy.avos,
+        genealogy.bisavos,
+    ];
+
+    return Array.from(
+        new Set(
+            buckets
+                .flatMap((bucket) => Object.values(bucket || {}))
+                .map((entry) => normalizeAncestorNode(entry)?.rowid)
+                .filter((rowid): rowid is string => Boolean(rowid))
+        )
+    );
+}
+
+function buildHistoricalNodeId(slotKey: string, rowid: string | null): string {
+    if (rowid) return `historical:${rowid}`;
+    return `historical:${slotKey}`;
+}
+
+function createHistoricalGenealogyNode(params: {
+    id: string;
+    ancestor: AncestralNode;
+    fatherId: string | null;
+    motherId: string | null;
+    fatherName: string | null;
+    motherName: string | null;
+    fallbackName: string;
+}): GenealogyNode {
+    return {
+        id: params.id,
+        abccmm_rowid: params.ancestor.rowid ?? null,
+        name: params.ancestor.nome || params.fallbackName,
+        registry_number: params.ancestor.registro ?? null,
+        main_image_url: null,
+        father_id: params.fatherId,
+        mother_id: params.motherId,
+        father_name: params.fatherName,
+        mother_name: params.motherName,
+        dados_genealogicos: null,
+        is_historical: true,
+    };
 }
 
 export const animalsService = {
@@ -313,7 +518,7 @@ export const animalsService = {
         let query = supabase
             .from('animals')
             .select(`
-                id, haras_id, nome, registro, chip, marca,
+                id, abccmm_rowid, haras_id, nome, registro, chip, marca,
                 sexo, categoria, data_nascimento, pelagem, andamento,
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
@@ -350,6 +555,7 @@ export const animalsService = {
 
         const mappedData = (data || []).map((item: any) => ({
             ...item,
+            abccmm_rowid: item.abccmm_rowid,
             // Mapear para os nomes que o frontend espera
             name: item.nome,
             registry_number: item.registro,
@@ -584,20 +790,166 @@ export const animalsService = {
             [root.id]: root,
         };
 
-        let currentIds = getUniqueIds([root.father_id, root.mother_id]);
+        const genealogyJson = parseGenealogyJson(root.dados_genealogicos);
+        const rowIds = collectGenealogyRowIds(genealogyJson);
 
-        for (let level = 0; level < 3 && currentIds.length > 0; level++) {
-            const fetched = await fetchGenealogyNodesByIds(currentIds);
-            fetched.forEach((node) => {
-                nodes[node.id] = node;
+        const realAncestorsByRowId = new Map<string, GenealogyNode>();
+        if (rowIds.length > 0) {
+            const { data: realAncestors, error: realAncestorsError } = await supabase
+                .from('animals')
+                .select(GENEALOGY_SELECT_FIELDS)
+                .in('abccmm_rowid', rowIds);
+
+            if (realAncestorsError) handleSupabaseError(realAncestorsError);
+
+            (realAncestors || []).forEach((item) => {
+                const mapped = mapGenealogyNode(item);
+                const rowid = mapped.abccmm_rowid;
+                if (rowid) {
+                    realAncestorsByRowId.set(rowid, mapped);
+                }
             });
-
-            currentIds = getUniqueIds(
-                fetched.flatMap((node) => [node.father_id, node.mother_id])
-            );
         }
 
-        return { root, nodes };
+        const slots: Record<string, GenealogySlotConfig> = {
+            parent_father: {
+                ancestor: normalizeAncestorNode(genealogyJson?.pais?.paterno_pai),
+                fatherSlot: 'grandparent_paternal_father',
+                motherSlot: 'grandparent_paternal_mother',
+                fallbackName: root.father_name || 'Pai nao registrado',
+            },
+            parent_mother: {
+                ancestor: normalizeAncestorNode(genealogyJson?.pais?.materno_mae),
+                fatherSlot: 'grandparent_maternal_father',
+                motherSlot: 'grandparent_maternal_mother',
+                fallbackName: root.mother_name || 'Mae nao registrada',
+            },
+            grandparent_paternal_father: {
+                ancestor: normalizeAncestorNode(genealogyJson?.avos?.paterno_pai),
+                fatherSlot: 'great_grandparent_paipai_pai',
+                motherSlot: 'great_grandparent_paipai_mae',
+                fallbackName: 'Avo (paterno) nao registrado',
+            },
+            grandparent_paternal_mother: {
+                ancestor: normalizeAncestorNode(genealogyJson?.avos?.paterno_mae),
+                fatherSlot: 'great_grandparent_maepai_pai',
+                motherSlot: 'great_grandparent_maepai_mae',
+                fallbackName: 'Avo (paterna) nao registrada',
+            },
+            grandparent_maternal_father: {
+                ancestor: normalizeAncestorNode(genealogyJson?.avos?.materno_pai),
+                fatherSlot: 'great_grandparent_paimae_pai',
+                motherSlot: 'great_grandparent_paimae_mae',
+                fallbackName: 'Avo (materno) nao registrado',
+            },
+            grandparent_maternal_mother: {
+                ancestor: normalizeAncestorNode(genealogyJson?.avos?.materno_mae),
+                fatherSlot: 'great_grandparent_maemae_pai',
+                motherSlot: 'great_grandparent_maemae_mae',
+                fallbackName: 'Avo (materna) nao registrada',
+            },
+            great_grandparent_paipai_pai: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.paipai_pai),
+                fallbackName: 'Bisavo nao registrado',
+            },
+            great_grandparent_paipai_mae: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.paipai_mae),
+                fallbackName: 'Bisava nao registrada',
+            },
+            great_grandparent_maepai_pai: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.maepai_pai),
+                fallbackName: 'Bisavo nao registrado',
+            },
+            great_grandparent_maepai_mae: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.maepai_mae),
+                fallbackName: 'Bisava nao registrada',
+            },
+            great_grandparent_paimae_pai: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.paimae_pai),
+                fallbackName: 'Bisavo nao registrado',
+            },
+            great_grandparent_paimae_mae: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.paimae_mae),
+                fallbackName: 'Bisava nao registrada',
+            },
+            great_grandparent_maemae_pai: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.maemae_pai),
+                fallbackName: 'Bisavo nao registrado',
+            },
+            great_grandparent_maemae_mae: {
+                ancestor: normalizeAncestorNode(genealogyJson?.bisavos?.maemae_mae),
+                fallbackName: 'Bisava nao registrada',
+            },
+        };
+
+        const resolvedBySlot = new Map<string, string | null>();
+
+        const resolveSlot = (slotKey: string | undefined): string | null => {
+            if (!slotKey) return null;
+            if (resolvedBySlot.has(slotKey)) {
+                return resolvedBySlot.get(slotKey) ?? null;
+            }
+
+            const slot = slots[slotKey];
+            if (!slot || !slot.ancestor) {
+                resolvedBySlot.set(slotKey, null);
+                return null;
+            }
+
+            const fatherId = resolveSlot(slot.fatherSlot);
+            const motherId = resolveSlot(slot.motherSlot);
+
+            const realNode = slot.ancestor.rowid ? realAncestorsByRowId.get(slot.ancestor.rowid) : undefined;
+            const fatherName = fatherId ? nodes[fatherId]?.name || null : null;
+            const motherName = motherId ? nodes[motherId]?.name || null : null;
+
+            if (realNode) {
+                const mergedNode: GenealogyNode = {
+                    ...realNode,
+                    name: realNode.name || slot.ancestor.nome || slot.fallbackName,
+                    registry_number: realNode.registry_number ?? slot.ancestor.registro ?? null,
+                    father_id: fatherId ?? realNode.father_id ?? null,
+                    mother_id: motherId ?? realNode.mother_id ?? null,
+                    father_name: fatherName ?? realNode.father_name ?? null,
+                    mother_name: motherName ?? realNode.mother_name ?? null,
+                    is_historical: false,
+                };
+
+                nodes[mergedNode.id] = mergedNode;
+                resolvedBySlot.set(slotKey, mergedNode.id);
+                return mergedNode.id;
+            }
+
+            const historicalNodeId = buildHistoricalNodeId(slotKey, slot.ancestor.rowid ?? null);
+            if (!nodes[historicalNodeId]) {
+                nodes[historicalNodeId] = createHistoricalGenealogyNode({
+                    id: historicalNodeId,
+                    ancestor: slot.ancestor,
+                    fatherId,
+                    motherId,
+                    fatherName,
+                    motherName,
+                    fallbackName: slot.fallbackName,
+                });
+            }
+
+            resolvedBySlot.set(slotKey, historicalNodeId);
+            return historicalNodeId;
+        };
+
+        const rootFatherId = resolveSlot('parent_father');
+        const rootMotherId = resolveSlot('parent_mother');
+
+        nodes[root.id] = {
+            ...root,
+            father_id: rootFatherId ?? root.father_id ?? null,
+            mother_id: rootMotherId ?? root.mother_id ?? null,
+            father_name: rootFatherId ? nodes[rootFatherId]?.name || root.father_name || null : root.father_name || null,
+            mother_name: rootMotherId ? nodes[rootMotherId]?.name || root.mother_name || null : root.mother_name || null,
+            is_historical: false,
+        };
+
+        return { root: nodes[root.id], nodes };
     },
 
     /**
@@ -839,10 +1191,7 @@ export const animalsService = {
     },
 
     /**
-     * Importa planilha ABCCMM (Excel/CSV) e reconstrói vínculos genealógicos por registro.
-     * Estratégia em dois passos:
-     * 1) salvar/atualizar animais citados (animal + ancestrais) para garantir UUIDs;
-     * 2) vinculação pai_id/mae_id dos animais principais.
+     * Importa planilha ABCCMM (Excel/CSV) no modelo 1 linha = 1 animal.
      */
     async importABCCMMData(params: {
         file: File;
@@ -880,7 +1229,7 @@ export const animalsService = {
 
         try {
             fileBuffer = await file.arrayBuffer();
-            workbook = XLSX.read(fileBuffer, { type: 'array', raw: false, cellDates: false });
+            workbook = XLSX.read(fileBuffer, { type: 'array', raw: true, cellDates: false });
             firstSheetName = workbook.SheetNames[0];
             console.log('[animalsService.importABCCMMData] Workbook parsed', {
                 bufferBytes: fileBuffer.byteLength,
@@ -902,7 +1251,7 @@ export const animalsService = {
         try {
             rows = XLSX.utils.sheet_to_json<SpreadsheetRow>(worksheet, {
                 defval: '',
-                raw: false,
+                raw: true,
                 blankrows: false,
             });
         } catch (sheetError) {
@@ -929,55 +1278,78 @@ export const animalsService = {
             const parsedMain = parseMainRow(normalized);
 
             if (!parsedMain) {
-                warnings.push(`Linha ${line}: registro principal não informado, linha ignorada.`);
+                warnings.push(`Linha ${line}: _rowid não informado, linha ignorada.`);
                 return;
             }
 
             parsedRows.push({ line, data: parsedMain });
 
-            const registroPaths = extractRegistroPaths(normalized);
-            registroPaths.forEach((registro, path) => {
-                const nome = normalizeOfficialText(
-                    normalized[`${path}nomeanimal`] ??
-                    normalized[`${path}nome`] ??
-                    (path === '' ? normalized.nomeanimal ?? normalized.nome : undefined)
-                ) || registro;
-                const sexo = normalizeSex(
-                    normalized[`${path}sexo`] ?? inferSexByPath(path, parsedMain.sexo)
-                );
+            seedMap.set(
+                parsedMain.rowid,
+                mergeSeed(seedMap.get(parsedMain.rowid), {
+                    rowid: parsedMain.rowid,
+                    registro: parsedMain.registro,
+                    nome: parsedMain.nome,
+                    sexo: parsedMain.sexo,
+                })
+            );
 
-                seedMap.set(
-                    registro,
-                    mergeSeed(seedMap.get(registro), { registro, nome, sexo })
-                );
-
-                const paiRegistro = registroPaths.get(`${path}pai`) || null;
-                const maeRegistro = registroPaths.get(`${path}mae`) || null;
-                const isMainAnimal = path === '';
-
-                linkSeedMap.set(
-                    registro,
-                    mergeLinkSeed(linkSeedMap.get(registro), {
-                        registro,
-                        paiRegistro,
-                        maeRegistro,
-                        dataNascimento: isMainAnimal ? parsedMain.dataNascimento : null,
-                        chip: isMainAnimal ? parsedMain.chip : null,
-                        pelagem: isMainAnimal ? parsedMain.pelagem : null,
-                    })
-                );
-            });
+            linkSeedMap.set(
+                parsedMain.rowid,
+                mergeLinkSeed(linkSeedMap.get(parsedMain.rowid), {
+                    rowid: parsedMain.rowid,
+                    registro: parsedMain.registro,
+                    paiRowId: parsedMain.paiRowId,
+                    maeRowId: parsedMain.maeRowId,
+                    paiNome: parsedMain.paiNome,
+                    maeNome: parsedMain.maeNome,
+                    paiRegistro: parsedMain.paiRegistro,
+                    maeRegistro: parsedMain.maeRegistro,
+                    dataNascimento: parsedMain.dataNascimento,
+                    chip: parsedMain.chip,
+                    pelagem: parsedMain.pelagem,
+                    criador: parsedMain.criador,
+                    proprietario: parsedMain.proprietario,
+                    dadosGenealogicos: parsedMain.dadosGenealogicos,
+                })
+            );
         });
 
         if (parsedRows.length === 0 || seedMap.size === 0 || linkSeedMap.size === 0) {
             throw new Error('Nenhum animal válido foi encontrado para importação.');
         }
 
-        const allRegistros = Array.from(seedMap.keys());
+        const allRowIds = Array.from(seedMap.keys());
+        const allParentRowIds = Array.from(linkSeedMap.values()).flatMap((seed) => [seed.paiRowId, seed.maeRowId]);
+        const validRowIds = Array.from(new Set([...allRowIds, ...allParentRowIds].filter((value): value is string => Boolean(value))));
+
+        const allRegistros = Array.from(linkSeedMap.values()).flatMap((seed) => [seed.registro, seed.paiRegistro, seed.maeRegistro]);
         const validRegistros = Array.from(new Set(allRegistros.filter(isValidRegistro)));
+
+        const existingByRowId = new Map<string, string>();
         const existingByRegistro = new Map<string, string>();
 
         reportProgress(35, 'Validando registros existentes...');
+        if (validRowIds.length > 0) {
+            const rowIdChunks = chunkArray(validRowIds, ABCCMM_BATCH_SIZE);
+            for (let index = 0; index < rowIdChunks.length; index++) {
+                const chunk = rowIdChunks[index];
+                const { data: existingRowsByRowId, error: existingByRowIdError } = await (supabase as any)
+                    .from('animals')
+                    .select('id, abccmm_rowid')
+                    .eq('haras_id', harasId)
+                    .in('abccmm_rowid', chunk);
+
+                if (existingByRowIdError) handleSupabaseError(existingByRowIdError);
+
+                (existingRowsByRowId || []).forEach((item: { id: string; abccmm_rowid: string | null }) => {
+                    if (item.abccmm_rowid && !existingByRowId.has(item.abccmm_rowid)) {
+                        existingByRowId.set(item.abccmm_rowid, item.id);
+                    }
+                });
+            }
+        }
+
         if (validRegistros.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
                 .from('animals')
@@ -996,33 +1368,61 @@ export const animalsService = {
 
         const toInsert: Array<{
             haras_id: string;
+            abccmm_rowid: string;
             nome: string;
             registro: string;
             sexo: AnimalSex;
             categoria: string;
             status: string;
+            data_nascimento: string | null;
+            chip: string | null;
+            pelagem: string | null;
+            criador: string | null;
+            proprietario: string | null;
+            father_name: string | null;
+            mother_name: string | null;
+            dados_genealogicos: ExtendedGenealogyData | null;
         }> = [];
         const toUpdate: Array<{
             id: string;
             payload: {
+                abccmm_rowid: string;
                 nome: string;
                 registro: string;
                 sexo: AnimalSex;
                 categoria: string;
                 status: string;
+                data_nascimento: string | null;
+                chip: string | null;
+                pelagem: string | null;
+                criador: string | null;
+                proprietario: string | null;
+                father_name: string | null;
+                mother_name: string | null;
+                dados_genealogicos: ExtendedGenealogyData | null;
             };
         }> = [];
 
         Array.from(seedMap.values()).forEach((seed) => {
+            const details = linkSeedMap.get(seed.rowid);
             const payload = {
+                abccmm_rowid: seed.rowid,
                 nome: seed.nome || seed.registro,
                 registro: seed.registro,
                 sexo: seed.sexo,
                 categoria: getCategoryBySex(seed.sexo),
                 status: 'Ativo',
+                data_nascimento: details?.dataNascimento ?? null,
+                chip: details?.chip ?? null,
+                pelagem: details?.pelagem ?? null,
+                criador: details?.criador ?? null,
+                proprietario: details?.proprietario ?? null,
+                father_name: details?.paiNome ?? null,
+                mother_name: details?.maeNome ?? null,
+                dados_genealogicos: details?.dadosGenealogicos ?? null,
             };
 
-            const existingId = isValidRegistro(seed.registro) ? existingByRegistro.get(seed.registro) : undefined;
+            const existingId = existingByRowId.get(seed.rowid);
 
             if (existingId) {
                 toUpdate.push({ id: existingId, payload });
@@ -1035,6 +1435,7 @@ export const animalsService = {
             });
         });
 
+        const idsByRowId = new Map<string, string>(existingByRowId);
         const idsByRegistro = new Map<string, string>(existingByRegistro);
         let insertedCount = 0;
         let updatedCount = 0;
@@ -1044,15 +1445,16 @@ export const animalsService = {
         }
         for (let index = 0; index < insertChunks.length; index++) {
             const chunk = insertChunks[index];
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from('animals')
                 .insert(chunk)
-                .select('id, registro');
+                .select('id, registro, abccmm_rowid');
 
             if (error) handleSupabaseError(error);
 
             insertedCount += chunk.length;
-            (data || []).forEach((item: { id: string; registro: string | null }) => {
+            (data || []).forEach((item: { id: string; registro: string | null; abccmm_rowid: string | null }) => {
+                if (item.abccmm_rowid) idsByRowId.set(item.abccmm_rowid, item.id);
                 if (item.registro) idsByRegistro.set(item.registro, item.id);
             });
             reportProgress(40 + ((index + 1) / insertChunks.length) * 29, 'Salvando novos animais...');
@@ -1074,57 +1476,47 @@ export const animalsService = {
 
                 if (error) handleSupabaseError(error);
                 updatedCount += 1;
+                idsByRowId.set(item.payload.abccmm_rowid, item.id);
                 idsByRegistro.set(item.payload.registro, item.id);
             }
             reportProgress(70 + ((chunkIndex + 1) / updateChunks.length) * 19, 'Atualizando dados existentes...');
         }
 
         const linkUpdates = Array.from(linkSeedMap.values()).map((seed) => {
-            const baseSeed = seedMap.get(seed.registro);
-            const paiId = seed.paiRegistro ? idsByRegistro.get(seed.paiRegistro) ?? null : null;
-            const maeId = seed.maeRegistro ? idsByRegistro.get(seed.maeRegistro) ?? null : null;
-            const animalId = idsByRegistro.get(seed.registro);
+            const paiId =
+                (seed.paiRowId ? idsByRowId.get(seed.paiRowId) ?? null : null) ||
+                (seed.paiRegistro ? idsByRegistro.get(seed.paiRegistro) ?? null : null);
+            const maeId =
+                (seed.maeRowId ? idsByRowId.get(seed.maeRowId) ?? null : null) ||
+                (seed.maeRegistro ? idsByRegistro.get(seed.maeRegistro) ?? null : null);
+            const animalId = idsByRowId.get(seed.rowid);
 
             if (!animalId) {
-                warnings.push(`Animal ${seed.registro} não localizado para atualização de genealogia.`);
+                warnings.push(`Animal rowid ${seed.rowid} não localizado para atualização de genealogia.`);
                 return null;
             }
 
-            if (seed.paiRegistro && !paiId) {
-                warnings.push(`Pai ${seed.paiRegistro} não localizado para vínculo de ${seed.registro}.`);
+            if ((seed.paiRowId || seed.paiRegistro) && !paiId) {
+                warnings.push(`Pai (${seed.paiRowId ?? seed.paiRegistro}) não localizado para vínculo de ${seed.registro || seed.rowid}.`);
             }
-            if (seed.maeRegistro && !maeId) {
-                warnings.push(`Mãe ${seed.maeRegistro} não localizada para vínculo de ${seed.registro}.`);
+            if ((seed.maeRowId || seed.maeRegistro) && !maeId) {
+                warnings.push(`Mãe (${seed.maeRowId ?? seed.maeRegistro}) não localizada para vínculo de ${seed.registro || seed.rowid}.`);
             }
+
+            const payload: any = {};
+            if (paiId) payload.pai_id = paiId;
+            if (maeId) payload.mae_id = maeId;
+            payload.father_name = seed.paiNome ?? null;
+            payload.mother_name = seed.maeNome ?? null;
 
             return {
                 id: animalId,
-                payload: {
-                    nome: baseSeed?.nome || seed.registro,
-                    sexo: baseSeed?.sexo || 'Macho',
-                    categoria: getCategoryBySex(baseSeed?.sexo || 'Macho'),
-                    status: 'Ativo',
-                    data_nascimento: seed.dataNascimento ?? null,
-                    chip: seed.chip ?? null,
-                    pelagem: seed.pelagem ?? null,
-                    pai_id: paiId,
-                    mae_id: maeId,
-                },
+                payload,
             };
         }).filter((item): item is {
             id: string;
-            payload: {
-                nome: string;
-                sexo: AnimalSex;
-                categoria: string;
-                status: string;
-                data_nascimento: string | null;
-                chip: string | null;
-                pelagem: string | null;
-                pai_id: string | null;
-                mae_id: string | null;
-            };
-        } => Boolean(item));
+            payload: Record<string, unknown>;
+        } => item !== null && Object.keys(item.payload).length > 0);
 
         const linkChunks = chunkArray(linkUpdates, ABCCMM_BATCH_SIZE);
         if (linkChunks.length === 0) {

@@ -1,12 +1,6 @@
-import { X } from 'lucide-react';
+import { User, X } from 'lucide-react';
 import { useAnimalGenealogy } from '@/hooks/useAnimals';
 import { buildGenealogyView } from '@/lib/genealogy';
-
-interface GenealogyAnimal {
-  id: number;
-  name: string;
-  registry: string;
-}
 
 interface QuickGenealogyModalProps {
   animal: {
@@ -15,7 +9,15 @@ interface QuickGenealogyModalProps {
     registry: string;
   };
   onClose: () => void;
-  onViewAnimal?: (animalId: number) => void;
+  onViewAnimal?: (animalId: string) => void;
+}
+
+function isHistoricalNodeId(id?: string): boolean {
+  return Boolean(id && id.startsWith('historical:'));
+}
+
+function isNodeNavigable(id: string | undefined, isHistorical: boolean | undefined): id is string {
+  return Boolean(id && !isHistorical && !isHistoricalNodeId(id));
 }
 
 export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGenealogyModalProps) {
@@ -38,8 +40,10 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
   ]);
   const hasParentsData = genealogyView.parents.some((parent) => !missingLabels.has(parent.name));
   const hasGrandparentsData = grandparents.some((grandparent) => !missingLabels.has(grandparent.name));
+  const fatherCanOpenDetails = isNodeNavigable(father?.id, father?.isHistorical);
+  const motherCanOpenDetails = isNodeNavigable(mother?.id, mother?.isHistorical);
 
-  const handleAnimalClick = (animalId: number) => {
+  const handleAnimalClick = (animalId: string) => {
     if (onViewAnimal) {
       onViewAnimal(animalId);
       onClose();
@@ -92,10 +96,15 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
                 {/* Pai */}
                 {father && !missingLabels.has(father.name) ? (
                   <div 
-                    className={`bg-gray-500 dark:bg-gray-600 text-white px-4 py-3 rounded-lg ${father.id ? 'cursor-pointer hover:opacity-90' : 'opacity-80'} transition-opacity`}
-                    onClick={() => father.id && handleAnimalClick(Number(father.id))}
+                    className={`${father.isHistorical ? 'bg-zinc-100 dark:bg-zinc-900 border border-dashed border-zinc-400 dark:border-zinc-500 text-zinc-800 dark:text-zinc-100' : 'bg-gray-500 dark:bg-gray-600 text-white'} px-4 py-3 rounded-lg ${fatherCanOpenDetails ? 'cursor-pointer hover:opacity-90' : 'opacity-90'} transition-opacity`}
+                    onClick={fatherCanOpenDetails ? () => handleAnimalClick(father.id!) : undefined}
                   >
                     <div className="text-xs opacity-90 mb-1">Pai</div>
+                    {father.isHistorical && (
+                      <div className="mb-2 inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                        <User className="w-3 h-3" /> Registro historico
+                      </div>
+                    )}
                     <div className="font-medium">{father.name}</div>
                     <div className="text-xs opacity-75 mt-1">{father.registry}</div>
                   </div>
@@ -109,10 +118,15 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
                 {/* Mãe */}
                 {mother && !missingLabels.has(mother.name) ? (
                   <div 
-                    className={`bg-pink-500 dark:bg-pink-600 text-white px-4 py-3 rounded-lg ${mother.id ? 'cursor-pointer hover:opacity-90' : 'opacity-80'} transition-opacity`}
-                    onClick={() => mother.id && handleAnimalClick(Number(mother.id))}
+                    className={`${mother.isHistorical ? 'bg-zinc-100 dark:bg-zinc-900 border border-dashed border-zinc-400 dark:border-zinc-500 text-zinc-800 dark:text-zinc-100' : 'bg-pink-500 dark:bg-pink-600 text-white'} px-4 py-3 rounded-lg ${motherCanOpenDetails ? 'cursor-pointer hover:opacity-90' : 'opacity-90'} transition-opacity`}
+                    onClick={motherCanOpenDetails ? () => handleAnimalClick(mother.id!) : undefined}
                   >
                     <p className="text-xs opacity-80 mb-1">Mãe</p>
+                    {mother.isHistorical && (
+                      <div className="mb-2 inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                        <User className="w-3 h-3" /> Registro historico
+                      </div>
+                    )}
                     <p className="font-medium text-sm">{mother.name}</p>
                     <p className="text-xs opacity-90">{mother.registry}</p>
                   </div>
@@ -130,19 +144,27 @@ export function QuickGenealogyModal({ animal, onClose, onViewAnimal }: QuickGene
               <div>
                 <h4 className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 text-center">Avós</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  {grandparents.map((avo, index) => (
-                    <div
-                      key={`${avo.id || 'avo'}-${index}`}
-                      className={`bg-muted dark:bg-[#0d0d0d] px-3 py-2 rounded-lg ${avo.id ? 'cursor-pointer hover:bg-accent dark:hover:bg-[#2a2a2a]' : 'opacity-80'} transition-colors border border-border dark:border-[#3a3a3a]`}
-                      onClick={() => avo.id && handleAnimalClick(Number(avo.id))}
-                    >
-                      <p className="text-xs text-muted-foreground dark:text-[#6b6b6b] mb-1">
-                        {index < 2 ? 'Avô' : 'Avó'} {index % 2 === 0 ? 'Paterno' : 'Materno'}
-                      </p>
-                      <p className="text-sm text-foreground dark:text-white font-medium">{avo.name}</p>
-                      <p className="text-xs text-muted-foreground dark:text-[#99a1af]">{avo.registry}</p>
-                    </div>
-                  ))}
+                  {grandparents.map((avo, index) => {
+                    const grandparentCanOpenDetails = isNodeNavigable(avo.id, avo.isHistorical);
+                    return (
+                        <div
+                          key={`${avo.id || 'avo'}-${index}`}
+                          className={`${avo.isHistorical ? 'bg-zinc-100 dark:bg-zinc-900 border-dashed border-zinc-400 dark:border-zinc-500' : 'bg-muted dark:bg-[#0d0d0d] border-border dark:border-[#3a3a3a]'} px-3 py-2 rounded-lg ${grandparentCanOpenDetails ? 'cursor-pointer hover:bg-accent dark:hover:bg-[#2a2a2a]' : 'opacity-90'} transition-colors border`}
+                          onClick={grandparentCanOpenDetails ? () => handleAnimalClick(avo.id!) : undefined}
+                        >
+                          <p className="text-xs text-muted-foreground dark:text-[#6b6b6b] mb-1">
+                            {index < 2 ? 'Avô' : 'Avó'} {index % 2 === 0 ? 'Paterno' : 'Materno'}
+                          </p>
+                          {avo.isHistorical && (
+                            <div className="mb-1 inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+                              <User className="w-3 h-3" /> Registro historico
+                            </div>
+                          )}
+                          <p className="text-sm text-foreground dark:text-white font-medium">{avo.name}</p>
+                          <p className="text-xs text-muted-foreground dark:text-[#99a1af]">{avo.registry}</p>
+                        </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

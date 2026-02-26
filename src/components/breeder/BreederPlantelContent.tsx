@@ -53,6 +53,7 @@ function calculateAge(birthDate?: string): string {
 // Interface local para a UI (compatível com AnimalCard)
 interface PlantelAnimal {
   id: string | number;
+  abccmm_rowid?: string | null;
   haras_id?: string;
   name: string;
   registry: string;
@@ -142,6 +143,7 @@ export function BreederPlantelContent() {
 
       return {
         id: animal.id, // Agora string, AnimalCard atualizado aceita string | number
+        abccmm_rowid: animal.abccmm_rowid || null,
         haras_id: animal.haras_id,
         name: animal.name,
         registry: animal.registry_number || '-',
