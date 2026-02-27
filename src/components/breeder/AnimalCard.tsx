@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, MapPin, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, User } from 'lucide-react';
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 
@@ -26,6 +26,7 @@ interface Animal {
   servicoTipo?: string;
   filhos?: number;
   premiacoes?: number;
+  proprietario?: string | null;
   image: string;
   images: string[];
   imageCaptions?: string[];
@@ -47,6 +48,9 @@ export function AnimalCard({
   onViewVideo,
 }: AnimalCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const isCondominio =
+    animal.proprietario?.toUpperCase().includes('CONDOMINIO') ||
+    animal.proprietario?.toUpperCase().includes('CONDOMÍNIO');
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,6 +104,14 @@ export function AnimalCard({
           <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/70 backdrop-blur-sm rounded-lg">
             <span className="text-xs text-white font-medium">
               {currentImageIndex + 1} / {animal.images.length}
+            </span>
+          </div>
+        )}
+
+        {isCondominio && (
+          <div className="absolute left-3 top-12">
+            <span className="inline-flex items-center rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+              Condomínio
             </span>
           </div>
         )}
@@ -186,6 +198,13 @@ export function AnimalCard({
         {animal.birthDate && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
             Nascimento: {formatBirthDate(animal.birthDate)}
+          </p>
+        )}
+
+        {animal.proprietario && (
+          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1 flex items-center gap-1 min-w-0">
+            <User className="w-3 h-3 flex-shrink-0" />
+            <span className="inline-block align-bottom truncate max-w-[160px]">Proprietário: {animal.proprietario}</span>
           </p>
         )}
 

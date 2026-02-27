@@ -279,6 +279,8 @@ interface Animal {
   videos?: Video[]; // FASE 30: Galeria de vídeos
   documents?: string[]; // URLs dos documentos
   gait?: string; // Tipo de andamento
+  criador?: string | null;
+  proprietario?: string | null;
 }
 
 interface BreederAnimalDetailsProps {
@@ -1184,8 +1186,10 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     <div className="space-y-4">
                       {fullAnimal.chip && <InfoRow label="Chip RFID" value={fullAnimal.chip} />}
                       {fullAnimal.marca && <InfoRow label="Marca/Ferro" value={fullAnimal.marca} />}
-                      <InfoRow label="Haras Atual" value={fullAnimal.haras || '-'} />
+                      <InfoRow label="Haras Atual" value={typeof fullAnimal.haras === 'string' ? fullAnimal.haras : fullAnimal.haras?.name || '-'} />
                       {fullAnimal.harasOrigem && <InfoRow label="Haras de Origem" value={fullAnimal.harasOrigem} />}
+                      <InfoRow label="Criador" value={fullAnimal.criador || '-'} />
+                      <InfoRow label="Proprietário" value={fullAnimal.proprietario || '-'} />
                       {fullAnimal.filhos !== undefined && fullAnimal.filhos >= 0 && (
                         <InfoRow label="Filhos Registrados" value={String(fullAnimal.filhos)} />
                       )}
@@ -2910,9 +2914,14 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
 // Componente auxiliar para exibir informações em linha
 function InfoRow({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
-    <div className="flex justify-between items-center py-1">
-      <span className="text-sm text-muted-foreground dark:text-[#99a1af]">{label}</span>
-      <span className={`text-sm font-medium text-foreground dark:text-white ${valueClassName || ''}`}>{value}</span>
+    <div className="flex justify-between items-center py-1 gap-4 min-w-0 w-full">
+      <span className="text-sm text-muted-foreground dark:text-[#99a1af] flex-shrink-0 whitespace-nowrap">{label}</span>
+      <span
+        className={`text-sm font-medium text-foreground dark:text-white flex-1 truncate text-right ${valueClassName || ''}`}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -3012,22 +3021,13 @@ function GenealogyCard({ id, name, registry, image, isMain, isSmall, isTiny, isP
         />
       )}
       <div className={`p-3 ${isSmall ? 'p-2' : ''}`}>
-        <div className="mb-2 flex flex-wrap gap-1">
-          {isHistoricalNode ? (
+        {isHistoricalNode && (
+          <div className="mb-2 flex flex-wrap gap-1">
             <span className="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-600 bg-zinc-200/70 dark:bg-zinc-800/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
               Registro Historico
             </span>
-          ) : (
-            <>
-              <span className="inline-flex items-center rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300">
-                Plantel
-              </span>
-              <span className="inline-flex items-center rounded border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-300 opacity-60">
-                Condominio
-              </span>
-            </>
-          )}
-        </div>
+          </div>
+        )}
         <p className={`font-medium text-foreground dark:text-white truncate ${isSmall ? 'text-sm' : ''}`}>{name}</p>
         <p className={`text-muted-foreground dark:text-[#99a1af] truncate ${isSmall ? 'text-xs' : 'text-sm'}`}>{registry}</p>
         {canNavigate && !isSmall && (

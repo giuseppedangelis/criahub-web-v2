@@ -14,7 +14,7 @@ interface BreederCadastrarAnimalProps {
 
 export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) {
   // Tipos de Entrada
-  type EntryType = 'nascimento' | 'compra' | 'hospedagem' | 'genealogia';
+  type EntryType = 'nascimento' | 'avulso' | 'terceiro';
   const [entryType, setEntryType] = useState<EntryType>('nascimento');
 
   const [formData, setFormData] = useState<{
@@ -36,6 +36,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     pai_id: string;
     mae: string;
     mae_id: string;
+    registroFuturoABCCMM: 'sim' | 'nao';
     observacoes: string;
   }>({
     nome: '',
@@ -56,6 +57,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     pai_id: '',
     mae: '',
     mae_id: '',
+    registroFuturoABCCMM: 'sim',
     observacoes: '',
   });
 
@@ -99,25 +101,20 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         statusManejo: 'Ao pé da mãe',
         localizacao: 'Pasto Maternidade'
       }));
-    } else if (entryType === 'hospedagem') {
+    } else if (entryType === 'terceiro') {
       setFormData(prev => ({
         ...prev,
         harasOrigem: '',
         statusManejo: 'Em observação',
         servicoTipo: 'Hospedagem'
       }));
-    } else if (entryType === 'genealogia') {
-      setFormData(prev => ({
-        ...prev,
-        statusManejo: 'Histórico',
-        localizacao: 'Externo'
-      }));
     } else {
-      // Compra (resetar defaults se necessário)
+      // Avulso (resetar defaults se necessário)
       setFormData(prev => ({
         ...prev,
         harasOrigem: '',
         statusManejo: '',
+        servicoTipo: '',
       }));
     }
   }, [entryType, userHarasName]);
@@ -168,13 +165,13 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   const updateAnimalMutation = useUpdateAnimal();
 
   // Helpers para visibilidade de campos
-  const isGenealogy = entryType === 'genealogia';
   const isBirth = entryType === 'nascimento';
-  const isHosting = entryType === 'hospedagem';
+  const isThirdParty = entryType === 'terceiro';
+  const isAvulso = entryType === 'avulso';
 
-  const showPhysicalInfo = !isGenealogy;
-  const showLocationInfo = !isGenealogy;
-  const isBirthDateRequired = !isGenealogy;
+  const showPhysicalInfo = true;
+  const showLocationInfo = true;
+  const isBirthDateRequired = true;
 
   const uploadFiles = async (animalId: string, files: File[], folder: 'media' | 'documents') => {
     if (files.length === 0) return [];
@@ -234,9 +231,9 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
       return;
     }
 
-    let statusFinal = 'ativo';
-    if (isHosting) statusFinal = 'em_servico';
-    if (isGenealogy) statusFinal = 'vendido'; // Considerar 'morto' ou 'vendido' como Inativo/Histórico
+    let statusFinal: 'ativo' | 'em_servico' | 'provisorio' = 'ativo';
+    if (isThirdParty) statusFinal = 'em_servico';
+    if (isBirth && formData.registroFuturoABCCMM === 'sim') statusFinal = 'provisorio';
 
     // Mapear campos para CreateAnimalInput
     const animalInput: CreateAnimalInput = {
@@ -245,14 +242,15 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
       sex: formData.sexo as AnimalSex,
       birth_date: formData.dataNascimento || undefined,
       category: (formData.categoria as AnimalCategory) || 'potro',
-      registry_number: formData.registro || undefined,
-      chip_number: formData.chip || undefined,
+      registry_number: isBirth ? undefined : (formData.registro || undefined),
+      chip_number: isBirth ? undefined : (formData.chip || undefined),
       brand: formData.marca || undefined,
       coat_color: formData.pelagem || undefined,
       location: formData.localizacao || undefined,
-      origin_haras: formData.harasOrigem || undefined,
+      origin_haras: isThirdParty ? undefined : (formData.harasOrigem || undefined),
+      proprietario: isThirdParty ? (formData.harasOrigem || undefined) : undefined,
       observations: formData.observacoes || undefined,
-      status: statusFinal as any,
+      status: statusFinal,
       weight: formData.peso ? parseFloat(formData.peso) : undefined,
       height: formData.altura ? parseFloat(formData.altura) : undefined,
       father_name: formData.pai || undefined,
@@ -335,7 +333,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
       {/* Seleção de Tipo de Entrada */}
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
         <h2 className="text-xl text-foreground dark:text-white mb-6">Tipo de Cadastro</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             type="button"
             onClick={() => setEntryType('nascimento')}
@@ -345,48 +343,36 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               }`}
           >
             <span className="text-2xl">🐣</span>
-            <span className="font-medium">Nascimento</span>
+            <span className="font-medium">Nascimento no Haras</span>
           </button>
           <button
             type="button"
-            onClick={() => setEntryType('compra')}
-            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'compra'
+            onClick={() => setEntryType('avulso')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'avulso'
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
               }`}
           >
             <span className="text-2xl">🚚</span>
-            <span className="font-medium">Compra</span>
+            <span className="font-medium">Avulso</span>
           </button>
           <button
             type="button"
-            onClick={() => setEntryType('hospedagem')}
-            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'hospedagem'
+            onClick={() => setEntryType('terceiro')}
+            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'terceiro'
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
               }`}
           >
             <span className="text-2xl">🤝</span>
-            <span className="font-medium">Hospedagem</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setEntryType('genealogia')}
-            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${entryType === 'genealogia'
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border dark:border-[#3a3a3a] text-muted-foreground hover:bg-muted dark:hover:bg-[#2a2a2a]'
-              }`}
-          >
-            <span className="text-2xl">📜</span>
-            <span className="font-medium">Genealogia</span>
+            <span className="font-medium">Terceiro</span>
           </button>
         </div>
 
         <div className="mt-4 p-4 bg-muted/50 dark:bg-[#111] rounded-lg text-sm text-muted-foreground">
-          {entryType === 'nascimento' && 'Cadastro de animal nascido no haras. O haras de origem será preenchido automaticamente, e é necessário selecionar a mãe.'}
-          {entryType === 'compra' && 'Cadastro de animal adquirido de outro haras. Sêmen ou animal comprado.'}
-          {entryType === 'hospedagem' && 'Animal de terceiro hospedado no haras. O proprietário será identificado.'}
-          {entryType === 'genealogia' && 'Cadastro para fins de árvore genealógica. O animal não será listado no plantel ativo.'}
+          {entryType === 'nascimento' && 'Cadastro de animal nascido no haras. Haras de origem bloqueado no seu haras e fluxo preparado para registro ABCCMM futuro.'}
+          {isAvulso && 'Cadastro de animal do plantel sem dependência imediata da ABCCMM. Pode ter registro e chip normalmente.'}
+          {isThirdParty && 'Animal de terceiro hospedado no haras. Informe o proprietário para rastreabilidade.'}
         </div>
       </div>
 
@@ -413,21 +399,23 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
             </div>
 
             {/* Registro */}
-            <div>
-              <label className="block text-sm text-foreground dark:text-white mb-2">
-                Registro
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: ABCCMM 123456-78"
-                value={formData.registro}
-                onChange={(e) => setFormData({ ...formData, registro: e.target.value })}
-                className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
-            </div>
+            {!isBirth && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Registro
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: ABCCMM 123456-78"
+                  value={formData.registro}
+                  onChange={(e) => setFormData({ ...formData, registro: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
-            {/* Chip - Hidden for Genealogy */}
-            {showPhysicalInfo && (
+            {/* Chip */}
+            {showPhysicalInfo && !isBirth && (
               <div>
                 <label className="block text-sm text-foreground dark:text-white mb-2">
                   Chip
@@ -439,6 +427,22 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                   onChange={(e) => setFormData({ ...formData, chip: e.target.value })}
                   className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
                 />
+              </div>
+            )}
+
+            {/* Registro futuro ABCCMM (somente nascimento) */}
+            {isBirth && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Este animal será registrado na ABCCMM futuramente?
+                </label>
+                <NativeSelect
+                  value={formData.registroFuturoABCCMM}
+                  onChange={(e) => setFormData({ ...formData, registroFuturoABCCMM: e.target.value as 'sim' | 'nao' })}
+                >
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </NativeSelect>
               </div>
             )}
 
@@ -567,21 +571,19 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
             )}
 
             {/* Haras de Origem / Proprietário */}
-            {(entryType !== 'genealogia' || formData.harasOrigem) && (
-              <div>
-                <label className="block text-sm text-foreground dark:text-white mb-2">
-                  {isHosting ? 'Proprietário' : 'Haras de Origem'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={isHosting ? "Nome do Proprietário" : "Ex: Haras ABC"}
-                  value={formData.harasOrigem}
-                  readOnly={isBirth}
-                  onChange={(e) => setFormData({ ...formData, harasOrigem: e.target.value })}
-                  className={`w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20 ${isBirth ? 'opacity-50 cursor-not-allowed' : ''}`}
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-sm text-foreground dark:text-white mb-2">
+                {isThirdParty ? 'Proprietário' : 'Haras de Origem'}
+              </label>
+              <input
+                type="text"
+                placeholder={isThirdParty ? 'Nome do Proprietário' : 'Ex: Haras ABC'}
+                value={formData.harasOrigem}
+                readOnly={isBirth}
+                onChange={(e) => setFormData({ ...formData, harasOrigem: e.target.value })}
+                className={`w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20 ${isBirth ? 'opacity-50 cursor-not-allowed' : ''}`}
+              />
+            </div>
 
             {/* Pelagem */}
             <div>

@@ -29,6 +29,7 @@ export type AnimalCategoryDb =
 
 export type AnimalStatus =
     | 'ativo'
+    | 'provisorio'
     | 'vendido'
     | 'morto'
     | 'emprestado'
@@ -199,6 +200,8 @@ export interface Animal {
     height: number | null;
     father_name: string | null;
     mother_name: string | null;
+    criador?: string | null;
+    proprietario?: string | null;
     created_at: string;
     updated_at: string;
     // Relacionamentos (quando carregados)
@@ -577,6 +580,8 @@ export interface CreateAnimalInput {
     management_status?: string;
     service_type?: string;
     gait?: string;
+    criador?: string;
+    proprietario?: string;
 }
 
 export interface CreateAnimalVideoInput {

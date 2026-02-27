@@ -518,11 +518,11 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
       <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
         <div className="space-y-8">
           {isOfficialDataLocked && (
-            <div className="rounded-xl border border-amber-300/70 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <Lock className="w-5 h-5 mt-0.5 text-amber-700 dark:text-amber-300 flex-shrink-0" />
-                <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-                  Os dados vitais deste animal foram importados do registro oficial da ABCCMM e nao podem ser alterados manualmente. Apenas informacoes de manejo e localizacao estao liberadas para edicao.
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-zinc-500 dark:text-zinc-400 flex-shrink-0" />
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-snug">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-200">Dados Oficiais:</span> Importados da ABCCMM. Apenas manejo e localização são editáveis.
                 </p>
               </div>
             </div>
@@ -574,7 +574,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   type="text"
                   value={formData.marca}
                   onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  disabled={isOfficialDataLocked}
+                  // disabled={isOfficialDataLocked}
                   className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
                   placeholder="Ex: Marca XYZ"
                 />

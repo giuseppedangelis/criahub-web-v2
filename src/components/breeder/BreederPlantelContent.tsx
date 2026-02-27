@@ -1,5 +1,5 @@
 
-import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2 } from 'lucide-react';
+import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2, User } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
@@ -90,6 +90,8 @@ interface PlantelAnimal {
   gait?: string;
   father_name?: string;
   mother_name?: string;
+  criador?: string | null;
+  proprietario?: string | null;
   observations?: string;
   weight?: number;
   height?: number;
@@ -164,13 +166,15 @@ export function BreederPlantelContent() {
         statusAtividade: isInactive ? 'Inativo' : 'Ativo',
         localizacao: animal.location || (animal as any).localizacao || undefined,
         location: animal.location || (animal as any).localizacao || undefined,
-        servicoTipo: animal.service_type || (animal as any).tipo_servico || undefined,
-        service_type: animal.service_type || (animal as any).tipo_servico || undefined,
+        servicoTipo: (animal as any).service_type || (animal as any).tipo_servico || undefined,
+        service_type: (animal as any).service_type || (animal as any).tipo_servico || undefined,
         coat_color: animal.coat_color || (animal as any).pelagem || undefined,
         pelagem: animal.coat_color || (animal as any).pelagem || undefined,
-        gait: animal.gait || (animal as any).andamento || undefined,
+        gait: (animal as any).gait || (animal as any).andamento || undefined,
         father_name: animal.father_name || undefined,
         mother_name: animal.mother_name || undefined,
+        criador: animal.criador || null,
+        proprietario: animal.proprietario || null,
         observations: animal.observations || (animal as any).observacoes || undefined,
         weight: animal.weight || undefined,
         height: animal.height || undefined,
@@ -537,6 +541,10 @@ function SummaryCard({ title, value }: { title: string; value: string }) {
 }
 
 function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo, onDelete }: any) {
+  const isCondominio =
+    animal.proprietario?.toUpperCase().includes('CONDOMINIO') ||
+    animal.proprietario?.toUpperCase().includes('CONDOMÍNIO');
+
   return (
     <div
       onClick={onClick}
@@ -567,6 +575,23 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
         {animal.birthDate && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
             Nascimento: {formatBirthDate(animal.birthDate)}
+          </p>
+        )}
+        {animal.proprietario && (
+          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1 flex items-center gap-1 min-w-0">
+            <User className="w-3 h-3 flex-shrink-0" />
+            <span className="inline-block align-bottom truncate max-w-[160px]">Proprietário: {animal.proprietario}</span>
+            {isCondominio && (
+              <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 flex-shrink-0">
+                Condomínio
+              </span>
+            )}
+          </p>
+        )}
+        {animal.criador && (
+          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1 flex items-center gap-1 min-w-0">
+            <User className="w-3 h-3 flex-shrink-0" />
+            <span className="inline-block align-bottom truncate max-w-[160px]">Criador: {animal.criador}</span>
           </p>
         )}
         {animal.filhos !== undefined && animal.filhos > 0 && (

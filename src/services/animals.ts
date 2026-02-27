@@ -67,6 +67,8 @@ function parseStatusManejo(value: string | null | undefined): { motivo?: string;
 // Mapeamento do status do banco para o frontend
 const STATUS_MAPPING: Record<string, string> = {
     'Ativo': 'ativo',
+    'Provisorio': 'provisorio',
+    'Provisório': 'provisorio',
     'Vendido': 'vendido',
     'Falecido': 'morto',
     'Transferido': 'emprestado'
@@ -523,6 +525,7 @@ export const animalsService = {
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
                 foto_url, images, documents, observacoes, father_name, mother_name,
+                criador, proprietario,
                 created_at, updated_at
             `, { count: 'exact' });
 
@@ -576,6 +579,8 @@ export const animalsService = {
             service_type: item.tipo_servico,
             father_name: item.father_name,
             mother_name: item.mother_name,
+            criador: item.criador,
+            proprietario: item.proprietario,
             observations: item.observacoes,
             main_image_url: item.foto_url,
             images: item.images || (item.foto_url ? [item.foto_url] : []),
@@ -600,6 +605,7 @@ export const animalsService = {
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
                 foto_url, images, documents, observacoes, father_name, mother_name,
+                criador, proprietario,
                 created_at, updated_at
             `)
             .eq('id', id)
@@ -760,6 +766,8 @@ export const animalsService = {
             // Outros campos
             father_name: data.father_name,
             mother_name: data.mother_name,
+            criador: data.criador,
+            proprietario: data.proprietario,
             observations: data.observacoes,
         };
 
@@ -988,6 +996,8 @@ export const animalsService = {
             foto_url: mainImageUrl,
             father_name: input.father_name,
             mother_name: input.mother_name,
+            criador: input.criador,
+            proprietario: input.proprietario,
             observacoes: input.observations
         };
 
@@ -1035,6 +1045,8 @@ export const animalsService = {
         if (updateData.height !== undefined) dbInput.height = updateData.height;
         if (updateData.father_name !== undefined) dbInput.father_name = updateData.father_name;
         if (updateData.mother_name !== undefined) dbInput.mother_name = updateData.mother_name;
+        if (updateData.criador !== undefined) dbInput.criador = updateData.criador;
+        if (updateData.proprietario !== undefined) dbInput.proprietario = updateData.proprietario;
         if (updateData.observations !== undefined) dbInput.observacoes = updateData.observations;
         if (updateData.origin_haras !== undefined) dbInput.haras_origem = updateData.origin_haras;
         if (updateData.service_type !== undefined) dbInput.tipo_servico = updateData.service_type;
