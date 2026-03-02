@@ -4,14 +4,7 @@ import { useState } from 'react';
 export function VetHerdContent() {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const animals = [
-    { id: 1, name: 'Estrela Mangalarga', status: 'Gestante - 45 dias', statusColor: 'bg-pink-500' },
-    { id: 2, name: 'Relâmpago Negro', status: 'Saudável', statusColor: 'bg-green-500' },
-    { id: 3, name: 'Lua Dourada', status: 'Em tratamento', statusColor: 'bg-yellow-500' },
-    { id: 4, name: 'Vento Sul', status: 'Vacinação em dia', statusColor: 'bg-blue-500' },
-    { id: 5, name: 'Bella Vista', status: 'Aguardando exame', statusColor: 'bg-yellow-500' },
-    { id: 6, name: 'Trovão Branco', status: 'Saudável', statusColor: 'bg-green-500' },
-  ];
+  const animals: Array<{ id: number; name: string; status: string; statusColor: string }> = [];
 
   const filteredAnimals = animals.filter(animal =>
     animal.name.toLowerCase().includes(searchQuery.toLowerCase())

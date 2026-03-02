@@ -80,89 +80,10 @@ export function AdvisorPendingValidation({ onBack }: AdvisorPendingValidationPro
   const [birthDate, setBirthDate] = useState('');
   const [sex, setSex] = useState<'Macho' | 'Fêmea'>('Macho');
   const [observations, setObservations] = useState('');
+  const [embryoOrigin, setEmbryoOrigin] = useState<'sociedade' | 'haras' | ''>('');
+  const [embryoCode, setEmbryoCode] = useState('');
 
-  const [pendingItems, setPendingItems] = useState<PendingItem[]>([
-    {
-      id: 1,
-      type: 'birth',
-      status: 'pending',
-      fieldData: {
-        photo: 'https://images.unsplash.com/photo-1598632640487-6ea4a4e8b6f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-        motherName: 'Égua Estrela',
-        motherId: 1,
-        reportedDate: '2025-01-10T08:30:00',
-        reportedBy: 'João Silva (Peão)',
-        location: 'Piquete 3',
-        provisionalSex: 'Macho',
-        observations: 'Potro nasceu de madrugada, aparenta saudável',
-      },
-    },
-    {
-      id: 2,
-      type: 'birth',
-      status: 'pending',
-      fieldData: {
-        photo: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-        motherName: 'Lua Prateada',
-        motherId: 5,
-        reportedDate: '2025-01-11T14:20:00',
-        reportedBy: 'Maria Costa (Peã)',
-        location: 'Baia 8',
-        provisionalSex: 'Fêmea',
-        observations: 'Parto assistido, sem complicações',
-      },
-    },
-    {
-      id: 3,
-      type: 'birth',
-      status: 'pending',
-      fieldData: {
-        photo: 'https://images.unsplash.com/photo-1587463272036-4cb85a5a7c88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-        motherName: 'Flor da Manhã',
-        motherId: 8,
-        reportedDate: '2025-01-09T06:15:00',
-        reportedBy: 'João Silva (Peão)',
-        location: 'Pasto 2',
-        provisionalSex: 'Fêmea',
-      },
-    },
-    {
-      id: 4,
-      type: 'occurrence',
-      status: 'pending',
-      fieldData: {
-        photos: [
-          'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-        ],
-        animalName: 'Relâmpago Negro',
-        animalId: 2,
-        occurrenceType: 'Ferimento',
-        severity: 'Média',
-        reportedDate: '2025-01-12T09:45:00',
-        reportedBy: 'Maria Costa (Peã)',
-        location: 'Piquete 5',
-        description: 'Animal apresenta ferimento no casco dianteiro esquerdo, está mancando levemente',
-      },
-    },
-    {
-      id: 5,
-      type: 'occurrence',
-      status: 'pending',
-      fieldData: {
-        photos: [
-          'https://images.unsplash.com/photo-1598632640487-6ea4a4e8b6f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-        ],
-        animalName: 'Estrela Mangalarga',
-        animalId: 1,
-        occurrenceType: 'Comportamento',
-        severity: 'Baixa',
-        reportedDate: '2025-01-11T16:30:00',
-        reportedBy: 'João Silva (Peão)',
-        location: 'Baia 12',
-        description: 'Égua está agitada e não está se alimentando normalmente',
-      },
-    },
-  ]);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
 
   const filteredItems = pendingItems.filter((item) => {
     if (filter === 'all') return item.status === 'pending';
@@ -183,6 +104,8 @@ export function AdvisorPendingValidation({ onBack }: AdvisorPendingValidationPro
       setBirthDate(birth.fieldData.reportedDate.split('T')[0]);
       setSex(birth.fieldData.provisionalSex || 'Macho');
       setObservations(birth.fieldData.observations || '');
+      setEmbryoOrigin('');
+      setEmbryoCode('');
     }
   };
 
@@ -517,6 +440,29 @@ export function AdvisorPendingValidation({ onBack }: AdvisorPendingValidationPro
                   <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
                     Verificar caderno de cobrição para confirmar
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">Origem do Embrião</label>
+                  <NativeSelect
+                    value={embryoOrigin}
+                    onChange={(e) => setEmbryoOrigin(e.target.value as 'sociedade' | 'haras' | '')}
+                  >
+                    <option value="">Não informado</option>
+                    <option value="sociedade">Veio de sociedade</option>
+                    <option value="haras">Feito no haras</option>
+                  </NativeSelect>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-foreground dark:text-white mb-2">Identificação do Embrião</label>
+                  <input
+                    type="text"
+                    value={embryoCode}
+                    onChange={(e) => setEmbryoCode(e.target.value)}
+                    placeholder="Ex: Embrião #A12"
+                    className="w-full px-4 py-3 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                  />
                 </div>
 
                 <div>

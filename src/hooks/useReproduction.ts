@@ -73,11 +73,13 @@ export function useReproductiveEvents(
 /**
  * Hook para eventos de um animal específico
  */
-export function useAnimalReproductiveEvents(animalId: string) {
+export function useAnimalReproductiveEvents(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: reproductionKeys.eventsByAnimal(animalId),
         queryFn: () => reproductionService.getEventsByAnimal(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
     })
 }
 

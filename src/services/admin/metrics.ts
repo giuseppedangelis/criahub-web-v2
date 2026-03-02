@@ -71,7 +71,7 @@ export async function getPlatformMetrics(): Promise<PlatformMetrics> {
     // Buscar uso por funcionalidade
     const feature_usage = await getFeatureUsage();
 
-    // Calcular armazenamento usado (simulação)
+    // Calcular armazenamento usado (estimativa)
     const storage_used_gb = await calculateStorageUsed();
 
     return {

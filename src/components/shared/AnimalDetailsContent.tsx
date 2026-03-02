@@ -11,7 +11,6 @@ interface Animal {
   registration?: string;
   registry?: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   harasOrigem?: string;
@@ -158,12 +157,6 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
                     <p className="text-foreground dark:text-white">{animal.chip}</p>
                   </div>
                 )}
-                {animal.marca && (
-                  <div>
-                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Marca</p>
-                    <p className="text-foreground dark:text-white">{animal.marca}</p>
-                  </div>
-                )}
                 {animal.sex && (
                   <div>
                     <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Sexo</p>
@@ -246,12 +239,12 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Pai</p>
-                  <p className="text-foreground dark:text-white">{animal.father || 'Trovão Branco'}</p>
+                  <p className="text-foreground dark:text-white">{animal.father || 'Não informado'}</p>
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">MM-2019-2468</p>
                 </div>
                 <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Mãe</p>
-                  <p className="text-foreground dark:text-white">{animal.mother || 'Bella Vista'}</p>
+                  <p className="text-foreground dark:text-white">{animal.mother || 'Não informada'}</p>
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">MM-2021-7890</p>
                 </div>
               </div>

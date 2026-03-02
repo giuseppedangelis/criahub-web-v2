@@ -16,7 +16,10 @@ import type {
     PaginationParams,
     PaginatedResponse,
     GenealogyNode,
-    ABCCMMImportResult
+    ABCCMMImportResult,
+    AnimalLinkQueueItem,
+    CondominiumShareImportResult,
+    AwardImportResult
 } from '@/types';
 
 const CATEGORY_MAPPING: Record<string, string> = {
@@ -49,6 +52,24 @@ function mapCategoryToDb(category: string): string {
 // Helper function to map database category to frontend category  
 function mapCategoryFromDb(dbCategory: string): string {
     return DB_TO_FRONTEND_CATEGORY[dbCategory] || dbCategory;
+}
+
+function deriveReproductionTypeFromCategory(category?: string | null): 'Doadora' | 'Matriz' | 'Garanhão' | 'Castrado' | 'Receptora' | undefined {
+    if (!category) return undefined;
+
+    const key = String(category)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+
+    if (key.includes('garanhao')) return 'Garanhão';
+    if (key.includes('egua')) return 'Matriz';
+    if (key.includes('castrado')) return 'Castrado';
+    if (key.includes('doadora')) return 'Doadora';
+    if (key.includes('receptora')) return 'Receptora';
+
+    return undefined;
 }
 
 function parseStatusManejo(value: string | null | undefined): { motivo?: string; data?: string } | null {
@@ -187,6 +208,15 @@ function normalizeRegistro(value: unknown): string {
     return normalizeSpaces(raw).toUpperCase();
 }
 
+function normalizeNameKey(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
 function isValidRegistro(registro: string | null | undefined): registro is string {
     return Boolean(registro && registro !== '-');
 }
@@ -306,6 +336,26 @@ function parseAbccmmDate(value: unknown): string | null {
     }
 
     return null;
+}
+
+function parseMonthYearPeriod(value: unknown): string | null {
+    if (value === null || value === undefined || value === '') return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    const mmYYYY = raw.match(/^(\d{1,2})\/(\d{4})$/);
+    if (mmYYYY) {
+        const month = String(Number(mmYYYY[1])).padStart(2, '0');
+        const year = mmYYYY[2];
+        return `${year}-${month}-01`;
+    }
+
+    return parseAbccmmDate(raw);
+}
+
+function makeImportHash(parts: Array<string | null | undefined>): string {
+    const normalized = parts.map((part) => normalizeSpaces(String(part || '').toUpperCase())).join('|');
+    return normalized;
 }
 
 function getCategoryBySex(sex: AnimalSex): string {
@@ -517,10 +567,41 @@ export const animalsService = {
             return formatPaginatedResponse([], 0, pagination);
         }
 
+        let environmentAnimalIds: string[] | null = null;
+        if (filters.environment === 'condominio') {
+            const { data: shares, error: sharesError } = await (supabase as any)
+                .from('animal_ownership_shares')
+                .select('animal_id')
+                .eq('haras_id', filters.haras_id)
+                .or(`end_date.is.null,end_date.gte.${new Date().toISOString().slice(0, 10)}`);
+
+            if (sharesError) handleSupabaseError(sharesError);
+
+            environmentAnimalIds = Array.from(new Set((shares || []).map((row: { animal_id: string }) => row.animal_id)));
+            if (environmentAnimalIds.length === 0) {
+                return formatPaginatedResponse([], 0, pagination);
+            }
+        }
+
+        if (filters.environment === 'vinculacao') {
+            const { data: queueRows, error: queueError } = await (supabase as any)
+                .from('animal_link_queue')
+                .select('provisional_animal_id')
+                .eq('haras_id', filters.haras_id)
+                .eq('status', 'pending');
+
+            if (queueError) handleSupabaseError(queueError);
+
+            environmentAnimalIds = Array.from(new Set((queueRows || []).map((row: { provisional_animal_id: string }) => row.provisional_animal_id)));
+            if (environmentAnimalIds.length === 0) {
+                return formatPaginatedResponse([], 0, pagination);
+            }
+        }
+
         let query = supabase
             .from('animals')
             .select(`
-                id, abccmm_rowid, haras_id, nome, registro, chip, marca,
+                id, abccmm_rowid, haras_id, nome, registro, chip,
                 sexo, categoria, data_nascimento, pelagem, andamento,
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
@@ -532,6 +613,15 @@ export const animalsService = {
         // Aplicar filtros
         if (filters.haras_id) {
             query = query.eq('haras_id', filters.haras_id);
+        }
+        if (filters.environment === 'oficial') {
+            query = query.not('abccmm_rowid', 'is', null);
+        }
+        if (filters.environment === 'avulsos') {
+            query = query.is('abccmm_rowid', null);
+        }
+        if (environmentAnimalIds && environmentAnimalIds.length > 0) {
+            query = query.in('id', environmentAnimalIds);
         }
         if (filters.sex) {
             query = query.eq('sexo', filters.sex);
@@ -563,7 +653,6 @@ export const animalsService = {
             name: item.nome,
             registry_number: item.registro,
             chip_number: item.chip,
-            brand: item.marca,
             sex: item.sexo,
             birth_date: item.data_nascimento,
             coat_color: item.pelagem,
@@ -587,6 +676,7 @@ export const animalsService = {
             documents: item.documents || [],
             category: REVERSE_CATEGORY_MAPPING[item.categoria] || item.categoria,
             _raw_status: item.status,
+            environment: item.abccmm_rowid ? 'oficial' : 'avulsos',
         }));
 
         return formatPaginatedResponse(mappedData as Animal[], count || 0, pagination);
@@ -600,7 +690,7 @@ export const animalsService = {
         const { data: animalData, error: animalError } = await supabase
             .from('animals')
             .select(`
-                id, haras_id, nome, registro, chip, marca,
+                id, haras_id, nome, registro, chip,
                 sexo, categoria, data_nascimento, pelagem, andamento,
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
@@ -610,10 +700,6 @@ export const animalsService = {
             `)
             .eq('id', id)
             .single();
-
-        console.log('Raw animal data from DB:', JSON.stringify(animalData, null, 2));
-        console.log('Raw images from DB:', JSON.stringify((animalData as any)?.images));
-        console.log('Raw documents from DB:', JSON.stringify((animalData as any)?.documents));
 
         if (animalError) {
             if (animalError.code === 'PGRST116') return null; // Not found
@@ -713,7 +799,6 @@ export const animalsService = {
             name: data.nome,
             registry_number: data.registro,
             chip_number: data.chip,
-            brand: data.marca,
             sex: data.sexo,
             category: REVERSE_CATEGORY_MAPPING[data.categoria] || data.categoria,
             birth_date: data.data_nascimento,
@@ -734,7 +819,6 @@ export const animalsService = {
             // Mapear nomes de campos para o formato do componente
             registry: data.registro,
             chip: data.chip,
-            marca: data.marca,
             birthDate: data.data_nascimento,
             harasOrigem: data.haras_origem,
             localizacao: data.localizacao,
@@ -757,8 +841,8 @@ export const animalsService = {
             // Dados que não existem no banco (inicializar como null/0)
             premiacoes: 0,
             videos: [],
-            reproductionType: data.tipo_servico,
-            activeForReproduction: data.para_venda,
+            reproductionType: deriveReproductionTypeFromCategory(data.categoria),
+            activeForReproduction: undefined,
             statusHistorico: [],
             motivoInativacao: parseStatusManejo(data.status_manejo)?.motivo || (data.status !== 'Ativo' ? data.status : null),
             dataInativacao: parseStatusManejo(data.status_manejo)?.data || null,
@@ -976,7 +1060,6 @@ export const animalsService = {
             nome: input.name,
             registro: input.registry_number,
             chip: input.chip_number,
-            marca: input.brand,
             sexo: input.sex,
             categoria: CATEGORY_MAPPING[input.category] || input.category,
             data_nascimento: input.birth_date,
@@ -1025,7 +1108,6 @@ export const animalsService = {
         if (updateData.name !== undefined) dbInput.nome = updateData.name;
         if (updateData.registry_number !== undefined) dbInput.registro = updateData.registry_number;
         if (updateData.chip_number !== undefined) dbInput.chip = updateData.chip_number;
-        if (updateData.brand !== undefined) dbInput.marca = updateData.brand;
         if (updateData.sex !== undefined) dbInput.sexo = updateData.sex;
         if (updateData.category !== undefined) dbInput.categoria = CATEGORY_MAPPING[updateData.category] || updateData.category;
         if (updateData.birth_date !== undefined) {
@@ -1107,7 +1189,7 @@ export const animalsService = {
         const { data, error } = await supabase
             .from('animals')
             .select(`
-                id, haras_id, nome, registro, chip, marca,
+                id, haras_id, nome, registro, chip,
                 sexo, categoria, data_nascimento, pelagem,
                 status, pai_id, mae_id, localizacao,
                 height, weight, foto_url,
@@ -1124,7 +1206,6 @@ export const animalsService = {
             name: item.nome,
             registry_number: item.registro,
             chip_number: item.chip,
-            brand: item.marca,
             coat_color: item.pelagem,
             weight: item.weight,
             height: item.height,
@@ -1145,7 +1226,7 @@ export const animalsService = {
 
         let query = supabase
             .from('animals')
-            .select('id, nome, registro')
+            .select('id, nome, registro, data_nascimento, categoria')
             .eq('haras_id', harasId)
             .eq('sexo', 'Macho');
 
@@ -1165,6 +1246,8 @@ export const animalsService = {
             ...item,
             name: item.nome,
             registry_number: item.registro,
+            birth_date: item.data_nascimento,
+            category: REVERSE_CATEGORY_MAPPING[item.categoria] || item.categoria,
         })) as unknown as Animal[];
     },
 
@@ -1179,7 +1262,7 @@ export const animalsService = {
 
         let query = supabase
             .from('animals')
-            .select('id, nome, registro')
+            .select('id, nome, registro, data_nascimento, categoria')
             .eq('haras_id', harasId)
             .eq('sexo', 'Fêmea');
 
@@ -1199,6 +1282,8 @@ export const animalsService = {
             ...item,
             name: item.nome,
             registry_number: item.registro,
+            birth_date: item.data_nascimento,
+            category: REVERSE_CATEGORY_MAPPING[item.categoria] || item.categoria,
         })) as unknown as Animal[];
     },
 
@@ -1340,6 +1425,26 @@ export const animalsService = {
 
         const existingByRowId = new Map<string, string>();
         const existingByRegistro = new Map<string, string>();
+        const existingByChip = new Map<string, string>();
+        const existingComposite = new Map<string, string[]>();
+        const pendingLinkQueueSeeds: Array<{ provisionalAnimalId: string; officialRowId: string; officialRegistro: string }> = [];
+
+        const { data: existingAnimalsForMatch, error: existingAnimalsForMatchError } = await (supabase as any)
+            .from('animals')
+            .select('id, abccmm_rowid, registro, chip, nome, data_nascimento, sexo')
+            .eq('haras_id', harasId);
+
+        if (existingAnimalsForMatchError) handleSupabaseError(existingAnimalsForMatchError);
+
+        (existingAnimalsForMatch || []).forEach((item: any) => {
+            if (item.registro) existingByRegistro.set(String(item.registro), item.id);
+            if (item.chip) existingByChip.set(String(item.chip), item.id);
+            if (!item.abccmm_rowid) {
+                const composite = `${normalizeNameKey(item.nome)}|${item.data_nascimento || ''}|${item.sexo || ''}`;
+                if (!existingComposite.has(composite)) existingComposite.set(composite, []);
+                existingComposite.get(composite)?.push(item.id);
+            }
+        });
 
         reportProgress(35, 'Validando registros existentes...');
         if (validRowIds.length > 0) {
@@ -1434,7 +1539,29 @@ export const animalsService = {
                 dados_genealogicos: details?.dadosGenealogicos ?? null,
             };
 
-            const existingId = existingByRowId.get(seed.rowid);
+            let existingId = existingByRowId.get(seed.rowid);
+
+            if (!existingId && isValidRegistro(seed.registro)) {
+                existingId = existingByRegistro.get(seed.registro);
+            }
+
+            if (!existingId && details?.chip) {
+                existingId = existingByChip.get(details.chip) || undefined;
+            }
+
+            if (!existingId && details?.dataNascimento) {
+                const composite = `${normalizeNameKey(seed.nome || details.registro || '')}|${details.dataNascimento || ''}|${seed.sexo || ''}`;
+                const candidates = existingComposite.get(composite) || [];
+                if (candidates.length === 1) {
+                    const candidateId = candidates[0];
+                    existingId = candidateId;
+                    pendingLinkQueueSeeds.push({
+                        provisionalAnimalId: candidateId,
+                        officialRowId: seed.rowid,
+                        officialRegistro: seed.registro,
+                    });
+                }
+            }
 
             if (existingId) {
                 toUpdate.push({ id: existingId, payload });
@@ -1549,6 +1676,41 @@ export const animalsService = {
             reportProgress(90 + ((chunkIndex + 1) / linkChunks.length) * 9, 'Construindo árvore genealógica...');
         }
 
+        if (pendingLinkQueueSeeds.length > 0) {
+            const queuePayload = pendingLinkQueueSeeds
+                .map((seed) => {
+                    const officialAnimalId = idsByRowId.get(seed.officialRowId) || null;
+                    if (!officialAnimalId) return null;
+                    return {
+                        haras_id: harasId,
+                        provisional_animal_id: seed.provisionalAnimalId,
+                        official_animal_id: officialAnimalId,
+                        official_abccmm_rowid: seed.officialRowId,
+                        official_registry: seed.officialRegistro,
+                        match_type: 'name_birth_sex',
+                        confidence: 0.8,
+                        status: 'pending',
+                        payload: {
+                            source: 'abccmm_import',
+                            reason: 'Match por nome + nascimento + sexo',
+                        },
+                    };
+                })
+                .filter(Boolean);
+
+            if (queuePayload.length > 0) {
+                const { error: queueInsertError } = await (supabase as any)
+                    .from('animal_link_queue')
+                    .upsert(queuePayload, {
+                        onConflict: 'haras_id,provisional_animal_id,official_abccmm_rowid,status',
+                    });
+
+                if (queueInsertError) {
+                    warnings.push('Não foi possível criar itens de vinculação automática.');
+                }
+            }
+        }
+
         const linkedAnimals = linkUpdates.filter((item) => Boolean(item.payload.pai_id || item.payload.mae_id)).length;
         reportProgress(100, 'Importação concluída');
 
@@ -1560,6 +1722,593 @@ export const animalsService = {
             warnings,
             errors,
         };
+    },
+
+    async listLinkQueue(harasId: string): Promise<AnimalLinkQueueItem[]> {
+        const { data, error } = await (supabase as any)
+            .from('animal_link_queue')
+            .select(`
+                id, haras_id, provisional_animal_id, official_animal_id,
+                official_abccmm_rowid, official_registry, match_type,
+                confidence, status, payload, created_at, updated_at,
+                provisional:provisional_animal_id(id, nome, registro, data_nascimento, sexo),
+                official:official_animal_id(id, nome, registro, data_nascimento, sexo)
+            `)
+            .eq('haras_id', harasId)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) handleSupabaseError(error);
+
+        return (data || []).map((row: any) => ({
+            id: row.id,
+            haras_id: row.haras_id,
+            provisional_animal_id: row.provisional_animal_id,
+            official_animal_id: row.official_animal_id,
+            official_abccmm_rowid: row.official_abccmm_rowid,
+            official_registry: row.official_registry,
+            match_type: row.match_type,
+            confidence: row.confidence,
+            status: row.status,
+            payload: row.payload || {},
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            provisional_animal: row.provisional ? {
+                id: row.provisional.id,
+                name: row.provisional.nome,
+                registry_number: row.provisional.registro,
+                birth_date: row.provisional.data_nascimento,
+                sex: row.provisional.sexo,
+            } : null,
+            official_animal: row.official ? {
+                id: row.official.id,
+                name: row.official.nome,
+                registry_number: row.official.registro,
+                birth_date: row.official.data_nascimento,
+                sex: row.official.sexo,
+            } : null,
+        }));
+    },
+
+    async linkQueueItem(queueId: string): Promise<void> {
+        const { data: queueItem, error: queueError } = await (supabase as any)
+            .from('animal_link_queue')
+            .select('*')
+            .eq('id', queueId)
+            .single();
+
+        if (queueError) handleSupabaseError(queueError);
+        if (!queueItem?.provisional_animal_id || !queueItem?.official_animal_id) {
+            throw new Error('Item de vinculação inválido.');
+        }
+
+        const { data: provisional, error: provisionalError } = await supabase
+            .from('animals')
+            .select('id, images, documents, observacoes, chip, localizacao')
+            .eq('id', queueItem.provisional_animal_id)
+            .single();
+
+        if (provisionalError) handleSupabaseError(provisionalError);
+
+        const { data: official, error: officialError } = await supabase
+            .from('animals')
+            .select('id, images, documents, observacoes, chip, localizacao')
+            .eq('id', queueItem.official_animal_id)
+            .single();
+
+        if (officialError) handleSupabaseError(officialError);
+
+        const mergedImages = Array.from(new Set([...(official?.images || []), ...(provisional?.images || [])]));
+        const mergedDocuments = Array.from(new Set([...(official?.documents || []), ...(provisional?.documents || [])]));
+
+        const mergedObservations = [
+            official?.observacoes,
+            provisional?.observacoes,
+            `Vinculado automaticamente do animal provisório ${provisional?.id}`,
+        ].filter(Boolean).join('\n');
+
+        const { error: officialUpdateError } = await supabase
+            .from('animals')
+            .update({
+                images: mergedImages,
+                documents: mergedDocuments,
+                observacoes: mergedObservations,
+                chip: official?.chip || provisional?.chip || null,
+                localizacao: official?.localizacao || provisional?.localizacao || null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', queueItem.official_animal_id);
+
+        if (officialUpdateError) handleSupabaseError(officialUpdateError);
+
+        const { error: provisionalUpdateError } = await supabase
+            .from('animals')
+            .update({
+                status: 'Transferido',
+                observacoes: `Vinculado ao animal oficial ${queueItem.official_animal_id}`,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', queueItem.provisional_animal_id);
+
+        if (provisionalUpdateError) handleSupabaseError(provisionalUpdateError);
+
+        const { error: queueUpdateError } = await (supabase as any)
+            .from('animal_link_queue')
+            .update({
+                status: 'linked',
+                resolved_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', queueId);
+
+        if (queueUpdateError) handleSupabaseError(queueUpdateError);
+    },
+
+    async dismissLinkQueueItem(queueId: string): Promise<void> {
+        const { error } = await (supabase as any)
+            .from('animal_link_queue')
+            .update({
+                status: 'dismissed',
+                resolved_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', queueId);
+
+        if (error) handleSupabaseError(error);
+    },
+
+    async importCondominiumShares(params: {
+        file: File;
+        harasId: string;
+        onProgress?: (progress: number, message: string) => void;
+    }): Promise<CondominiumShareImportResult> {
+        const { file, harasId, onProgress } = params;
+        const warnings: string[] = [];
+        const errors: string[] = [];
+
+        const report = (progress: number, message: string) => {
+            if (onProgress) onProgress(Math.max(0, Math.min(100, Math.round(progress))), message);
+        };
+
+        report(10, 'Lendo planilha de condomínio...');
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', raw: true });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) throw new Error('Planilha de condomínio sem aba válida.');
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], { defval: '' });
+
+        if (rows.length === 0) {
+            throw new Error('Planilha de condomínio vazia.');
+        }
+
+        report(30, 'Validando e importando cotas...');
+
+        let processedRows = 0;
+        let insertedShares = 0;
+        let updatedShares = 0;
+
+        for (const raw of rows) {
+            processedRows += 1;
+            const normalized = Object.fromEntries(Object.entries(raw).map(([k, v]) => [normalizeColumnName(String(k)), v]));
+
+            const identifier = normalizeRegistro(normalized.identificadoranimal ?? normalized.registro ?? normalized.abccmmrowid);
+            const ownerName = normalizeSpaces(String(normalized.nomecotista ?? normalized.cotista ?? normalized.proprietario ?? '')).trim();
+            const percentageRaw = String(normalized.percentual ?? '').replace(',', '.').trim();
+            const percentage = Number.parseFloat(percentageRaw);
+            const isPrimary = String(normalized.cotistaprincipal ?? normalized.principal ?? '').toLowerCase().startsWith('s');
+            const startDate = parseAbccmmDate(normalized.datainicio) || null;
+            const endDate = parseAbccmmDate(normalized.datafim) || null;
+            const notes = normalizeSpaces(String(normalized.observacoes ?? normalized.obs ?? '')).trim() || null;
+
+            if (!identifier || !ownerName || !Number.isFinite(percentage)) {
+                warnings.push(`Linha ${processedRows + 1}: dados obrigatórios ausentes.`);
+                continue;
+            }
+
+            let animalId: string | null = null;
+            const { data: byRowId } = await (supabase as any)
+                .from('animals')
+                .select('id')
+                .eq('haras_id', harasId)
+                .eq('abccmm_rowid', identifier)
+                .maybeSingle();
+            if (byRowId?.id) animalId = byRowId.id;
+
+            if (!animalId) {
+                const { data: byRegistro } = await supabase
+                    .from('animals')
+                    .select('id')
+                    .eq('haras_id', harasId)
+                    .eq('registro', identifier)
+                    .maybeSingle();
+                if (byRegistro?.id) animalId = byRegistro.id;
+            }
+
+            if (!animalId) {
+                warnings.push(`Linha ${processedRows + 1}: animal ${identifier} não encontrado.`);
+                continue;
+            }
+
+            const { data: existingShare } = await (supabase as any)
+                .from('animal_ownership_shares')
+                .select('id')
+                .eq('haras_id', harasId)
+                .eq('animal_id', animalId)
+                .eq('owner_name', ownerName)
+                .maybeSingle();
+
+            if (existingShare?.id) {
+                const { error: updateError } = await (supabase as any)
+                    .from('animal_ownership_shares')
+                    .update({
+                        percentage,
+                        is_primary: isPrimary,
+                        start_date: startDate,
+                        end_date: endDate,
+                        notes,
+                        source: 'spreadsheet',
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', existingShare.id);
+                if (updateError) {
+                    errors.push(`Linha ${processedRows + 1}: erro ao atualizar cota.`);
+                } else {
+                    updatedShares += 1;
+                }
+            } else {
+                const { error: insertError } = await (supabase as any)
+                    .from('animal_ownership_shares')
+                    .insert({
+                        haras_id: harasId,
+                        animal_id: animalId,
+                        owner_name: ownerName,
+                        percentage,
+                        is_primary: isPrimary,
+                        start_date: startDate,
+                        end_date: endDate,
+                        notes,
+                        source: 'spreadsheet',
+                    });
+                if (insertError) {
+                    errors.push(`Linha ${processedRows + 1}: erro ao inserir cota.`);
+                } else {
+                    insertedShares += 1;
+                }
+            }
+        }
+
+        report(100, 'Importação de condomínio concluída.');
+
+        return {
+            processedRows,
+            insertedShares,
+            updatedShares,
+            warnings,
+            errors,
+        };
+    },
+
+    async importCondominiumAnimals(params: {
+        file: File;
+        harasId: string;
+        onProgress?: (progress: number, message: string) => void;
+    }): Promise<ABCCMMImportResult> {
+        const { file, harasId, onProgress } = params;
+
+        const importResult = await this.importABCCMMData({ file, harasId, onProgress });
+
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', raw: true, cellDates: false });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) return importResult;
+
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], {
+            defval: '',
+            raw: true,
+            blankrows: false,
+        });
+
+        const shareRows: Array<{ rowid: string; owner: string }> = [];
+        rows.forEach((raw) => {
+            const normalized = normalizeRowKeys(raw);
+            const parsed = parseMainRow(normalized);
+            if (!parsed?.rowid) return;
+            if (!parsed.proprietario) return;
+            shareRows.push({ rowid: parsed.rowid, owner: parsed.proprietario });
+        });
+
+        const uniqueRowIds = Array.from(new Set(shareRows.map((item) => item.rowid)));
+        if (uniqueRowIds.length === 0) return importResult;
+
+        const { data: animals, error: animalsError } = await (supabase as any)
+            .from('animals')
+            .select('id, abccmm_rowid')
+            .eq('haras_id', harasId)
+            .in('abccmm_rowid', uniqueRowIds);
+
+        if (animalsError) handleSupabaseError(animalsError);
+
+        const animalIdByRowId = new Map<string, string>();
+        (animals || []).forEach((item: { id: string; abccmm_rowid: string | null }) => {
+            if (item.abccmm_rowid) animalIdByRowId.set(item.abccmm_rowid, item.id);
+        });
+
+        let insertedShares = 0;
+        let updatedShares = 0;
+
+        for (const item of shareRows) {
+            const animalId = animalIdByRowId.get(item.rowid);
+            if (!animalId) {
+                importResult.warnings.push(`Condomínio: RowId ${item.rowid} não localizado para vincular cota.`);
+                continue;
+            }
+
+            const ownerName = normalizeSpaces(item.owner).toUpperCase();
+            if (!ownerName) continue;
+
+            const { data: existingShare, error: existingShareError } = await (supabase as any)
+                .from('animal_ownership_shares')
+                .select('id')
+                .eq('haras_id', harasId)
+                .eq('animal_id', animalId)
+                .eq('owner_name', ownerName)
+                .maybeSingle();
+
+            if (existingShareError) {
+                importResult.warnings.push(`Condomínio: falha ao verificar cota do RowId ${item.rowid}.`);
+                continue;
+            }
+
+            if (existingShare?.id) {
+                const { error: updateError } = await (supabase as any)
+                    .from('animal_ownership_shares')
+                    .update({
+                        percentage: 100,
+                        is_primary: true,
+                        source: 'abccmm_condominio',
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', existingShare.id);
+
+                if (updateError) {
+                    importResult.warnings.push(`Condomínio: falha ao atualizar cota do RowId ${item.rowid}.`);
+                } else {
+                    updatedShares += 1;
+                }
+            } else {
+                const { error: insertError } = await (supabase as any)
+                    .from('animal_ownership_shares')
+                    .insert({
+                        haras_id: harasId,
+                        animal_id: animalId,
+                        owner_name: ownerName,
+                        percentage: 100,
+                        is_primary: true,
+                        source: 'abccmm_condominio',
+                    });
+
+                if (insertError) {
+                    importResult.warnings.push(`Condomínio: falha ao inserir cota do RowId ${item.rowid}.`);
+                } else {
+                    insertedShares += 1;
+                }
+            }
+        }
+
+        importResult.warnings.push(`Condomínio: cotas processadas (${insertedShares} novas, ${updatedShares} atualizadas).`);
+        return importResult;
+    },
+
+    async importAwardsFromSpreadsheet(params: {
+        file: File;
+        harasId: string;
+        source: 'associado' | 'condominio';
+        onProgress?: (progress: number, message: string) => void;
+    }): Promise<AwardImportResult> {
+        const { file, harasId, source, onProgress } = params;
+        const warnings: string[] = [];
+        const errors: string[] = [];
+
+        const report = (progress: number, message: string) => {
+            if (onProgress) onProgress(Math.max(0, Math.min(100, Math.round(progress))), message);
+        };
+
+        report(10, 'Lendo planilha de premiações...');
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', raw: true, cellDates: false });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) throw new Error('Planilha de premiações sem aba válida.');
+
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], {
+            defval: '',
+            raw: true,
+            blankrows: false,
+        });
+
+        if (rows.length === 0) {
+            throw new Error('Planilha de premiações vazia.');
+        }
+
+        report(30, 'Validando animais por RowId...');
+        const normalizedRows = rows.map((row, idx) => ({ idx: idx + 2, data: normalizeRowKeys(row) }));
+        const rowIds = Array.from(new Set(normalizedRows
+            .map((row) => normalizeSpaces(String(row.data.rowid || row.data._rowid || '')).trim())
+            .filter(Boolean)));
+
+        const rowIdToAnimalId = new Map<string, string>();
+        if (rowIds.length > 0) {
+            const chunks = chunkArray(rowIds, ABCCMM_BATCH_SIZE);
+            for (const chunk of chunks) {
+                const { data: matchedAnimals, error: matchError } = await (supabase as any)
+                    .from('animals')
+                    .select('id, abccmm_rowid')
+                    .eq('haras_id', harasId)
+                    .in('abccmm_rowid', chunk);
+
+                if (matchError) handleSupabaseError(matchError);
+
+                (matchedAnimals || []).forEach((item: { id: string; abccmm_rowid: string | null }) => {
+                    if (item.abccmm_rowid) rowIdToAnimalId.set(item.abccmm_rowid, item.id);
+                });
+            }
+        }
+
+        report(55, 'Importando premiações...');
+        let processedRows = 0;
+        let insertedAwards = 0;
+        let updatedAwards = 0;
+
+        for (const row of normalizedRows) {
+            const sourceRowId = normalizeSpaces(String(row.data.rowid || row.data._rowid || '')).trim();
+            if (!sourceRowId) {
+                warnings.push(`Linha ${row.idx}: RowId ausente, ignorada.`);
+                continue;
+            }
+
+            processedRows += 1;
+            const animalId = rowIdToAnimalId.get(sourceRowId);
+            if (!animalId) {
+                warnings.push(`Linha ${row.idx}: RowId ${sourceRowId} não encontrado no plantel, ignorada.`);
+                continue;
+            }
+
+            const eventNameRaw = row.data.nomeexposicao || row.data._evento || row.data.evento || '';
+            const locationRaw = row.data.cidadeestado || row.data._cidadeuf || row.data.local || '';
+            const periodRaw = row.data.periodo || row.data._periodo || row.data.dataevento || '';
+            const awardRaw = row.data.premiacao || row.data._premiacao || row.data.colocacao || '';
+            const eventCodeRaw = row.data.codigoevento || row.data._julgados || row.data.julgados || '';
+            const categoryRaw = row.data.categoria || null;
+
+            const evento = normalizeSpaces(decode(String(eventNameRaw || '')).trim());
+            const local = normalizeSpaces(decode(String(locationRaw || '')).trim()) || null;
+            const colocacao = normalizeSpaces(decode(String(awardRaw || '')).trim());
+            const categoria = categoryRaw ? normalizeSpaces(decode(String(categoryRaw)).trim()) : null;
+            const dataEvento = parseMonthYearPeriod(periodRaw) || new Date().toISOString().slice(0, 10);
+            const sourceEventCode = normalizeSpaces(String(eventCodeRaw || '').trim()) || null;
+
+            if (!evento || !colocacao) {
+                warnings.push(`Linha ${row.idx}: dados essenciais da premiação ausentes, ignorada.`);
+                continue;
+            }
+
+            const sourceHash = makeImportHash([
+                source,
+                sourceRowId,
+                sourceEventCode,
+                evento,
+                colocacao,
+                dataEvento,
+            ]);
+
+            const awardPayload: any = {
+                haras_id: harasId,
+                animal_id: animalId,
+                evento,
+                local,
+                data_evento: dataEvento,
+                categoria,
+                colocacao,
+                pontuacao: null,
+                observacoes: source === 'condominio' ? 'Importado de premiações de animais em condomínio.' : 'Importado de premiação de associado.',
+                source,
+                source_rowid: sourceRowId,
+                source_event_code: sourceEventCode,
+                source_hash: sourceHash,
+            };
+
+            const { data: existingAward, error: existingAwardError } = await (supabase as any)
+                .from('awards')
+                .select('id')
+                .eq('haras_id', harasId)
+                .eq('source_hash', sourceHash)
+                .maybeSingle();
+
+            if (existingAwardError) {
+                errors.push(`Linha ${row.idx}: falha ao verificar premiação existente.`);
+                continue;
+            }
+
+            if (existingAward?.id) {
+                const { error: updateError } = await (supabase as any)
+                    .from('awards')
+                    .update({ ...awardPayload, updated_at: new Date().toISOString() })
+                    .eq('id', existingAward.id);
+
+                if (updateError) {
+                    errors.push(`Linha ${row.idx}: falha ao atualizar premiação.`);
+                } else {
+                    updatedAwards += 1;
+                }
+            } else {
+                const { error: insertError } = await (supabase as any)
+                    .from('awards')
+                    .insert(awardPayload);
+
+                if (insertError) {
+                    errors.push(`Linha ${row.idx}: falha ao inserir premiação.`);
+                } else {
+                    insertedAwards += 1;
+                }
+            }
+        }
+
+        report(100, 'Importação de premiações concluída.');
+        return {
+            processedRows,
+            insertedAwards,
+            updatedAwards,
+            warnings,
+            errors,
+        };
+    },
+
+    async listAwardsByAnimal(animalId: string, harasId?: string): Promise<Array<{
+        id: string;
+        eventName: string;
+        date: string;
+        location: string;
+        category: string;
+        placement: string;
+        placementType: '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Campeão' | 'Reservado' | 'Menção Honrosa';
+        points?: number;
+        description?: string;
+        photos: string[];
+        certificate?: string;
+    }>> {
+        let query = (supabase as any)
+            .from('awards')
+            .select('id, evento, data_evento, local, categoria, colocacao, pontuacao, observacoes')
+            .eq('animal_id', animalId)
+            .order('data_evento', { ascending: false });
+
+        if (harasId) query = query.eq('haras_id', harasId);
+
+        const { data, error } = await query;
+        if (error) handleSupabaseError(error);
+
+        const mapPlacementType = (value: string): '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Campeão' | 'Reservado' | 'Menção Honrosa' => {
+            const key = value.toLowerCase();
+            if (key.includes('campe')) return 'Campeão';
+            if (key.includes('reserv')) return 'Reservado';
+            if (key.includes('1')) return '1º Lugar';
+            if (key.includes('2')) return '2º Lugar';
+            if (key.includes('3')) return '3º Lugar';
+            return 'Menção Honrosa';
+        };
+
+        return (data || []).map((row: any) => ({
+            id: row.id,
+            eventName: row.evento,
+            date: row.data_evento,
+            location: row.local || 'Não informado',
+            category: row.categoria || 'Sem categoria',
+            placement: row.colocacao,
+            placementType: mapPlacementType(row.colocacao || ''),
+            points: row.pontuacao || undefined,
+            description: row.observacoes || undefined,
+            photos: [],
+            certificate: undefined,
+        }));
     },
 
     /**

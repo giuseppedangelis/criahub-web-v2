@@ -14,8 +14,6 @@ interface Animal {
   registry_number?: string;
   chip?: string;
   chip_number?: string;
-  marca?: string;
-  brand?: string;
   sex?: string;
   birthDate?: string;
   birth_date?: string;
@@ -29,6 +27,7 @@ interface Animal {
   statusColor?: string;
   localizacao?: string;
   location?: string;
+  status_manejo?: string;
   servicoTipo?: string;
   service_type?: string;
   coat_color?: string;
@@ -74,64 +73,101 @@ interface DocumentItem {
 }
 
 export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAnimalProps) {
+  const DEFAULT_PLACEHOLDER = '';
+  const SERVICE_TYPE_OPTIONS = ['Reprodução', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
+
+  const getAgeInMonths = (birthDate?: string) => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    return (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  };
+
+  const resolveCategoryByAge = (sex?: string, birthDate?: string): string => {
+    if (!sex || !birthDate) return '';
+    const ageInMonths = getAgeInMonths(birthDate);
+    if (ageInMonths === null) return '';
+    if (ageInMonths < 24) return sex === 'Fêmea' ? 'potra' : 'potro';
+    return sex === 'Fêmea' ? 'egua' : 'garanhao';
+  };
+
+  const isAdultByAgeOrCategory = (item: { birth_date?: string | null; category?: string | null }) => {
+    const ageInMonths = getAgeInMonths(item.birth_date || undefined);
+    if (ageInMonths !== null) return ageInMonths >= 24;
+    const key = (item.category || '').toLowerCase();
+    return key.includes('garanh') || key.includes('egua');
+  };
+
   const updateAnimalMutation = useUpdateAnimal();
   const { stableHarasId } = useUser();
   const [isLoading, setIsLoading] = useState(false);
-  const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
-  const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
+  const [hydratedAnimal, setHydratedAnimal] = useState<Animal | null>(null);
+  const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null; birth_date?: string | null; category?: string }[]>([]);
+  const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null; birth_date?: string | null; category?: string }[]>([]);
+  const [fatherSearch, setFatherSearch] = useState('');
+  const [motherSearch, setMotherSearch] = useState('');
   const isOfficialDataLocked = Boolean(animal.abccmm_rowid);
 
-  // Initialize form data with actual animal data from the database
-  const [formData, setFormData] = useState({
-    nome: animal.name || '',
-    registro: animal.registry || animal.registry_number || '',
-    chip: animal.chip || animal.chip_number || '',
-    marca: animal.marca || animal.brand || '',
-    categoria: animal.category || '',
-    sexo: animal.sex || 'Macho',
-    dataNascimento: animal.birthDate || animal.birth_date || '',
-    pelagem: animal.coat_color || animal.pelagem || '',
-    andamento: animal.gait || 'Marchado',
-    pai_id: animal.father_id || (animal as any).pai_id || (animal.father_name ? 'external' : ''),
-    pai: animal.father_name || animal.pai || '',
-    mae_id: animal.mother_id || (animal as any).mae_id || (animal.mother_name ? 'external' : ''),
-    mae: animal.mother_name || animal.mae || '',
-    haras: animal.haras || '',
-    status: animal.status || 'ativo',
-    localizacao: animal.localizacao || animal.location || 'Baia',
-    servicoTipo: animal.servicoTipo || animal.service_type || 'Reprodução',
-    origemHaras: animal.origin_haras || animal.harasOrigem || '',
-    observacoes: animal.observations || '',
-    peso: animal.weight || '',
-    altura: animal.height || '',
+  const buildFormData = (source: Animal | null | undefined) => ({
+    nome: source?.name || '',
+    registro: source?.registry || source?.registry_number || '',
+    chip: source?.chip || source?.chip_number || '',
+    categoria: source?.category || '',
+    sexo: source?.sex || 'Macho',
+    dataNascimento: source?.birthDate || source?.birth_date || '',
+    pelagem: source?.coat_color || source?.pelagem || '',
+    andamento: source?.gait || 'Marchado',
+    pai_id: source?.father_id || (source as any)?.pai_id || (source?.father_name ? 'external' : ''),
+    pai: source?.father_name || source?.pai || '',
+    mae_id: source?.mother_id || (source as any)?.mae_id || (source?.mother_name ? 'external' : ''),
+    mae: source?.mother_name || source?.mae || '',
+    haras: source?.haras || '',
+    status: source?.status || 'ativo',
+    statusManejo: (source as any)?.status_manejo || (source as any)?.management_status || '',
+    localizacao: source?.localizacao || source?.location || 'Baia',
+    servicoTipo: source?.servicoTipo || source?.service_type || (source as any)?.tipo_servico || 'Reprodução',
+    origemHaras: source?.origin_haras || source?.harasOrigem || '',
+    observacoes: source?.observations || '',
+    peso: source?.weight || '',
+    altura: source?.height || '',
   });
+
+  // Initialize form data with actual animal data from the database
+  const [formData, setFormData] = useState(() => buildFormData(animal));
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAnimalDetails() {
+      const { animalsService } = await import('@/services/animals');
+      const fullAnimal = await animalsService.getById(String(animal.id));
+      if (isMounted && fullAnimal) {
+        setHydratedAnimal(fullAnimal as unknown as Animal);
+      }
+    }
+
+    setHydratedAnimal(null);
+    loadAnimalDetails().catch((error) => {
+      console.error('Erro ao carregar ficha completa do animal para edição:', error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [animal.id]);
 
   // Update form data when animal prop changes
   useEffect(() => {
-    setFormData({
-      nome: animal.name || '',
-      registro: animal.registry || animal.registry_number || '',
-      chip: animal.chip || animal.chip_number || '',
-      marca: animal.marca || animal.brand || '',
-      categoria: animal.category || '',
-      sexo: animal.sex || 'Macho',
-      dataNascimento: animal.birthDate || animal.birth_date || '',
-      pelagem: animal.coat_color || animal.pelagem || '',
-      andamento: animal.gait || 'Marchado',
-      pai_id: animal.father_id || (animal as any).pai_id || (animal.father_name ? 'external' : ''),
-      pai: animal.father_name || animal.pai || '',
-      mae_id: animal.mother_id || (animal as any).mae_id || (animal.mother_name ? 'external' : ''),
-      mae: animal.mother_name || animal.mae || '',
-      haras: animal.haras || '',
-      status: animal.status || 'ativo',
-      localizacao: animal.localizacao || animal.location || 'Baia',
-      servicoTipo: animal.servicoTipo || animal.service_type || 'Reprodução',
-      origemHaras: animal.origin_haras || animal.harasOrigem || '',
-      observacoes: animal.observations || '',
-      peso: animal.weight || '',
-      altura: animal.height || '',
-    });
-  }, [animal]);
+    setFormData(buildFormData(hydratedAnimal || animal));
+  }, [animal, hydratedAnimal]);
+
+  useEffect(() => {
+    const autoCategory = resolveCategoryByAge(formData.sexo, formData.dataNascimento);
+    if (autoCategory && formData.categoria !== autoCategory) {
+      setFormData((prev) => ({ ...prev, categoria: autoCategory }));
+    }
+  }, [formData.sexo, formData.dataNascimento]);
 
   // Carregar garanhões e éguas do mesmo haras para seleção de genealogia
   useEffect(() => {
@@ -152,8 +188,14 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
 
       // Evitar auto-referência (animal não pode ser pai/mãe dele mesmo)
       const currentId = String(animal.id);
-      setStallions(stallionsData.filter((item) => String(item.id) !== currentId));
-      setMares(maresData.filter((item) => String(item.id) !== currentId));
+      setStallions(
+        stallionsData.filter((item) => String(item.id) !== currentId)
+          .filter((item) => isAdultByAgeOrCategory({ birth_date: (item as any).birth_date, category: (item as any).category }))
+      );
+      setMares(
+        maresData.filter((item) => String(item.id) !== currentId)
+          .filter((item) => isAdultByAgeOrCategory({ birth_date: (item as any).birth_date, category: (item as any).category }))
+      );
     }
 
     loadParents();
@@ -186,10 +228,13 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   // Estado para mídia existente e nova
   const [existingMedia, setExistingMedia] = useState<MediaItem[]>([]);
   const [newMedia, setNewMedia] = useState<{ file: File; caption: string; type: 'image' | 'video' }[]>([]);
+  const [selectedCoverId, setSelectedCoverId] = useState<string>('');
 
   // Estado para documentos existentes e novos
   const [existingDocuments, setExistingDocuments] = useState<DocumentItem[]>([]);
   const [newDocuments, setNewDocuments] = useState<File[]>([]);
+
+  const getMediaToken = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
   // Initialize media and documents from animal prop when component mounts or animal changes
   useEffect(() => {
@@ -199,7 +244,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     console.log('Animal documents:', animal.documents);
 
     // Handle images - check both 'images' and legacy 'image' properties
-    const animalImages = animal.images || (animal.image ? [animal.image] : []);
+    const animalImages = (animal.images || (animal.image ? [animal.image] : []))
+      .filter((url) => !!url && url !== DEFAULT_PLACEHOLDER);
     console.log('Animal images processadas:', animalImages);
 
     if (animalImages && animalImages.length > 0) {
@@ -212,9 +258,14 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
       }));
       console.log('Mídia existente inicializada:', mediaItems.length, 'itens');
       setExistingMedia(mediaItems);
+      const preferredCover = animal.main_image_url && animal.main_image_url !== DEFAULT_PLACEHOLDER
+        ? mediaItems.find((item) => item.url === animal.main_image_url)
+        : mediaItems[0];
+      setSelectedCoverId(preferredCover?.id || '');
     } else {
       console.log('Nenhuma mídia existente');
       setExistingMedia([]);
+      setSelectedCoverId('');
     }
 
     // Handle documents
@@ -241,7 +292,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     // Reset new media and documents when animal changes
     setNewMedia([]);
     setNewDocuments([]);
-  }, [animal.id, animal.images, animal.documents]); // Re-run when animal data changes
+  }, [animal.id, animal.images, animal.documents, animal.main_image_url]); // Re-run when animal data changes
 
   const handleNewMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log('handleNewMediaSelect chamado', event.target.files);
@@ -258,6 +309,10 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
         console.log('newMedia atualizado:', updated.length, 'itens');
         return updated;
       });
+      if (!selectedCoverId) {
+        const firstImage = newMediaItems.find((item) => item.type === 'image');
+        if (firstImage) setSelectedCoverId(`new-${getMediaToken(firstImage.file)}`);
+      }
       // Reset input value to allow selecting the same file again
       event.target.value = '';
     }
@@ -279,11 +334,32 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   };
 
   const removeExistingMedia = (id: string) => {
-    setExistingMedia(existingMedia.filter(item => item.id !== id));
+    const updated = existingMedia.filter(item => item.id !== id);
+    setExistingMedia(updated);
+    if (selectedCoverId === id) {
+      const nextExisting = updated.find((item) => item.type === 'image');
+      if (nextExisting) {
+        setSelectedCoverId(nextExisting.id);
+        return;
+      }
+      const nextNew = newMedia.find((item) => item.type === 'image');
+      setSelectedCoverId(nextNew ? `new-${getMediaToken(nextNew.file)}` : '');
+    }
   };
 
   const removeNewMedia = (index: number) => {
-    setNewMedia(newMedia.filter((_, i) => i !== index));
+    const removed = newMedia[index];
+    const updated = newMedia.filter((_, i) => i !== index);
+    setNewMedia(updated);
+    if (removed && selectedCoverId === `new-${getMediaToken(removed.file)}`) {
+      const nextExisting = existingMedia.find((item) => item.type === 'image');
+      if (nextExisting) {
+        setSelectedCoverId(nextExisting.id);
+        return;
+      }
+      const nextNew = updated.find((item) => item.type === 'image');
+      setSelectedCoverId(nextNew ? `new-${getMediaToken(nextNew.file)}` : '');
+    }
   };
 
   const updateExistingMediaCaption = (id: string, caption: string) => {
@@ -351,17 +427,42 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   const handleSave = async () => {
     try {
       setIsLoading(true);
+      const supabase = createClient();
 
       // Upload new media files if any
-      let allMediaUrls = existingMedia.map(item => item.url);
+      const existingImageUrls = existingMedia.filter((item) => item.type === 'image').map(item => item.url);
+      const newImageMedia = newMedia.filter((item) => item.type === 'image');
+      const newVideoMedia = newMedia.filter((item) => item.type === 'video');
+      let allMediaUrls = [...existingImageUrls];
       let uploadedMediaCount = 0;
 
-      if (newMedia.length > 0) {
+      if (newImageMedia.length > 0) {
         toast.info('Fazendo upload das fotos/vídeos...');
-        const uploadedMediaUrls = await uploadFiles(newMedia, 'media');
+        const uploadedMediaUrls = await uploadFiles(newImageMedia, 'media');
         allMediaUrls = [...allMediaUrls, ...uploadedMediaUrls];
         uploadedMediaCount = uploadedMediaUrls.length;
         console.log(`Upload de mídia concluído: ${uploadedMediaCount} arquivo(s) enviado(s)`);
+      }
+
+      if (newVideoMedia.length > 0) {
+        const uploadedVideoUrls = await uploadFiles(newVideoMedia, 'videos');
+        if (uploadedVideoUrls.length > 0) {
+          const videoPayload = uploadedVideoUrls.map((url, index) => ({
+            animal_id: animal.id,
+            haras_id: animal.haras_id || stableHarasId,
+            title: newVideoMedia[index]?.caption || newVideoMedia[index]?.file.name || `Vídeo ${index + 1}`,
+            url,
+            type: 'Upload',
+            visibility: 'Privado',
+            source: 'upload',
+            caption: newVideoMedia[index]?.caption || null,
+          }));
+          const { error: videoInsertError } = await (supabase as any).from('animal_videos').insert(videoPayload);
+          if (videoInsertError) {
+            console.error('Erro ao registrar vídeos:', videoInsertError);
+            toast.warning('Vídeos enviados, mas houve falha no registro.');
+          }
+        }
       }
 
       // Upload new documents if any
@@ -387,22 +488,29 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
       console.log('Total de documentos:', allDocumentUrls.length);
 
       // Prepare update data mapping form fields to database fields
+      const selectedExistingCover = existingMedia.find((item) => item.id === selectedCoverId && item.type === 'image');
+      const selectedNewCoverIndex = newImageMedia.findIndex((item) => `new-${getMediaToken(item.file)}` === selectedCoverId);
+      const selectedNewCoverUrl = selectedNewCoverIndex >= 0
+        ? allMediaUrls[existingImageUrls.length + selectedNewCoverIndex]
+        : undefined;
+      const mainImageUrl = selectedExistingCover?.url || selectedNewCoverUrl || allMediaUrls[0] || undefined;
+
       const updateData = {
         id: animal.id,
         name: formData.nome,
         registry_number: formData.registro,
         chip_number: formData.chip,
-        brand: formData.marca,
         sex: formData.sexo as 'Macho' | 'Fêmea',
         category: mapCategoryToDb(formData.categoria),
         birth_date: formData.dataNascimento,
         coat_color: formData.pelagem,
         gait: formData.andamento,
         status: mapStatusToDb(formData.status) as 'ativo' | 'vendido' | 'morto' | 'emprestado' | 'em_servico',
-        father_id: formData.pai_id && formData.pai_id !== 'external' ? formData.pai_id : null,
-        mother_id: formData.mae_id && formData.mae_id !== 'external' ? formData.mae_id : null,
-        father_name: formData.pai || null,
-        mother_name: formData.mae || null,
+        management_status: formData.statusManejo || undefined,
+        father_id: formData.pai_id && formData.pai_id !== 'external' ? formData.pai_id : undefined,
+        mother_id: formData.mae_id && formData.mae_id !== 'external' ? formData.mae_id : undefined,
+        father_name: formData.pai || undefined,
+        mother_name: formData.mae || undefined,
         location: formData.localizacao,
         service_type: formData.servicoTipo,
         origin_haras: formData.origemHaras,
@@ -411,7 +519,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
         observations: formData.observacoes,
         // Media URLs (existing + newly uploaded)
         images: allMediaUrls,
-        main_image_url: allMediaUrls.length > 0 ? allMediaUrls[0] : undefined,
+        main_image_url: mainImageUrl,
         documents: allDocumentUrls,
       };
 
@@ -470,8 +578,6 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     return mapping[status] || status.toLowerCase();
   };
 
-  // Função para determinar se deve mostrar sub-opções de serviço
-  const mostrarSubOpcoesServico = formData.localizacao === 'Serviço';
   const lockedFieldClasses = isOfficialDataLocked
     ? 'disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-zinc-200/60 dark:disabled:bg-zinc-800/60'
     : '';
@@ -569,18 +675,6 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
               </div>
 
               <div>
-                <label className="block text-sm text-foreground dark:text-white mb-2">Marca</label>
-                <input
-                  type="text"
-                  value={formData.marca}
-                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  // disabled={isOfficialDataLocked}
-                  className={`w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white ${lockedFieldClasses}`}
-                  placeholder="Ex: Marca XYZ"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm text-foreground dark:text-white mb-2">Categoria *</label>
                 <NativeSelect
                   value={formData.categoria}
@@ -592,7 +686,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   <option value="egua">Égua</option>
                   <option value="garanhao">Garanhão</option>
                   <option value="potro">Potro</option>
-                  <option value="potra">Potranca</option>
+                  <option value="potra">Potra</option>
                   <option value="castrado">Castrado</option>
                 </NativeSelect>
               </div>
@@ -701,6 +795,13 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
               {/* Pai */}
               <div>
                 <label className="block text-sm text-foreground dark:text-white mb-2">Pai</label>
+                <input
+                  type="text"
+                  value={fatherSearch}
+                  onChange={(e) => setFatherSearch(e.target.value)}
+                  placeholder="Buscar pai por nome"
+                  className="w-full h-10 px-4 mb-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
                 <div className="flex gap-2">
                   <NativeSelect
                     value={formData.pai_id || ''}
@@ -739,7 +840,9 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                         {formData.pai ? `Atual: ${formData.pai}` : 'Pai atual (fora da lista)'}
                       </option>
                     )}
-                    {stallions.map((stallion) => (
+                    {stallions
+                      .filter((stallion) => stallion.name.toLowerCase().includes(fatherSearch.trim().toLowerCase()))
+                      .map((stallion) => (
                       <option key={stallion.id} value={stallion.id}>
                         {stallion.name} {stallion.registry_number ? `(${stallion.registry_number})` : ''}
                       </option>
@@ -761,6 +864,13 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
               {/* Mãe */}
               <div>
                 <label className="block text-sm text-foreground dark:text-white mb-2">Mãe</label>
+                <input
+                  type="text"
+                  value={motherSearch}
+                  onChange={(e) => setMotherSearch(e.target.value)}
+                  placeholder="Buscar mãe por nome"
+                  className="w-full h-10 px-4 mb-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
                 <div className="flex gap-2">
                   <NativeSelect
                     value={formData.mae_id || ''}
@@ -799,7 +909,9 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                         {formData.mae ? `Atual: ${formData.mae}` : 'Mãe atual (fora da lista)'}
                       </option>
                     )}
-                    {mares.map((mare) => (
+                    {mares
+                      .filter((mare) => mare.name.toLowerCase().includes(motherSearch.trim().toLowerCase()))
+                      .map((mare) => (
                       <option key={mare.id} value={mare.id}>
                         {mare.name} {mare.registry_number ? `(${mare.registry_number})` : ''}
                       </option>
@@ -860,22 +972,41 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                     </NativeSelect>
                   </div>
 
-                  {/* Sub-opções de Serviço */}
-                  {mostrarSubOpcoesServico && (
-                    <div>
-                      <label className="block text-sm text-foreground dark:text-white mb-2">Tipo de Serviço *</label>
-                      <NativeSelect
-                        value={formData.servicoTipo}
-                        onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
-                        className="w-full"
-                      >
-                        <option value="Reprodução">Reprodução</option>
-                        <option value="Trabalho">Trabalho</option>
-                        <option value="Repouso">Repouso</option>
-                        <option value="Outro">Outro</option>
-                      </NativeSelect>
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Status de Manejo</label>
+                    <input
+                      type="text"
+                      list="status-suggestions-edit"
+                      value={formData.statusManejo}
+                      onChange={(e) => setFormData({ ...formData, statusManejo: e.target.value })}
+                      placeholder="Descreva o status"
+                      className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                    />
+                    <datalist id="status-suggestions-edit">
+                      <option value="Treinamento para pista" />
+                      <option value="Baia para tratamento" />
+                      <option value="Trato em baia" />
+                      <option value="Pasto" />
+                      <option value="Serviço" />
+                      <option value="Reprodução" />
+                      <option value="Repouso" />
+                      <option value="Em observação" />
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Tipo de Serviço</label>
+                    <NativeSelect
+                      value={formData.servicoTipo}
+                      onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
+                      className="w-full"
+                    >
+                      <option value="">Selecione</option>
+                      {SERVICE_TYPE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </NativeSelect>
+                  </div>
                 </div>
 
                 {/* Informação da última alteração */}
@@ -926,6 +1057,15 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                             />
                           )}
                         </div>
+                        {item.type === 'image' && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCoverId(item.id)}
+                            className={`absolute bottom-2 left-2 px-2 py-1 text-xs rounded-md ${selectedCoverId === item.id ? 'bg-primary text-white' : 'bg-black/70 text-white'}`}
+                          >
+                            {selectedCoverId === item.id ? 'Foto de capa' : 'Definir capa'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => removeExistingMedia(item.id)}
@@ -1000,6 +1140,15 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                               />
                             )}
                           </div>
+                          {item.type === 'image' && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCoverId(`new-${getMediaToken(item.file)}`)}
+                              className={`absolute bottom-2 left-2 px-2 py-1 text-xs rounded-md ${selectedCoverId === `new-${getMediaToken(item.file)}` ? 'bg-primary text-white' : 'bg-black/70 text-white'}`}
+                            >
+                              {selectedCoverId === `new-${getMediaToken(item.file)}` ? 'Foto de capa' : 'Definir capa'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeNewMedia(index)}

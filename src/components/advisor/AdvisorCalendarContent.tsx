@@ -8,11 +8,7 @@ export function AdvisorCalendarContent() {
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  const events = [
-    { id: 1, title: 'Vistoria ABCCMM', date: 23, time: '10:00', type: 'Administrativo', animal: 'Estrela Mangalarga' },
-    { id: 2, title: 'Entrega de GIA - Bella Vista', date: 20, time: '14:00', type: 'Documentação', animal: 'Bella Vista' },
-    { id: 3, title: 'Atualização de Registros', date: 25, time: '09:00', type: 'ABCCMM', animal: 'Vento Sul' },
-  ];
+  const events: Array<{ id: number; title: string; date: number; time: string; type: string; animal: string }> = [];
 
   const navigatePrevious = () => {
     const newDate = new Date(currentDate);
@@ -398,11 +394,6 @@ function NewEventModal({ onClose, selectedDate }: { onClose: () => void, selecte
               </label>
               <NativeSelect>
                 <option value="">Selecione o animal</option>
-                <option value="1">Estrela Mangalarga (MM-2020-1234)</option>
-                <option value="2">Relâmpago Negro (MM-2018-5678)</option>
-                <option value="3">Lua Dourada (MM-2019-9012)</option>
-                <option value="4">Vento Sul (MM-2023-3456)</option>
-                <option value="5">Bella Vista (MM-2021-7890)</option>
               </NativeSelect>
             </div>
 

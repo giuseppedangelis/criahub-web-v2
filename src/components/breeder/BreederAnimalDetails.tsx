@@ -1,17 +1,18 @@
 import { ArrowLeft, Eye, Plus, Download, Trash2, FileText, ZoomIn, ZoomOut, RefreshCw, ChevronDown, Filter, X, Upload, ChevronLeft, ChevronRight, Video, Trophy, Calendar, Link, MoreVertical, Edit, Share2, MapPin, Home, AlertCircle, Clock, Stethoscope, Syringe, Heart, User } from 'lucide-react';
-import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, type ChangeEvent, type SyntheticEvent } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from './GenealogyTree';
 import { AwardsDetailModal } from './AwardsDetailModal';
 import { AnimalLocationSection } from './AnimalLocationSection';
 import { AnimalDocumentsSection } from './AnimalDocumentsSection';
+import { MediaShowcase } from './MediaShowcase';
 import { HealthTabs } from './HealthTabs';
 import { RegisterVaccineModal, type VaccineData } from './RegisterVaccineModal';
 import { RegisterExamModal, type ExamData } from './RegisterExamModal';
 import { RegisterVeterinaryProcedureModal, type VeterinaryProcedureData } from './RegisterVeterinaryProcedureModal';
 
 import { NativeSelect } from '../ui/native-select';
-import { useAnimal, useAnimalGenealogy, useAnimalOffspring, useUpdateAnimal } from '@/hooks/useAnimals';
+import { useAnimal, useAnimalAwards, useAnimalGenealogy, useAnimalOffspring, useUpdateAnimal } from '@/hooks/useAnimals';
 import { useAnimalExams, useAnimalHealthRecords, useAnimalVaccines, useCreateExam, useCreateHealthRecord, useCreateVaccine } from '@/hooks/useAnimalHealth';
 import { useAnimalVideos, useCreateAnimalVideo, useUpdateAnimalVideo, useDeleteAnimalVideo } from '@/hooks/useAnimalVideos';
 import { createClient } from '@/lib/supabase/client';
@@ -64,8 +65,7 @@ function calculateAge(birthDate: string | undefined): string {
   }
 }
 
-const DEFAULT_VIDEO_THUMBNAIL =
-  'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=1080&q=80';
+const DEFAULT_VIDEO_THUMBNAIL = '';
 
 function extractYoutubeId(url: string): string | null {
   const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([^&?/]+)/i);
@@ -104,7 +104,7 @@ function normalizeLocationType(value?: string | null): 'Baia' | 'Pasto' | 'Servi
   return undefined;
 }
 
-function normalizeServiceType(value?: string | null): 'Reproducao' | 'Trabalho' | 'Repouso' | 'Outro' | undefined {
+function normalizeServiceType(value?: string | null): 'Reproducao' | 'Trabalho' | 'Repouso' | 'Hospedagem' | 'Compra' | 'Nascimento' | 'Outro' | undefined {
   if (!value) return undefined;
   const key = value
     .toLowerCase()
@@ -114,6 +114,9 @@ function normalizeServiceType(value?: string | null): 'Reproducao' | 'Trabalho' 
   if (key.includes('reproducao')) return 'Reproducao';
   if (key.includes('trabalho')) return 'Trabalho';
   if (key.includes('repouso')) return 'Repouso';
+  if (key.includes('hospedagem')) return 'Hospedagem';
+  if (key.includes('compra')) return 'Compra';
+  if (key.includes('nascimento')) return 'Nascimento';
   return 'Outro';
 }
 
@@ -180,7 +183,7 @@ function VideoThumbnail({ url, title, fallback }: { url: string; title: string; 
     <img
       src={thumb}
       alt={title}
-      className="w-full h-full object-cover"
+      className="w-full h-full object-contain bg-black"
       loading="lazy"
     />
   );
@@ -247,7 +250,6 @@ interface Animal {
   name: string;
   registry: string;
   chip?: string;  // Chip RFID
-  marca?: string; // Número da marca/ferro
   sex?: 'Macho' | 'Fêmea'; // FASE 19: Sexo do animal
   birthDate?: string; // FASE 20: Data de nascimento (ISO format)
   harasOrigem?: string; // FASE 19: Haras de origem
@@ -281,6 +283,11 @@ interface Animal {
   gait?: string; // Tipo de andamento
   criador?: string | null;
   proprietario?: string | null;
+}
+
+function formatMotherDisplayName(value?: string | null): string {
+  if (!value) return 'Não informado';
+  return value.replace(/\s*\((doadora|matriz|receptora)\)\s*$/i, '').trim();
 }
 
 interface BreederAnimalDetailsProps {
@@ -327,13 +334,14 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   });
   // FASE 30-32: Estados para Vídeos
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
+  const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [showEditVideoModal, setShowEditVideoModal] = useState(false);
   const [showDeleteVideoModal, setShowDeleteVideoModal] = useState(false);
   const [videoToEdit, setVideoToEdit] = useState<Video | null>(null);
   const [videoToDelete, setVideoToDelete] = useState<Video | null>(null);
-  const [activeVideoMenu, setActiveVideoMenu] = useState<string | null>(null);
+  const [selectedGalleryVideoId, setSelectedGalleryVideoId] = useState<string | null>(null);
   // FASE 31: Estados para formulário de vídeo
   const [videoInputMethod, setVideoInputMethod] = useState<'upload' | 'link'>('link');
   const [videoFormData, setVideoFormData] = useState({
@@ -344,14 +352,16 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
     caption: '',
   });
   const [videoUploadFile, setVideoUploadFile] = useState<File | null>(null);
+  const [photoUploadFiles, setPhotoUploadFiles] = useState<File[]>([]);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [selectedPhotoOrientation, setSelectedPhotoOrientation] = useState<'portrait' | 'landscape' | 'square'>('landscape');
   // NOVOS ESTADOS: Modal de Inativação
   const [showInactivateModal, setShowInactivateModal] = useState(false);
   const [inactivateReason, setInactivateReason] = useState<'Vendido' | 'Obito' | 'Doado' | 'Transferido'>('Vendido');
   const [inactivateDate, setInactivateDate] = useState(new Date().toISOString().split('T')[0]);
   const [localStatusHistory, setLocalStatusHistory] = useState<StatusHistoryEntry[]>([]);
   // FASE 33-37: Estados para Premiações
-  const [showAddAwardModal, setShowAddAwardModal] = useState(false);
   const [showAwardDetailsModal, setShowAwardDetailsModal] = useState(false);
   const [selectedAward, setSelectedAward] = useState<Award | null>(null);
   const [awardFilters, setAwardFilters] = useState({
@@ -362,16 +372,26 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   // FASE 38: Estado para modal de detalhes completos de premiações
   const [showAwardsFullDetailsModal, setShowAwardsFullDetailsModal] = useState(false);
 
+  const shouldLoadOverviewData = activeTab === 'overview';
+  const shouldLoadOffspringData = shouldLoadOverviewData || activeTab === 'offspring';
+  const shouldLoadGenealogyData = shouldLoadOverviewData || activeTab === 'genealogy';
+  const shouldLoadAwardsData = shouldLoadOverviewData || activeTab === 'awards';
+  const shouldLoadVideosData = activeTab === 'videos';
+  const shouldLoadHealthData = activeTab === 'health' || activeTab === 'history';
+  const shouldLoadLocationHistoryData = activeTab === 'location' || activeTab === 'history';
+  const shouldLoadReproductionEventsData = shouldLoadOverviewData || activeTab === 'history';
+
   // FASE 2: Dados Dinâmicos
   const { data: animalDetails, isLoading: isLoadingDetails } = useAnimal(String(animal.id));
-  const { data: offspringList, isLoading: isLoadingOffspring } = useAnimalOffspring(String(animal.id));
-  const { data: genealogyData, isLoading: isLoadingGenealogy } = useAnimalGenealogy(String(animal.id));
-  const { data: animalVideos, isLoading: isLoadingVideos } = useAnimalVideos(String(animal.id));
-  const { data: healthRecords, isLoading: isLoadingHistoryHealth } = useAnimalHealthRecords(String(animal.id));
-  const { data: vaccineRecords, isLoading: isLoadingHistoryVaccines } = useAnimalVaccines(String(animal.id));
-  const { data: examRecords, isLoading: isLoadingHistoryExams } = useAnimalExams(String(animal.id));
-  const { data: locationHistory, isLoading: isLoadingHistoryLocations } = useAnimalLocationHistory(String(animal.id));
-  const { data: reproductiveEvents, isLoading: isLoadingHistoryReproduction } = useAnimalReproductiveEvents(String(animal.id));
+  const { data: offspringList, isLoading: isLoadingOffspring } = useAnimalOffspring(String(animal.id), shouldLoadOffspringData);
+  const { data: genealogyData, isLoading: isLoadingGenealogy } = useAnimalGenealogy(String(animal.id), shouldLoadGenealogyData);
+  const { data: animalVideos, isLoading: isLoadingVideos } = useAnimalVideos(String(animal.id), shouldLoadVideosData);
+  const { data: healthRecords, isLoading: isLoadingHistoryHealth } = useAnimalHealthRecords(String(animal.id), shouldLoadHealthData);
+  const { data: vaccineRecords, isLoading: isLoadingHistoryVaccines } = useAnimalVaccines(String(animal.id), shouldLoadHealthData);
+  const { data: examRecords, isLoading: isLoadingHistoryExams } = useAnimalExams(String(animal.id), shouldLoadHealthData);
+  const { data: locationHistory, isLoading: isLoadingHistoryLocations } = useAnimalLocationHistory(String(animal.id), shouldLoadLocationHistoryData);
+  const { data: reproductiveEvents, isLoading: isLoadingHistoryReproduction } = useAnimalReproductiveEvents(String(animal.id), shouldLoadReproductionEventsData);
+  const { data: awardsList, isLoading: isLoadingAwards } = useAnimalAwards(String(animal.id), animal.haras_id, shouldLoadAwardsData);
   const { mutateAsync: createVideo } = useCreateAnimalVideo();
   const { mutateAsync: updateVideo } = useUpdateAnimalVideo();
   const { mutateAsync: deleteVideo } = useDeleteAnimalVideo();
@@ -383,10 +403,16 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   // Merge prop animal with details - usar fullAnimal em vez de animal para ter acesso a todos os dados sincronizados
   const fullAnimal = { ...animal, ...animalDetails };
 
+  const awardsCount = awardsList?.length || 0;
+  const photosCount = (fullAnimal.images && fullAnimal.images.length > 0)
+    ? fullAnimal.images.length
+    : (fullAnimal.image ? 1 : 0);
+
   const tabs = [
     { id: 'overview', label: 'Visão Geral' },
+    { id: 'photos', label: `Fotos (${photosCount})` },
     { id: 'videos', label: 'Vídeos' },
-    ...(fullAnimal.premiacoes && fullAnimal.premiacoes > 0 ? [{ id: 'awards', label: `Premiações (${fullAnimal.premiacoes})` }] : []),
+    { id: 'awards', label: awardsCount > 0 ? `Premiações (${awardsCount})` : 'Premiações' },
     { id: 'location', label: 'Localização' },
     { id: 'health', label: 'Saúde' },
     { id: 'genealogy', label: 'Genealogia' },
@@ -422,7 +448,27 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   }, [showInactivateModal]);
 
   // Ensure we have images array
-  const animalImages = fullAnimal.images || [fullAnimal.image];
+  const animalImages = (fullAnimal.images && fullAnimal.images.length > 0)
+    ? fullAnimal.images
+    : (fullAnimal.image ? [fullAnimal.image] : []);
+
+  const photoStageHeight = 'clamp(320px, 52vh, 520px)';
+
+  const handleSelectedPhotoLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    if (!image.naturalWidth || !image.naturalHeight) return;
+
+    const ratio = image.naturalWidth / image.naturalHeight;
+    if (ratio < 0.9) {
+      setSelectedPhotoOrientation('portrait');
+      return;
+    }
+    if (ratio > 1.15) {
+      setSelectedPhotoOrientation('landscape');
+      return;
+    }
+    setSelectedPhotoOrientation('square');
+  };
 
   const currentAnimalId = String(fullAnimal.id || animal.id);
   const resolvedLocationType = normalizeLocationType(fullAnimal.localizacao);
@@ -483,9 +529,10 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   };
 
   const mapInactivationStatus = (reason: 'Vendido' | 'Obito' | 'Doado' | 'Transferido') => {
-    if (reason === 'Obito') return 'Falecido';
-    if (reason === 'Doado') return 'Transferido';
-    return reason;
+    if (reason === 'Obito') return 'morto';
+    if (reason === 'Doado') return 'emprestado';
+    if (reason === 'Transferido') return 'emprestado';
+    return 'vendido';
   };
 
   const mergedStatusHistory = useMemo(
@@ -736,6 +783,17 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
     }
   };
 
+  const handlePhotoFilesSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    const files = Array.from(event.target.files).filter((file) => file.type.startsWith('image/'));
+    if (files.length === 0) {
+      toast.error('Selecione arquivos de imagem válidos.');
+      return;
+    }
+    setPhotoUploadFiles((prev) => [...prev, ...files]);
+    event.target.value = '';
+  };
+
   const uploadVideoFile = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${currentAnimalId}/videos/${Date.now()}_${Math.random().toString(36).substring(7)}${fileExt ? `.${fileExt}` : ''}`;
@@ -753,6 +811,29 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
     return data.publicUrl;
   };
 
+  const uploadPhotoFiles = async (files: File[]): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentAnimalId}/media/${Date.now()}_${Math.random().toString(36).substring(7)}${fileExt ? `.${fileExt}` : ''}`;
+
+      const { error } = await supabase.storage
+        .from('animals')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data } = supabase.storage
+        .from('animals')
+        .getPublicUrl(fileName);
+
+      if (data?.publicUrl) uploadedUrls.push(data.publicUrl);
+    }
+
+    return uploadedUrls;
+  };
+
   const resetVideoForm = () => {
     setVideoFormData({
       title: '',
@@ -762,6 +843,61 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
       caption: '',
     });
     setVideoUploadFile(null);
+  };
+
+  const resetPhotoForm = () => {
+    setPhotoUploadFiles([]);
+  };
+
+  const handleAddPhotos = async () => {
+    if (photoUploadFiles.length === 0) {
+      toast.error('Selecione ao menos uma foto para upload.');
+      return;
+    }
+
+    try {
+      setIsUploadingPhotos(true);
+      const uploadedUrls = await uploadPhotoFiles(photoUploadFiles);
+      const mergedImages = Array.from(new Set([...(animalImages || []), ...uploadedUrls]));
+
+      await updateAnimal({
+        id: currentAnimalId,
+        images: mergedImages,
+        main_image_url: mergedImages[0],
+      });
+
+      toast.success(`${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'foto enviada' : 'fotos enviadas'} com sucesso!`);
+      setShowAddPhotoModal(false);
+      resetPhotoForm();
+    } catch (error) {
+      console.error('Erro ao enviar fotos:', error);
+      toast.error('Erro ao enviar fotos. Tente novamente.');
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const handleDeletePhoto = async (photoIndex: number) => {
+    const targetPhoto = animalImages[photoIndex];
+    if (!targetPhoto) return;
+
+    try {
+      const nextImages = animalImages.filter((_, index) => index !== photoIndex);
+      await updateAnimal({
+        id: currentAnimalId,
+        images: nextImages,
+        main_image_url: nextImages[0] || undefined,
+      });
+
+      if (currentImageIndex >= nextImages.length) {
+        setCurrentImageIndex(Math.max(0, nextImages.length - 1));
+      }
+
+      toast.success('Foto removida com sucesso.');
+    } catch (error) {
+      console.error('Erro ao remover foto:', error);
+      toast.error('Erro ao remover foto.');
+    }
   };
 
   const handleAddVideo = async () => {
@@ -853,28 +989,11 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
     }
   };
 
-  // useEffect para fechar menu de vídeo ao clicar fora
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (activeVideoMenu !== null) {
-        setActiveVideoMenu(null);
-      }
-    };
-
-    if (activeVideoMenu !== null) {
-      document.addEventListener('click', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [activeVideoMenu]);
-
   // FASE 28: Dados dinâmicos dos filhos
   const offspringData = (offspringList || []).map(child => ({
     id: child.id,
     name: child.name,
-    image: child.main_image_url || 'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?auto=format&fit=crop&w=1080&q=80', // Placeholder
+    image: child.main_image_url || '',
     birthDate: child.birth_date || '',
     sex: child.sex,
     category: child.category || 'Potro',
@@ -896,82 +1015,33 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
     caption: video.caption || undefined,
   }));
 
-  // FASE 33-34: Dados mockados de premiações
-  const awardsData: Award[] = [
-    {
-      id: 1,
-      eventName: 'Exposição Nacional ABCCMM 2024',
-      date: '2024-11-15',
-      location: 'Belo Horizonte - MG',
-      category: 'Garanhão Adulto',
-      placement: '1º Lugar',
-      placementType: '1º Lugar',
-      points: 98,
-      description: 'Campeão da categoria Garanhão Adulto com excelente avaliação em marcha e morfologia.',
-      photos: ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGdhbGxvcHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080'],
-      certificate: 'certificado_nacional_2024.pdf'
-    },
-    {
-      id: 2,
-      eventName: 'Copa dos Campeões 2024',
-      date: '2024-08-20',
-      location: 'São Paulo - SP',
-      category: 'Marcha Batida',
-      placement: 'Campeão',
-      placementType: 'Campeão',
-      points: 100,
-      description: 'Grande Campeão da Copa com pontuação máxima em marcha batida.',
-      photos: ['https://images.unsplash.com/photo-1568042424740-e4d3e4ae9f6f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGNvbXBldGl0aW9ufGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080'],
-    },
-    {
-      id: 3,
-      eventName: 'Expo Mangalarga Regional Sul',
-      date: '2024-05-10',
-      location: 'Curitiba - PR',
-      category: 'Melhor Andamento',
-      placement: '2º Lugar',
-      placementType: '2º Lugar',
-      points: 95,
-      description: 'Segundo colocado na categoria de melhor andamento.',
-      photos: ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGdhbGxvcHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080'],
-    },
-    {
-      id: 4,
-      eventName: 'Torneio Estadual de Marcha 2023',
-      date: '2023-10-15',
-      location: 'Rio de Janeiro - RJ',
-      category: 'Garanhão Júnior',
-      placement: '1º Lugar',
-      placementType: '1º Lugar',
-      points: 97,
-      description: 'Campeão da categoria júnior com destaque em conformação.',
-      photos: ['https://images.unsplash.com/photo-1568042424740-e4d3e4ae9f6f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGNvbXBldGl0aW9ufGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080'],
-    },
-    {
-      id: 5,
-      eventName: 'Feira Nacional do Cavalo 2023',
-      date: '2023-07-22',
-      location: 'Goiânia - GO',
-      category: 'Morfologia',
-      placement: 'Reservado Campeão',
-      placementType: 'Reservado',
-      points: 96,
-      description: 'Reservado campeão em morfologia com excelente pontuação.',
-      photos: ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGdhbGxvcHxlbnwxfHx8fDE3NjM1MDAxMTR8MA&ixlib=rb-4.1.0&q=80&w=1080'],
-    },
-    {
-      id: 6,
-      eventName: 'Exposição de Inverno 2023',
-      date: '2023-06-10',
-      location: 'Poços de Caldas - MG',
-      category: 'Apresentação',
-      placement: '3º Lugar',
-      placementType: '3º Lugar',
-      points: 92,
-      description: 'Terceiro lugar na categoria de apresentação.',
-      photos: ['https://images.unsplash.com/photo-1568042424740-e4d3e4ae9f6f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3JzZSUyMGNvbXBldGl0aW9ufGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080'],
-    },
-  ];
+  useEffect(() => {
+    if (videosData.length === 0) {
+      setSelectedGalleryVideoId(null);
+      return;
+    }
+
+    const stillExists = selectedGalleryVideoId && videosData.some((video) => video.id === selectedGalleryVideoId);
+    if (!stillExists) {
+      setSelectedGalleryVideoId(videosData[0].id);
+    }
+  }, [videosData, selectedGalleryVideoId]);
+
+  const selectedGalleryVideo = videosData.find((video) => video.id === selectedGalleryVideoId) || videosData[0] || null;
+
+  const awardsData: Award[] = (awardsList || []).map((award, index) => ({
+    id: Number(index + 1),
+    eventName: award.eventName,
+    date: award.date,
+    location: award.location,
+    category: award.category,
+    placement: award.placement,
+    placementType: award.placementType,
+    points: award.points,
+    description: award.description,
+    photos: award.photos,
+    certificate: award.certificate,
+  }));
 
   // FASE 37: Aplicar filtros e ordenação às premiações
   const filteredAndSortedAwards = awardsData
@@ -992,6 +1062,64 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
       }
       return 0;
     });
+
+  const availableAwardYears = Array.from(
+    new Set(
+      awardsData
+        .map((award) => (award.date || '').split('-')[0])
+        .filter((year) => /^\d{4}$/.test(year))
+    )
+  ).sort((a, b) => Number(b) - Number(a));
+
+  const recentAwards = [...awardsData]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 3);
+
+  const derivedReproductionProfile = useMemo(() => {
+    const explicitType = typeof fullAnimal.reproductionType === 'string'
+      ? fullAnimal.reproductionType.trim()
+      : '';
+
+    if (explicitType) {
+      return explicitType;
+    }
+
+    const categoryKey = String(fullAnimal.category || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+
+    if (categoryKey.includes('garanhao')) return 'Garanhão';
+    if (categoryKey.includes('egua')) return 'Matriz';
+    if (categoryKey.includes('castrado')) return 'Castrado';
+    if (categoryKey.includes('doadora')) return 'Doadora';
+    if (categoryKey.includes('receptora')) return 'Receptora';
+
+    return undefined;
+  }, [fullAnimal.reproductionType, fullAnimal.category]);
+
+  const latestReproductiveEvent = fullAnimal.lastReproductiveEvent
+    ? fullAnimal.lastReproductiveEvent
+    : (reproductiveEvents && reproductiveEvents.length > 0
+      ? [...reproductiveEvents]
+          .sort((a, b) => toDateValue(b.event_date) - toDateValue(a.event_date))[0]
+      : null);
+
+  const latestReproductiveEventDisplay = latestReproductiveEvent
+    ? ('event_type' in latestReproductiveEvent
+      ? {
+          type: getReproductionLabel(latestReproductiveEvent.event_type),
+          date: latestReproductiveEvent.event_date,
+        }
+      : latestReproductiveEvent)
+    : null;
+
+  const shouldShowReproductionOverview =
+    Boolean(derivedReproductionProfile) ||
+    (fullAnimal.coverageCount !== undefined && fullAnimal.coverageCount > 0) ||
+    Boolean(latestReproductiveEventDisplay) ||
+    (fullAnimal.filhos !== undefined && fullAnimal.filhos > 0);
 
   // FASE 29: Aplicar filtros aos filhos
   const filteredOffspring = offspringData.filter(offspring => {
@@ -1185,7 +1313,6 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     {/* Coluna 2: Identificação e genealogia */}
                     <div className="space-y-4">
                       {fullAnimal.chip && <InfoRow label="Chip RFID" value={fullAnimal.chip} />}
-                      {fullAnimal.marca && <InfoRow label="Marca/Ferro" value={fullAnimal.marca} />}
                       <InfoRow label="Haras Atual" value={typeof fullAnimal.haras === 'string' ? fullAnimal.haras : fullAnimal.haras?.name || '-'} />
                       {fullAnimal.harasOrigem && <InfoRow label="Haras de Origem" value={fullAnimal.harasOrigem} />}
                       <InfoRow label="Criador" value={fullAnimal.criador || '-'} />
@@ -1213,31 +1340,47 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   </div>
                   <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                     <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Mãe</p>
-                    <p className="text-foreground dark:text-white">{fullAnimal.mother?.name || fullAnimal.mother_name || 'Não informado'}</p>
+                    <p className="text-foreground dark:text-white">{formatMotherDisplayName(fullAnimal.mother?.name || fullAnimal.mother_name)}</p>
                     <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{fullAnimal.mother?.registry_number || '-'}</p>
                   </div>
                 </div>
               </div>
 
-              <div>
+              {isLoadingAwards || awardsData.length > 0 ? (
+                <div>
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-foreground dark:text-white">Premiações</h4>
-                  {fullAnimal.premiacoes !== undefined && fullAnimal.premiacoes >= 0 && (
+                  {isLoadingAwards ? (
+                    <span className="text-sm text-muted-foreground dark:text-[#99a1af]">Carregando...</span>
+                  ) : (
                     <span className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                      Total: {fullAnimal.premiacoes} {fullAnimal.premiacoes === 1 ? 'prêmio' : 'prêmios'}
+                      Total: {awardsData.length} {awardsData.length === 1 ? 'prêmio' : 'prêmios'}
                     </span>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg flex justify-between items-center">
-                    <div>
-                      <p className="text-foreground dark:text-white">Exposição Nacional ABCCMM 2023</p>
-                      <p className="text-sm text-muted-foreground dark:text-[#99a1af]">15 de Agosto, 2023</p>
+                  {isLoadingAwards ? (
+                    <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Carregando premiações...
                     </div>
-                    <span className="text-primary dark:text-white">1º Lugar</span>
-                  </div>
+                  ) : recentAwards.length > 0 ? (
+                    recentAwards.map((award) => (
+                      <div key={`overview-award-${award.id}`} className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg flex justify-between items-center">
+                        <div>
+                          <p className="text-foreground dark:text-white">{award.eventName}</p>
+                          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{formatBirthDate(award.date)}</p>
+                        </div>
+                        <span className="text-primary dark:text-white">{award.placement}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Sem premiações registradas para este animal.
+                    </div>
+                  )}
                 </div>
-              </div>
+                </div>
+              ) : null}
 
               {/* NOVA SE??O: Hist?rico de Mudan?as de Status */}
               {mergedStatusHistory.length > 0 && (
@@ -1279,25 +1422,16 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
               )}
 
               {/* FASE 25-27: Seção Reprodução */}
-              {(fullAnimal.reproductionType || fullAnimal.sex === 'Macho' || fullAnimal.sex === 'Fêmea') && (
+              {shouldShowReproductionOverview && (
                 <div>
                   <h4 className="text-foreground dark:text-white mb-4">Reprodução</h4>
                   <div className="space-y-4">
                     {/* Grid de informações reprodutivas */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {fullAnimal.reproductionType && (
+                      {derivedReproductionProfile && (
                         <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
-                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Tipo Reprodutivo</p>
-                          <p className="text-foreground dark:text-white">{fullAnimal.reproductionType}</p>
-                        </div>
-                      )}
-
-                      {fullAnimal.activeForReproduction !== undefined && (
-                        <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
-                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Status Reprodutivo</p>
-                          <p className="text-foreground dark:text-white">
-                            {fullAnimal.activeForReproduction ? '?o. Ativo para Reprodução' : '?O Inativo para Reprodução'}
-                          </p>
+                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Perfil Reprodutivo</p>
+                          <p className="text-foreground dark:text-white">{derivedReproductionProfile}</p>
                         </div>
                       )}
 
@@ -1307,28 +1441,16 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                           <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">Coberturas Realizadas</p>
                           <div className="flex items-center justify-between">
                             <p className="text-foreground dark:text-white text-xl">{fullAnimal.coverageCount}</p>
-                            <button
-                              onClick={() => alert('Funcionalidade de detalhes de coberturas será implementada em breve')}
-                              className="text-sm text-primary dark:text-white hover:underline"
-                            >
-                              Ver Detalhes ??'
-                            </button>
                           </div>
                         </div>
                       )}
 
                       {/* FASE 27: ?sltimo Evento Reprodutivo */}
-                      {fullAnimal.lastReproductiveEvent && (
+                      {latestReproductiveEventDisplay && (
                         <div className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                           <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">?sltimo Evento Reprodutivo</p>
-                          <p className="text-foreground dark:text-white mb-1">{fullAnimal.lastReproductiveEvent.type}</p>
-                          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{fullAnimal.lastReproductiveEvent.date}</p>
-                          <button
-                            onClick={() => alert('Funcionalidade de detalhes do evento reprodutivo será implementada em breve')}
-                            className="mt-2 text-sm text-primary dark:text-white hover:underline"
-                          >
-                            Ver Evento Completo ??'
-                          </button>
+                          <p className="text-foreground dark:text-white mb-1">{latestReproductiveEventDisplay.type}</p>
+                          <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{formatBirthDate(latestReproductiveEventDisplay.date)}</p>
                         </div>
                       )}
                     </div>
@@ -1354,6 +1476,119 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     )}
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'photos' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xl text-foreground dark:text-white mb-1">Galeria de Fotos</h4>
+                  <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                    {animalImages.length} {animalImages.length === 1 ? 'foto' : 'fotos'} registradas
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetPhotoForm();
+                    setShowAddPhotoModal(true);
+                  }}
+                  className="px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Fotos
+                </button>
+              </div>
+
+              {animalImages.length === 0 ? (
+                <div className="text-center py-12">
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground dark:text-[#99a1af]" />
+                  <p className="text-muted-foreground dark:text-[#99a1af] mb-2">Nenhuma foto registrada para este animal</p>
+                  <button
+                    onClick={() => {
+                      resetPhotoForm();
+                      setShowAddPhotoModal(true);
+                    }}
+                    className="text-primary dark:text-white hover:underline text-sm"
+                  >
+                    Adicionar primeira foto
+                  </button>
+                </div>
+              ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_180px] gap-4">
+                <div className="space-y-3">
+                  <MediaShowcase height="clamp(300px, 50vh, 500px)">
+                    <div className="w-full h-full flex items-center justify-center p-4 bg-black">
+                      <ImageWithFallback
+                        src={animalImages[currentImageIndex]}
+                        alt={`${fullAnimal.name} - foto ${currentImageIndex + 1}`}
+                        onLoad={handleSelectedPhotoLoad}
+                        className="w-auto h-auto max-w-full max-h-[450px] object-contain"
+                      />
+                    </div>
+
+                    {animalImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={handlePrevImage}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 p-2.5 bg-black/70 hover:bg-black/90 rounded-full"
+                          aria-label="Foto anterior"
+                        >
+                          <ChevronLeft className="w-5 h-5 text-white" />
+                        </button>
+                        <button
+                          onClick={handleNextImage}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-black/70 hover:bg-black/90 rounded-full"
+                          aria-label="Próxima foto"
+                        >
+                          <ChevronRight className="w-5 h-5 text-white" />
+                        </button>
+                      </>
+                    )}
+                  </MediaShowcase>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Foto {currentImageIndex + 1} de {animalImages.length}</p>
+                    <button
+                      onClick={() => handleDeletePhoto(currentImageIndex)}
+                      className="px-3 py-1.5 text-xs bg-red-500/10 text-red-600 dark:text-red-400 rounded hover:bg-red-500/20 transition-colors flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Excluir foto atual
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 xl:grid-cols-2 gap-2 xl:max-h-[500px] xl:overflow-y-auto pr-1">
+                  {animalImages.map((image, index) => (
+                    <div
+                      key={`${image}-${index}`}
+                      className={`relative rounded-lg overflow-hidden border-2 transition-colors ${index === currentImageIndex ? 'border-primary dark:border-white' : 'border-transparent'}`}
+                    >
+                      <button
+                        onClick={() => setCurrentImageIndex(index)}
+                        className="w-full"
+                      >
+                      <div className="relative w-full aspect-[4/3] bg-black/90">
+                        <ImageWithFallback
+                          src={image}
+                          alt={`${fullAnimal.name} miniatura ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      </button>
+                      <button
+                        onClick={() => handleDeletePhoto(index)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-600/90 hover:bg-red-600 rounded-md text-white"
+                        title="Excluir foto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
               )}
             </div>
           )}
@@ -1619,7 +1854,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   >
                     <option value="all">Todas as Categorias</option>
                     <option value="Potro">Potros</option>
-                    <option value="Potra">Potrancas</option>
+                    <option value="Potra">Potras</option>
                     <option value="Garanhão">Garanhões</option>
                     <option value="??gua">??guas</option>
                     <option value="Castrado">Castrados</option>
@@ -1648,8 +1883,8 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                       onClick={() => onViewAnimal?.(String(child.id))}
                     >
                       <div className="flex items-center gap-4">
-                        <img
-                          src={child.image}
+                        <ImageWithFallback
+                          src={child.image || undefined}
                           alt={child.name}
                           className="w-16 h-16 rounded-lg object-cover"
                         />
@@ -1676,9 +1911,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                             Nascimento: {child.birthDate ? formatBirthDate(child.birthDate) : 'Não informado'}
                           </span>
                           <span className={`px-2 py-0.5 rounded text-xs ${
-                            child.status === 'Ativo'
+                            child.status === 'ativo'
                               ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                              : child.status === 'Vendido'
+                              : child.status === 'vendido'
                                 ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                                 : 'bg-red-500/20 text-red-600 dark:text-red-400'
                           }`}>
@@ -1783,16 +2018,16 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
               locationType={resolvedLocationType}
               serviceType={resolvedServiceType}
               availableBaias={[
-                { id: 1, name: 'Baia 01 - Setor A', status: 'ocupada', animal: 'Thor' },
-                { id: 2, name: 'Baia 02 - Setor A', status: 'disponível' },
-                { id: 3, name: 'Baia 03 - Setor A', status: 'manutencao' },
-                { id: 4, name: 'Baia 04 - Setor B', status: 'disponível' },
-                { id: 5, name: 'Baia 05 - Setor B', status: 'ocupada', animal: 'Safira' },
+                { id: '1', name: 'Baia 01 - Setor A', status: 'ocupada', animal: 'Thor' },
+                { id: '2', name: 'Baia 02 - Setor A', status: 'disponível' },
+                { id: '3', name: 'Baia 03 - Setor A', status: 'manutencao' },
+                { id: '4', name: 'Baia 04 - Setor B', status: 'disponível' },
+                { id: '5', name: 'Baia 05 - Setor B', status: 'ocupada', animal: 'Safira' },
               ]}
               availablePastos={[
-                { id: 1, name: 'Pasto 01 - Norte', status: 'disponível', capacity: 20, current: 12 },
-                { id: 2, name: 'Pasto 02 - Norte', status: 'cheio', capacity: 15, current: 15 },
-                { id: 3, name: 'Pasto 03 - Sul', status: 'disponível', capacity: 25, current: 8 },
+                { id: '1', name: 'Pasto 01 - Norte', status: 'disponível', capacity: 20, current: 12 },
+                { id: '2', name: 'Pasto 02 - Norte', status: 'cheio', capacity: 15, current: 15 },
+                { id: '3', name: 'Pasto 03 - Sul', status: 'disponível', capacity: 25, current: 8 },
               ]}
             />
           )}
@@ -1830,128 +2065,91 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                 <div className="flex justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-              ) : videosData.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {videosData.map((video) => (
-                    <div
-                      key={video.id}
-                      className="group bg-muted dark:bg-[#0d0d0d] rounded-xl overflow-hidden border border-border dark:border-[rgba(255,255,255,0.1)] hover:border-primary dark:hover:border-white transition-all"
-                    >
-                      {/* Thumbnail */}
-                      <div className="relative aspect-video">
-                        <VideoThumbnail
-                          url={video.url}
-                          title={video.title}
-                          fallback={video.thumbnail}
-                        />
-                        {/* Overlay com botão play */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            onClick={() => {
-                              setSelectedVideo(video);
-                              setShowVideoPlayer(true);
-                            }}
-                            className="p-3 bg-primary dark:bg-white rounded-full hover:scale-110 transition-transform"
-                          >
-                            <Video className="w-6 h-6 text-white dark:text-black" />
-                          </button>
+              ) : videosData.length > 0 && selectedGalleryVideo ? (
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4">
+                  <div className="space-y-3">
+                    <MediaShowcase height={'clamp(260px, 42vh, 440px)'} className="bg-black">
+                      <button
+                        onClick={() => {
+                          setSelectedVideo(selectedGalleryVideo);
+                          setShowVideoPlayer(true);
+                        }}
+                        className="absolute inset-0 z-10"
+                        aria-label="Abrir vídeo"
+                      />
+                      <VideoThumbnail
+                        url={selectedGalleryVideo.url}
+                        title={selectedGalleryVideo.title}
+                        fallback={selectedGalleryVideo.thumbnail || DEFAULT_VIDEO_THUMBNAIL}
+                      />
+                      <div className="absolute inset-0 bg-black/20" />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="p-3 rounded-full bg-black/65">
+                          <Video className="w-6 h-6 text-white" />
                         </div>
-                        {/* Badge de tipo */}
-                        <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 rounded text-xs text-white">
-                          {video.type}
-                        </div>
-                        {/* Badge de visibilidade */}
-                        <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs ${
-                          video.visibility === 'Público'
-                            ? 'bg-green-500/80 text-white'
-                            : 'bg-yellow-500/80 text-white'
-                        }`}>
-                          {video.visibility}
-                        </div>
-                        {/* Duração */}
-                        {video.duration && (
-                          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 rounded text-xs text-white">
-                            {video.duration}
-                          </div>
-                        )}
                       </div>
+                    </MediaShowcase>
 
-                      {/* Info */}
-                      <div className="p-4">
-                        <h5 className="text-foreground dark:text-white font-medium mb-1 line-clamp-1">
-                          {video.title}
-                        </h5>
-                        <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                          Adicionado em {formatBirthDate(video.uploadDate)}
-                        </p>
-                        {video.caption && (
-                          <p className="text-sm text-muted-foreground dark:text-[#99a1af] line-clamp-2">
-                            {video.caption}
-                          </p>
-                        )}
-
-                        {/* Ações */}
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border dark:border-[rgba(255,255,255,0.1)]">
-                          <button
-                            onClick={() => {
-                              setSelectedVideo(video);
-                              setShowVideoPlayer(true);
-                            }}
-                            className="flex-1 px-3 py-1.5 text-sm bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
-                          >
-                            Ver Vídeo
-                          </button>
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveVideoMenu(activeVideoMenu === video.id ? null : video.id);
-                              }}
-                              className="p-1.5 hover:bg-muted dark:hover:bg-[#1a1a1a] rounded transition-colors"
-                            >
-                              <MoreVertical className="w-4 h-4 text-muted-foreground dark:text-[#99a1af]" />
-                            </button>
-
-                            {/* Menu Dropdown */}
-                            {activeVideoMenu === video.id && (
-                              <div className="absolute right-0 bottom-full mb-1 w-40 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg shadow-lg z-10 py-1">
-                                  <button
-                                    onClick={() => {
-                                      setVideoToEdit(video);
-                                      setVideoFormData({
-                                        title: video.title,
-                                        url: video.url,
-                                        type: video.type,
-                                        visibility: video.visibility,
-                                        caption: video.caption || '',
-                                      });
-                                      setVideoInputMethod('link');
-                                      setShowEditVideoModal(true);
-                                      setActiveVideoMenu(null);
-                                    }}
-                                  className="w-full px-4 py-2 text-sm text-left text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors flex items-center gap-2"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setVideoToDelete(video);
-                                    setShowDeleteVideoModal(true);
-                                    setActiveVideoMenu(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-sm text-left text-red-600 dark:text-red-400 hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Excluir
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    <div className="bg-muted dark:bg-[#0d0d0d] rounded-xl p-4 border border-border dark:border-[rgba(255,255,255,0.1)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <h5 className="text-foreground dark:text-white font-medium line-clamp-1">{selectedGalleryVideo.title}</h5>
+                        <span className="text-xs px-2 py-1 rounded bg-primary/10 dark:bg-white/10 text-primary dark:text-white">{selectedGalleryVideo.type}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">Adicionado em {formatBirthDate(selectedGalleryVideo.uploadDate)}</p>
+                      {selectedGalleryVideo.caption && (
+                        <p className="text-sm text-muted-foreground dark:text-[#99a1af] mt-2 line-clamp-2">{selectedGalleryVideo.caption}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            setVideoToEdit(selectedGalleryVideo);
+                            setVideoFormData({
+                              title: selectedGalleryVideo.title,
+                              url: selectedGalleryVideo.url,
+                              type: selectedGalleryVideo.type,
+                              visibility: selectedGalleryVideo.visibility,
+                              caption: selectedGalleryVideo.caption || '',
+                            });
+                            setVideoInputMethod('link');
+                            setShowEditVideoModal(true);
+                          }}
+                          className="px-3 py-1.5 text-sm bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded hover:bg-primary/20 dark:hover:bg-white/20 transition-colors"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => {
+                            setVideoToDelete(selectedGalleryVideo);
+                            setShowDeleteVideoModal(true);
+                          }}
+                          className="px-3 py-1.5 text-sm bg-red-500/10 text-red-600 dark:text-red-400 rounded hover:bg-red-500/20 transition-colors"
+                        >
+                          Excluir
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 xl:grid-cols-1 gap-2 xl:max-h-[520px] xl:overflow-y-auto pr-1">
+                    {videosData.map((video) => (
+                      <button
+                        key={video.id}
+                        onClick={() => setSelectedGalleryVideoId(video.id)}
+                        className={`text-left rounded-lg overflow-hidden border transition-colors ${selectedGalleryVideoId === video.id ? 'border-primary dark:border-white' : 'border-border dark:border-[rgba(255,255,255,0.1)]'}`}
+                      >
+                        <div className="relative aspect-video bg-black">
+                          <VideoThumbnail
+                            url={video.url}
+                            title={video.title}
+                            fallback={video.thumbnail || DEFAULT_VIDEO_THUMBNAIL}
+                          />
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs text-foreground dark:text-white line-clamp-1">{video.title}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12">
@@ -1986,6 +2184,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
                     {awardsData.length} {awardsData.length === 1 ? 'premiação' : 'premiações'} registradas
                   </p>
+                  <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
+                    Premiações são gerenciadas exclusivamente por importação das planilhas ABCCMM.
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Filtros */}
@@ -1995,8 +2196,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     className="w-auto"
                   >
                     <option value="all">Todos os Anos</option>
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
+                    {availableAwardYears.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
                   </NativeSelect>
 
                   <NativeSelect
@@ -2022,13 +2224,6 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     <option value="placement">Por Colocação</option>
                   </NativeSelect>
 
-                  <button
-                    onClick={() => setShowAddAwardModal(true)}
-                    className="px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Adicionar
-                  </button>
                 </div>
               </div>
 
@@ -2119,12 +2314,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                       ? 'Nenhuma premiação corresponde aos filtros selecionados'
                       : 'Este animal ainda não possui premiações registradas'}
                   </p>
-                  <button
-                    onClick={() => setShowAddAwardModal(true)}
-                    className="text-primary dark:text-white hover:underline text-sm"
-                  >
-                    Adicionar primeira premiação
-                  </button>
+                  <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-2">
+                    Para incluir premiações, utilize a importação de planilhas ABCCMM no Plantel.
+                  </p>
                 </div>
               )}
 
@@ -2435,6 +2627,88 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
         </div>
       )}
 
+      {/* Modal: Adicionar Fotos */}
+      {showAddPhotoModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
+              <h3 className="text-xl text-foreground dark:text-white">Adicionar Fotos</h3>
+              <button
+                onClick={() => {
+                  setShowAddPhotoModal(false);
+                  resetPhotoForm();
+                }}
+                className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div
+                className="border-2 border-dashed border-border dark:border-[#333333] rounded-lg p-8 text-center cursor-pointer hover:border-primary dark:hover:border-white/50 transition-colors"
+                onClick={() => document.getElementById('animal-photo-upload-input')?.click()}
+              >
+                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground dark:text-[#99a1af]" />
+                <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Clique para selecionar uma ou várias fotos
+                </p>
+                <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
+                  JPG, PNG, WEBP
+                </p>
+              </div>
+
+              <input
+                id="animal-photo-upload-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handlePhotoFilesSelect}
+                className="hidden"
+              />
+
+              {photoUploadFiles.length > 0 && (
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {photoUploadFiles.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="px-3 py-2 rounded-lg bg-muted dark:bg-[#0d0d0d] text-sm text-foreground dark:text-white flex items-center justify-between">
+                      <span className="truncate mr-3">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPhotoUploadFiles((prev) => prev.filter((_, i) => i !== index))}
+                        className="text-red-500 hover:text-red-400"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddPhotoModal(false);
+                    resetPhotoForm();
+                  }}
+                  className="flex-1 px-4 py-2 border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddPhotos}
+                  disabled={isUploadingPhotos || photoUploadFiles.length === 0}
+                  className="flex-1 px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploadingPhotos ? 'Enviando...' : 'Enviar Fotos'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Editar Vídeo */}
       {showEditVideoModal && videoToEdit && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2600,163 +2874,13 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
       {/* Modais de Premiações */}
       {showAwardDetailsModal && (
         <AwardsDetailModal
-          awards={fullAnimal.awards || []}
+          awards={awardsData || []}
           animalName={fullAnimal.name}
           onClose={() => {
             setShowAwardDetailsModal(false);
             setSelectedAward(null);
           }}
         />
-      )}
-
-      {/* Modal: Adicionar/Editar Premiação */}
-      {showAddAwardModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl w-full max-w-lg overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
-              <h3 className="text-xl text-foreground dark:text-white">
-                {selectedAward ? 'Editar Premiação' : 'Adicionar Premiação'}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowAddAwardModal(false);
-                  setSelectedAward(null);
-                }}
-                className="p-2 hover:bg-muted dark:hover:bg-[#0d0d0d] rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-muted-foreground dark:text-[#99a1af]" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                console.log('Salvando premiação:', selectedAward?.id);
-                // TODO: Implementar salvamento no banco
-                alert(selectedAward ? 'Premiação atualizada!' : 'Premiação adicionada!');
-                setShowAddAwardModal(false);
-                setSelectedAward(null);
-              }}
-              className="p-6 space-y-4"
-            >
-              {/* Nome do Evento */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Nome do Evento
-                </label>
-                <input
-                  type="text"
-                  defaultValue={selectedAward?.eventName}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white"
-                  placeholder="Ex: Exposição Nacional ABCCMM"
-                  required
-                />
-              </div>
-
-              {/* Data */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Data do Evento
-                </label>
-                <input
-                  type="date"
-                  defaultValue={selectedAward?.date}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white"
-                  required
-                />
-              </div>
-
-              {/* Local */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Local
-                </label>
-                <input
-                  type="text"
-                  defaultValue={selectedAward?.location}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white"
-                  placeholder="Ex: Belo Horizonte - MG"
-                />
-              </div>
-
-              {/* Categoria */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Categoria
-                </label>
-                <input
-                  type="text"
-                  defaultValue={selectedAward?.category}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white"
-                  placeholder="Ex: Garanhão Adulto"
-                />
-              </div>
-
-              {/* Colocação */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Colocação
-                </label>
-                <NativeSelect defaultValue={selectedAward?.placementType || '1º Lugar'}>
-                  <option value="Campeão">Campeão</option>
-                  <option value="1º Lugar">1º Lugar</option>
-                  <option value="2º Lugar">2º Lugar</option>
-                  <option value="3º Lugar">3º Lugar</option>
-                  <option value="Reservado">Reservado Campeão</option>
-                  <option value="Menção Honrosa">Menção Honrosa</option>
-                </NativeSelect>
-              </div>
-
-              {/* Pontos */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Pontos
-                </label>
-                <input
-                  type="number"
-                  defaultValue={selectedAward?.points}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white"
-                  placeholder="Ex: 98"
-                />
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                  Descrição
-                </label>
-                <textarea
-                  defaultValue={selectedAward?.description}
-                  className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white resize-none"
-                  rows={3}
-                  placeholder="Descreva a premiação..."
-                />
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddAwardModal(false);
-                    setSelectedAward(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-border dark:border-[#333333] rounded-lg text-foreground dark:text-white hover:bg-muted dark:hover:bg-[#0d0d0d] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  {selectedAward ? 'Salvar Alterações' : 'Adicionar Premiação'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* BLOCO 17: Modais de Saude */}

@@ -16,6 +16,7 @@ interface AddServiceModalProps {
 }
 
 export function AddServiceModal({ onClose, onBack, onCreate, harasId, animals, isSaving = false }: AddServiceModalProps) {
+  const serviceLocationOptions = ['Baia 01', 'Baia 02', 'Baia 03', 'Pasto Maternidade', 'Pasto Norte', 'Pasto Sul', 'Centro de Treinamento', 'Hospedagem Externa'];
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -186,13 +187,16 @@ export function AddServiceModal({ onClose, onBack, onCreate, harasId, animals, i
               <label className="block text-sm text-foreground dark:text-white mb-2">
                 Local
               </label>
-              <input
-                type="text"
+              <NativeSelect
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                placeholder="Ex: Piquete Central, Baia 12"
-                className="w-full px-4 py-2 bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-              />
+                className="w-full"
+              >
+                <option value="">Selecione o local</option>
+                {serviceLocationOptions.map((locationOption) => (
+                  <option key={locationOption} value={locationOption}>{locationOption}</option>
+                ))}
+              </NativeSelect>
             </div>
 
             <div>

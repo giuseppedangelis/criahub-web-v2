@@ -1,6 +1,7 @@
 
 import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2, User } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
@@ -13,6 +14,7 @@ import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
 import { animalsService } from '@/services/animals';
 import { toast } from 'sonner';
+import type { AnimalEnvironment } from '@/types';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {
@@ -50,6 +52,16 @@ function calculateAge(birthDate?: string): string {
   return `${age} anos`;
 }
 
+function resolveDisplayCategory(birthDate: string | undefined, sex: 'Macho' | 'Fêmea' | undefined, fallback: string): string {
+  if (!birthDate || !sex) return fallback;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return fallback;
+  const today = new Date();
+  const ageInMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  if (ageInMonths < 24) return sex === 'Fêmea' ? 'potra' : 'potro';
+  return sex === 'Fêmea' ? 'egua' : 'garanhao';
+}
+
 // Interface local para a UI (compatível com AnimalCard)
 interface PlantelAnimal {
   id: string | number;
@@ -58,7 +70,6 @@ interface PlantelAnimal {
   name: string;
   registry: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   birth_date?: string;
@@ -77,6 +88,8 @@ interface PlantelAnimal {
   dataInativacao?: string;
   localizacao?: string;
   location?: string;
+  status_manejo?: string;
+  management_status?: string;
   servicoTipo?: string;
   service_type?: string;
   filhos?: number;
@@ -95,12 +108,14 @@ interface PlantelAnimal {
   observations?: string;
   weight?: number;
   height?: number;
+  environment?: AnimalEnvironment;
   // Campos de Reprodução
   reproductionType?: string;
   activeForReproduction?: boolean;
 }
 
 export function BreederPlantelContent() {
+  const [activeEnvironment, setActiveEnvironment] = useState<AnimalEnvironment>('oficial');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showAnimalDetails, setShowAnimalDetails] = useState(false);
   const [showEditarAnimal, setShowEditarAnimal] = useState(false);
@@ -115,7 +130,7 @@ export function BreederPlantelContent() {
   // Estados dos filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSexo, setFilterSexo] = useState('todos');
-  const [filterStatus, setFilterStatus] = useState('todos');
+  const [filterStatus, setFilterStatus] = useState('ativos');
   const [filterCategoria, setFilterCategoria] = useState('todos');
   const [filterIdade, setFilterIdade] = useState('todos');
   const [filterFilhos, setFilterFilhos] = useState('todos');
@@ -126,10 +141,20 @@ export function BreederPlantelContent() {
 
   // Hook de Animais
   const { data: animalsData, isLoading, refetch } = useAnimals(
-    { haras_id: harasId },
+    { haras_id: harasId, environment: activeEnvironment },
     { page: 1, limit: 1000 }, // Buscando 1000 para permitir filtro client-side de idade/filhos
     !!harasId && isSessionReady && !isUserLoading
   );
+
+  const {
+    data: linkQueueItems = [],
+    isLoading: isLinkQueueLoading,
+    refetch: refetchLinkQueue,
+  } = useQuery({
+    queryKey: ['animal-link-queue', harasId],
+    queryFn: () => animalsService.listLinkQueue(harasId || ''),
+    enabled: !!harasId && activeEnvironment === 'vinculacao',
+  });
 
   const isHarasLoading = !harasId && (isUserLoading || !isSessionReady);
 
@@ -140,6 +165,14 @@ export function BreederPlantelContent() {
     if (!animalsData?.data) return [];
 
     return animalsData.data.map(animal => {
+      const realImages = (animal.images || []).filter((url) => !!url);
+      const fallbackMain = animal.main_image_url
+        ? animal.main_image_url
+        : undefined;
+      const normalizedImages = fallbackMain && !realImages.includes(fallbackMain)
+        ? [fallbackMain, ...realImages]
+        : realImages;
+
       const status = animal.status || 'Ativo';
       const isInactive = status.toLowerCase() === 'vendido' || status.toLowerCase() === 'morto' || status.toLowerCase() === 'óbito';
 
@@ -150,7 +183,6 @@ export function BreederPlantelContent() {
         name: animal.name,
         registry: animal.registry_number || '-',
         chip: animal.chip_number || undefined,
-        marca: animal.brand || undefined,
         sex: animal.sex,
         birthDate: animal.birth_date || (animal as any).data_nascimento || undefined,
         birth_date: animal.birth_date || (animal as any).data_nascimento || undefined,
@@ -158,7 +190,7 @@ export function BreederPlantelContent() {
         mother_id: animal.mother_id || (animal as any).mae_id || null,
         harasOrigem: animal.origin_haras || undefined,
         origin_haras: animal.origin_haras || (animal as any).haras_origem || undefined,
-        category: animal.category,
+         category: resolveDisplayCategory(animal.birth_date || undefined, animal.sex, animal.category),
         age: calculateAge(animal.birth_date || undefined),
         haras: 'Meu Haras', // Poderíamos buscar o nome do haras se necessário
         status: status,
@@ -166,6 +198,8 @@ export function BreederPlantelContent() {
         statusAtividade: isInactive ? 'Inativo' : 'Ativo',
         localizacao: animal.location || (animal as any).localizacao || undefined,
         location: animal.location || (animal as any).localizacao || undefined,
+        status_manejo: (animal as any).status_manejo || (animal as any).management_status || undefined,
+        management_status: (animal as any).management_status || (animal as any).status_manejo || undefined,
         servicoTipo: (animal as any).service_type || (animal as any).tipo_servico || undefined,
         service_type: (animal as any).service_type || (animal as any).tipo_servico || undefined,
         coat_color: animal.coat_color || (animal as any).pelagem || undefined,
@@ -180,9 +214,10 @@ export function BreederPlantelContent() {
         height: animal.height || undefined,
         filhos: 0, // TODO: Buscar count de filhos via API ou include
         premiacoes: 0, // TODO: Buscar count de premiações
-        image: animal.main_image_url || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80', // Placeholder
-        images: animal.images && animal.images.length > 0 ? animal.images : (animal.main_image_url ? [animal.main_image_url] : ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80']),
-        documents: animal.documents || [],
+         image: fallbackMain || normalizedImages[0] || '',
+         images: normalizedImages,
+         documents: animal.documents || [],
+         environment: (animal as any).environment || ((animal as any).abccmm_rowid ? 'oficial' : 'avulsos'),
       };
     });
   }, [animalsData]);
@@ -236,6 +271,11 @@ export function BreederPlantelContent() {
 
       return matchesSearch && matchesSexo && matchesStatus && matchesCategoria &&
         matchesIdade && matchesFilhos && matchesPremiacoes;
+    }).sort((a, b) => {
+      const aHasMedia = (a.images?.length || 0) > 0;
+      const bHasMedia = (b.images?.length || 0) > 0;
+      if (aHasMedia !== bHasMedia) return aHasMedia ? -1 : 1;
+      return a.name.localeCompare(b.name, 'pt-BR');
     });
   }, [animalsList, searchTerm, filterSexo, filterStatus, filterCategoria, filterIdade, filterFilhos, filterPremiacoes]);
 
@@ -256,6 +296,29 @@ export function BreederPlantelContent() {
         console.error(error);
         toast.error('Erro ao excluir animal');
       }
+    }
+  };
+
+  const handleLinkQueueItem = async (queueId: string) => {
+    try {
+      await animalsService.linkQueueItem(queueId);
+      toast.success('Vinculação concluída com sucesso.');
+      refetch();
+      refetchLinkQueue();
+    } catch (error) {
+      console.error(error);
+      toast.error('Falha ao vincular animal.');
+    }
+  };
+
+  const handleDismissQueueItem = async (queueId: string) => {
+    try {
+      await animalsService.dismissLinkQueueItem(queueId);
+      toast.success('Item removido da fila de vinculação.');
+      refetchLinkQueue();
+    } catch (error) {
+      console.error(error);
+      toast.error('Falha ao dispensar item da fila.');
     }
   };
 
@@ -281,14 +344,72 @@ export function BreederPlantelContent() {
             setShowEditarAnimal(true);
           }}
           onViewAnimal={(animalId) => {
-            console.log('Navegando para animal ID:', animalId);
-            // Simulação de navegação na árvore - TODO integrar busca por ID real
-            const mockAnimal = animalsList.find(a => String(a.id) === String(animalId));
-            if (mockAnimal) {
-              setSelectedAnimal(mockAnimal);
+            const localAnimal = animalsList.find(a => String(a.id) === String(animalId));
+            if (localAnimal) {
+              setSelectedAnimal(localAnimal);
               setInitialTab('overview');
               setShowAnimalDetails(true);
+              return;
             }
+
+            animalsService.getById(String(animalId))
+              .then((fetchedAnimal) => {
+                if (!fetchedAnimal) {
+                  toast.error('Animal não encontrado.');
+                  return;
+                }
+
+                const mapped: PlantelAnimal = {
+                  id: fetchedAnimal.id,
+                  abccmm_rowid: (fetchedAnimal as any).abccmm_rowid || null,
+                  haras_id: fetchedAnimal.haras_id,
+                  name: fetchedAnimal.name,
+                  registry: fetchedAnimal.registry_number || '-',
+                  chip: fetchedAnimal.chip_number || undefined,
+                  sex: fetchedAnimal.sex,
+                  birthDate: fetchedAnimal.birth_date || undefined,
+                  birth_date: fetchedAnimal.birth_date || undefined,
+                  father_id: fetchedAnimal.father_id || null,
+                  mother_id: fetchedAnimal.mother_id || null,
+                  harasOrigem: fetchedAnimal.origin_haras || undefined,
+                  origin_haras: fetchedAnimal.origin_haras || undefined,
+                  category: fetchedAnimal.category,
+                  age: calculateAge(fetchedAnimal.birth_date || undefined),
+                  haras: 'Meu Haras',
+                  status: fetchedAnimal.status || 'Ativo',
+                  statusColor: getStatusColorClasses(fetchedAnimal.status || 'Ativo'),
+                  statusAtividade: (fetchedAnimal.status || '').toLowerCase() === 'ativo' ? 'Ativo' : 'Inativo',
+                  localizacao: fetchedAnimal.location || undefined,
+                  location: fetchedAnimal.location || undefined,
+                  status_manejo: (fetchedAnimal as any).status_manejo || (fetchedAnimal as any).management_status || undefined,
+                  management_status: (fetchedAnimal as any).management_status || (fetchedAnimal as any).status_manejo || undefined,
+                  servicoTipo: (fetchedAnimal as any).service_type || undefined,
+                  service_type: (fetchedAnimal as any).service_type || undefined,
+                  coat_color: fetchedAnimal.coat_color || undefined,
+                  pelagem: fetchedAnimal.coat_color || undefined,
+                  gait: (fetchedAnimal as any).gait || undefined,
+                  father_name: fetchedAnimal.father_name || undefined,
+                  mother_name: fetchedAnimal.mother_name || undefined,
+                  criador: fetchedAnimal.criador || null,
+                  proprietario: fetchedAnimal.proprietario || null,
+                  observations: fetchedAnimal.observations || undefined,
+                  weight: fetchedAnimal.weight || undefined,
+                  height: fetchedAnimal.height || undefined,
+                  filhos: 0,
+                  premiacoes: 0,
+                  image: fetchedAnimal.main_image_url || fetchedAnimal.images?.[0] || '',
+                  images: fetchedAnimal.images || [],
+                  documents: fetchedAnimal.documents || [],
+                  environment: (fetchedAnimal as any).environment || ((fetchedAnimal as any).abccmm_rowid ? 'oficial' : 'avulsos'),
+                };
+
+                setSelectedAnimal(mapped);
+                setInitialTab('overview');
+                setShowAnimalDetails(true);
+              })
+              .catch(() => {
+                toast.error('Não foi possível abrir esse animal agora.');
+              });
           }}
           initialTab={initialTab}
         />
@@ -314,6 +435,35 @@ export function BreederPlantelContent() {
             <SummaryCard title="Ativos" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.statusAtividade === 'Ativo').length)} />
           </div>
 
+          <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-4 border border-border dark:border-[rgba(255,255,255,0.1)]">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <button
+                onClick={() => setActiveEnvironment('oficial')}
+                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'oficial' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
+              >
+                Plantel Oficial
+              </button>
+              <button
+                onClick={() => setActiveEnvironment('avulsos')}
+                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'avulsos' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
+              >
+                Avulsos
+              </button>
+              <button
+                onClick={() => setActiveEnvironment('vinculacao')}
+                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'vinculacao' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
+              >
+                Vinculação
+              </button>
+              <button
+                onClick={() => setActiveEnvironment('condominio')}
+                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'condominio' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
+              >
+                Condomínio
+              </button>
+            </div>
+          </div>
+
           {/* Actions and Filters */}
           <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
@@ -323,7 +473,7 @@ export function BreederPlantelContent() {
                   onClick={() => setShowImportModal(true)}
                 >
                   <Upload className="w-5 h-5" />
-                  Importar Planilha
+                  {activeEnvironment === 'condominio' ? 'Importar Condomínio/Premiações' : 'Importar ABCCMM/Premiações'}
                 </button>
                 <button
                   className="w-full lg:w-auto px-6 py-3 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
@@ -397,7 +547,45 @@ export function BreederPlantelContent() {
             </div>
 
             {/* Animals Grid/List */}
-            {viewMode === 'grid' ? (
+            {activeEnvironment === 'vinculacao' ? (
+              <div className="space-y-3">
+                {isLinkQueueLoading ? (
+                  <div className="p-6 text-sm text-muted-foreground">Carregando fila de vinculação...</div>
+                ) : linkQueueItems.length === 0 ? (
+                  <div className="p-6 text-sm text-muted-foreground">Nenhum item pendente na fila de vinculação.</div>
+                ) : linkQueueItems.map((item) => (
+                  <div key={item.id} className="p-4 bg-muted dark:bg-[#0d0d0d] rounded-xl border border-border dark:border-[#3a3a3a]">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div>
+                        <p className="text-foreground dark:text-white text-sm">
+                          Provisório: <span className="font-semibold">{item.provisional_animal?.name || '-'}</span>
+                          {item.provisional_animal?.registry_number ? ` (${item.provisional_animal.registry_number})` : ''}
+                        </p>
+                        <p className="text-foreground dark:text-white text-sm">
+                          Oficial sugerido: <span className="font-semibold">{item.official_animal?.name || '-'}</span>
+                          {item.official_registry ? ` (${item.official_registry})` : ''}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Match: {item.match_type} | Confiança: {item.confidence ?? 0}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleLinkQueueItem(item.id)}
+                          className="px-4 py-2 rounded-lg bg-primary dark:bg-white text-white dark:text-black hover:opacity-90"
+                        >
+                          Vincular
+                        </button>
+                        <button
+                          onClick={() => handleDismissQueueItem(item.id)}
+                          className="px-4 py-2 rounded-lg bg-muted border border-border dark:border-[#3a3a3a] text-foreground dark:text-white hover:bg-accent dark:hover:bg-[#2a2a2a]"
+                        >
+                          Dispensar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {filteredAnimals.map((animal) => (
                   <AnimalCard
@@ -422,6 +610,7 @@ export function BreederPlantelContent() {
                       setInitialTab('videos');
                       setShowAnimalDetails(true);
                     }}
+                    onDelete={() => handleDeleteAnimal(animal)}
                   />
                 ))}
               </div>
@@ -468,7 +657,8 @@ export function BreederPlantelContent() {
             <ImportModal
               onClose={() => setShowImportModal(false)}
               harasId={harasId}
-              onSuccess={refetch}
+              environment={activeEnvironment}
+              onSuccess={() => { refetch(); refetchLinkQueue(); }}
             />
           )}
 
@@ -567,11 +757,6 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
             Chip: {animal.chip}
           </p>
         )}
-        {animal.marca && (
-          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
-            Marca: {animal.marca}
-          </p>
-        )}
         {animal.birthDate && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
             Nascimento: {formatBirthDate(animal.birthDate)}
@@ -652,8 +837,11 @@ function AnimalListItem({ animal, onClick, onEdit, onViewGenealogy, onViewVideo,
   );
 }
 
-function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, harasId?: string, onSuccess: () => void }) {
+function ImportModal({ onClose, harasId, environment, onSuccess }: { onClose: () => void, harasId?: string, environment: AnimalEnvironment, onSuccess: () => void }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'abccmm_plantel' | 'abccmm_condominio_animais' | 'premiacoes_associado' | 'premiacoes_condominio'>(
+    environment === 'condominio' ? 'abccmm_condominio_animais' : 'abccmm_plantel'
+  );
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -685,19 +873,40 @@ function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, har
 
     const toastId = toast.loading('Iniciando importação...', { duration: Infinity });
 
-    const importPromise = animalsService.importABCCMMData({
-      file: selectedFile,
-      harasId,
-      onProgress: (percent, msg) => {
-        toast.loading(`${msg} (${percent}%)`, { id: toastId, duration: Infinity });
-      },
-    });
+    const importPromise = importMode === 'abccmm_plantel'
+      ? animalsService.importABCCMMData({
+        file: selectedFile,
+        harasId,
+        onProgress: (percent, msg) => {
+          toast.loading(`${msg} (${percent}%)`, { id: toastId, duration: Infinity });
+        },
+      })
+      : importMode === 'abccmm_condominio_animais'
+        ? animalsService.importCondominiumAnimals({
+          file: selectedFile,
+          harasId,
+          onProgress: (percent, msg) => {
+            toast.loading(`${msg} (${percent}%)`, { id: toastId, duration: Infinity });
+          },
+        })
+        : animalsService.importAwardsFromSpreadsheet({
+        file: selectedFile,
+        harasId,
+        source: importMode === 'premiacoes_associado' ? 'associado' : 'condominio',
+        onProgress: (percent, msg) => {
+          toast.loading(`${msg} (${percent}%)`, { id: toastId, duration: Infinity });
+        },
+      });
 
     onClose();
 
     importPromise
       .then((result) => {
-        toast.success(`Importação concluída: ${result.newAnimals} novos, ${result.updatedAnimals} atualizados`, { id: toastId });
+        if ('newAnimals' in result) {
+          toast.success(`Importação concluída: ${result.newAnimals} novos, ${result.updatedAnimals} atualizados`, { id: toastId });
+        } else {
+          toast.success(`Premiações: ${result.insertedAwards} novas, ${result.updatedAwards} atualizadas`, { id: toastId });
+        }
         onSuccess();
       })
       .catch((error) => {
@@ -713,7 +922,7 @@ function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, har
         <div className="p-6 border-b border-border dark:border-[rgba(255,255,255,0.1)]">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-2xl text-foreground dark:text-white mb-2">Importar Planilha</h3>
+              <h3 className="text-2xl text-foreground dark:text-white mb-2">Importações ABCCMM</h3>
             </div>
             <button
               onClick={onClose}
@@ -734,6 +943,19 @@ function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, har
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm text-foreground dark:text-white">Tipo de importação</label>
+              <NativeSelect
+                value={importMode}
+                onChange={(e) => setImportMode(e.target.value as typeof importMode)}
+              >
+                {environment !== 'condominio' && <option value="abccmm_plantel">Animais do plantel (ABCCMM)</option>}
+                <option value="abccmm_condominio_animais">Animais em condomínio</option>
+                {environment !== 'condominio' && <option value="premiacoes_associado">Premiações de associado</option>}
+                <option value="premiacoes_condominio">Premiações de condomínio</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm text-foreground dark:text-white">Formato do Arquivo aceito</label>
               <div className="bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-lg px-4 py-2.5">
                 <p className="text-sm text-muted-foreground dark:text-[#6b6b6b]">Arquivos Excel (.xlsx) com dados organizados em colunas</p>
@@ -745,15 +967,15 @@ function ImportModal({ onClose, harasId, onSuccess }: { onClose: () => void, har
               <div className="bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-lg px-4 py-3">
                 <div className="grid grid-cols-2 gap-x-16">
                   <ul className="text-sm text-muted-foreground dark:text-[#6b6b6b] space-y-1">
-                    <li>• Nome do Animal</li>
-                    <li>• Registro</li>
-                    <li>• Data de Nascimento</li>
-                    <li>• Sexo</li>
+                    <li>• RowId / _rowid</li>
+                    <li>• Nome do Animal / Nome Exposição</li>
+                    <li>• Registro / Evento</li>
+                    <li>• Data / Período</li>
                   </ul>
                   <ul className="text-sm text-muted-foreground dark:text-[#6b6b6b] space-y-1">
-                    <li>• Pelagem</li>
-                    <li>• Status</li>
-                    <li>• Categoria</li>
+                    <li>• Colocação / Premiação</li>
+                    <li>• Cidade/UF</li>
+                    <li>• Código do Evento / Julgados</li>
                   </ul>
                 </div>
               </div>

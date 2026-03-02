@@ -33,7 +33,6 @@ interface Animal {
   name: string;
   registry: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   harasOrigem?: string;
@@ -79,59 +78,7 @@ export function AdvisorHerdContent() {
   const [filterFilhos, setFilterFilhos] = useState('todos');
   const [filterPremiacoes, setFilterPremiacoes] = useState('todos');
   
-  // Lista de animais (dados mockados para o Assessor)
-  const [animalsList, setAnimalsList] = useState<Animal[]>([
-    { 
-      id: 1, 
-      name: 'Estrela Mangalarga', 
-      registry: 'MM-2020-1234',
-      chip: '123456789',
-      marca: 'HV-001',
-      sex: 'Fêmea',
-      birthDate: '2020-01-15',
-      category: 'Reprodutora', 
-      age: '4 anos', 
-      haras: 'Haras Vale Verde', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      localizacao: 'Baia 12',
-      servicoTipo: 'Reprodução',
-      filhos: 3,
-      premiacoes: 2,
-      image: 'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080', 
-      images: [
-        'https://images.unsplash.com/photo-1667992711873-4bd87cbfbb65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVzdG51dCUyMGhvcnNlfGVufDF8fHx8MTc2MzUwMDExNHww&ixlib=rb-4.1.0&q=80&w=1080',
-      ],
-      reproductionType: 'Matriz',
-      activeForReproduction: true,
-      coverageCount: 5,
-    },
-    { 
-      id: 2, 
-      name: 'Relâmpago Negro', 
-      registry: 'MM-2018-5678',
-      chip: '987654321',
-      marca: 'HT-002',
-      sex: 'Macho',
-      birthDate: '2018-03-22',
-      category: 'Reprodutor', 
-      age: '6 anos', 
-      haras: 'Haras Trovão', 
-      status: 'Ativo', 
-      statusColor: 'bg-green-500',
-      localizacao: 'Piquete 5',
-      servicoTipo: 'Reprodução',
-      filhos: 8,
-      premiacoes: 5,
-      image: 'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080', 
-      images: [
-        'https://images.unsplash.com/photo-1656964353220-99aa5acc47e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxibGFjayUyMHN0YWxsaW9uJTIwaG9yc2V8ZW58MXx8fHwxNzYzNTAwMTEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      ],
-      reproductionType: 'Garanhão',
-      activeForReproduction: true,
-      coverageCount: 12,
-    },
-  ]);
+  const [animalsList, setAnimalsList] = useState<Animal[]>([]);
 
   // Função de filtro
   const filteredAnimals = animalsList.filter((animal) => {

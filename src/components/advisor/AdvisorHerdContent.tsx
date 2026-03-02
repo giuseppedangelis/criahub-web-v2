@@ -32,64 +32,7 @@ export function AdvisorHerdContent() {
   const [filterCategory, setFilterCategory] = useState('todos');
   const [filterSex, setFilterSex] = useState('todos');
 
-  const [animals] = useState<Animal[]>([
-    {
-      id: 1,
-      photo: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      name: 'Estrela Mangalarga',
-      registration: 'MM-12345',
-      sex: 'Fêmea',
-      birthDate: '15/03/2018',
-      status: 'Ativo',
-      category: 'Pista',
-      father: 'Rei da Marcha',
-      mother: 'Lua Prateada',
-      coat: 'Castanha',
-      importedFromABCCMM: true,
-    },
-    {
-      id: 2,
-      photo: 'https://images.unsplash.com/photo-1598632640487-6ea4a4e8b6f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      name: 'Relâmpago Negro',
-      registration: 'MM-12346',
-      sex: 'Macho',
-      birthDate: '20/05/2017',
-      status: 'Ativo',
-      category: 'Reprodução',
-      father: 'Trovão Dourado',
-      mother: 'Estrela da Manhã',
-      coat: 'Preta',
-      importedFromABCCMM: true,
-    },
-    {
-      id: 3,
-      photo: 'https://images.unsplash.com/photo-1587463272036-4cb85a5a7c88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      name: 'Bella Vista',
-      registration: 'MM-12347',
-      sex: 'Fêmea',
-      birthDate: '10/08/2019',
-      status: 'Ativo',
-      category: 'Pasto',
-      father: 'Vento Sul',
-      mother: 'Rosa Branca',
-      coat: 'Alazã',
-      importedFromABCCMM: true,
-    },
-    {
-      id: 4,
-      photo: 'https://images.unsplash.com/photo-1551191916-131f9a076e54?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      name: 'Sol Nascente',
-      registration: 'MM-12348',
-      sex: 'Macho',
-      birthDate: '12/01/2020',
-      status: 'Vendido',
-      category: 'Pista',
-      father: 'Rei da Marcha',
-      mother: 'Flor da Tarde',
-      coat: 'Pampa',
-      importedFromABCCMM: true,
-    },
-  ]);
+  const [animals] = useState<Animal[]>([]);
 
   // Filtrar animais
   const filteredAnimals = animals.filter((animal) => {
@@ -130,7 +73,7 @@ export function AdvisorHerdContent() {
   if (activeView === 'details' && selectedAnimal) {
     return (
       <AdvisorAnimalDetails
-        animal={selectedAnimal}
+        animal={selectedAnimal as any}
         onBack={() => {
           setActiveView('list');
           setSelectedAnimal(null);

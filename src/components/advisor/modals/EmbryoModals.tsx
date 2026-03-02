@@ -2,19 +2,7 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-// Lista de animais sugeridos e receptoras
-const suggestedAnimals = [
-  'Estrela Mangalarga',
-  'Relâmpago Negro',
-  'Lua Dourada',
-  'Trovão Branco',
-  'Bella Vista',
-  'Vento Sul',
-  'Aurora',
-  'Diamante Negro',
-  'Serena',
-  'Jade'
-];
+const suggestedAnimals: string[] = [];
 
 interface Embryo {
   id: string;

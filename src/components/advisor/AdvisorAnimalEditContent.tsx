@@ -21,22 +21,18 @@ export function AdvisorAnimalEditContent({ animalId, animalName, onBack }: Anima
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [formData, setFormData] = useState({
-    name: 'Haras Rei da Marcha',
-    sex: 'Macho',
-    registry: 'MM-2020-1234',
-    city: 'São Paulo',
-    state: 'SP',
-    birthDate: '2020-03-12',
-    chip: '123456789',
-    breeder: 'Haras Vale Verde',
-    status: 'Ativo',
+    name: animalName || '',
+    sex: '',
+    registry: '',
+    city: '',
+    state: '',
+    birthDate: '',
+    chip: '',
+    breeder: '',
+    status: '',
   });
 
-  const images = [
-    'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1598632640487-6ea4a4e8b928?w=800&h=600&fit=crop',
-    'https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?w=800&h=600&fit=crop',
-  ];
+  const images: string[] = [];
 
   const handleSave = () => {
     toast.success('Animal atualizado com sucesso!');
@@ -50,10 +46,12 @@ export function AdvisorAnimalEditContent({ animalId, animalName, onBack }: Anima
   };
 
   const handlePrevImage = () => {
+    if (images.length <= 1) return;
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
+    if (images.length <= 1) return;
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
@@ -118,11 +116,17 @@ export function AdvisorAnimalEditContent({ animalId, animalName, onBack }: Anima
             <div className="relative">
               {/* Main Image */}
               <div className="w-full h-[400px] bg-muted dark:bg-[#0d0d0d] rounded-xl overflow-hidden mb-4">
-                <img
-                  src={images[currentImageIndex]}
-                  alt={`${formData.name} - Imagem ${currentImageIndex + 1}`}
-                  className="w-full h-full object-cover"
-                />
+                {images.length > 0 ? (
+                  <img
+                    src={images[currentImageIndex]}
+                    alt={`${formData.name} - Imagem ${currentImageIndex + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground dark:text-[#99a1af]">
+                    Sem imagens registradas
+                  </div>
+                )}
               </div>
 
               {/* Navigation Arrows */}

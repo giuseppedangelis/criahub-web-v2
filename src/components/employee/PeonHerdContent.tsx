@@ -6,16 +6,7 @@ export function PeonHerdContent() {
   const [showAnimalDetails, setShowAnimalDetails] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState<any>(null);
 
-  const animals = [
-    { id: 1, name: 'Estrela Mangalarga', registry: 'MM-2020-1234', status: 'Gestante' },
-    { id: 2, name: 'Relâmpago Negro', registry: 'MM-2018-5678', status: 'Reprodutor' },
-    { id: 3, name: 'Lua Dourada', registry: 'MM-2019-9012', status: 'Em Cobertura' },
-    { id: 4, name: 'Vento Sul', registry: 'MM-2023-3456', status: 'Potro' },
-    { id: 5, name: 'Bella Vista', registry: 'MM-2021-7890', status: 'Ativo' },
-    { id: 6, name: 'Trovão Branco', registry: 'MM-2019-2468', status: 'Reprodutor' },
-    { id: 7, name: 'Noite Estrelada', registry: 'MM-2022-1357', status: 'Potra' },
-    { id: 8, name: 'Sol Nascente', registry: 'MM-2020-9876', status: 'Gestante' },
-  ];
+  const animals: Array<{ id: number; name: string; registry: string; status: string }> = [];
 
   const filteredAnimals = animals.filter(animal =>
     animal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -178,11 +169,11 @@ function AnimalDetailsModal({ animal, onClose }: any) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                   <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Pai</p>
-                  <p className="text-sm text-foreground dark:text-white">Trovão Branco</p>
+                  <p className="text-sm text-foreground dark:text-white">Não informado</p>
                 </div>
                 <div className="p-3 bg-muted dark:bg-[#0d0d0d] rounded-lg">
                   <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Mãe</p>
-                  <p className="text-sm text-foreground dark:text-white">Bella Vista</p>
+                  <p className="text-sm text-foreground dark:text-white">Não informada</p>
                 </div>
               </div>
             </div>

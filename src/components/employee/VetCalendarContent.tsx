@@ -5,12 +5,7 @@ export function VetCalendarContent() {
   const [currentDate, setCurrentDate] = useState(new Date(2024, 10, 18)); // Nov 18, 2024
   const [selectedDate, setSelectedDate] = useState(18);
 
-  const events = [
-    { id: 1, title: 'Ultrassom - Bella Vista', type: 'Reprodução', time: '09:00', date: 18, color: 'bg-pink-500' },
-    { id: 2, title: 'Vacinação em Lote', type: 'Saúde', time: '14:00', date: 18, color: 'bg-green-500' },
-    { id: 3, title: 'Consulta - Estrela M.', type: 'Consulta', time: '10:00', date: 23, color: 'bg-blue-500' },
-    { id: 4, title: 'Coleta de Sêmen', type: 'Reprodução', time: '08:00', date: 25, color: 'bg-pink-500' },
-  ];
+  const events: Array<{ id: number; title: string; type: string; time: string; date: number; color: string }> = [];
 
   const selectedEvents = events.filter(e => e.date === selectedDate);
 

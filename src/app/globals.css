@@ -5749,29 +5749,13 @@ select {
 }
 
 select option {
-  color: #fff;
-  background-color: #2a2a2a;
-  border-radius: .5rem;
-  margin: 4px 0;
-  padding: 8px 12px;
-}
-
-:root select option {
-  color: #333;
-  background-color: #fff;
+  color: #111827;
+  background-color: #ffffff;
 }
 
 .dark select option {
-  color: #fff;
+  color: #f9fafb;
   background-color: #2a2a2a;
-}
-
-select option:hover, select option:checked {
-  background: linear-gradient(0deg, #ffffff1a, #ffffff1a), #2a2a2a;
-}
-
-:root select option:hover, :root select option:checked {
-  background: linear-gradient(0deg, #0000000d, #0000000d), #fff;
 }
 
 @property --tw-translate-x {

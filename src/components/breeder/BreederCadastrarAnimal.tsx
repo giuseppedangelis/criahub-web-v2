@@ -1,5 +1,5 @@
 import { ArrowLeft, Upload, Camera, X, Video, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { useCreateAnimal, useUpdateAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
@@ -7,12 +7,39 @@ import { useCurrentHaras } from '@/hooks/useHaras';
 import { toast } from 'sonner';
 import type { CreateAnimalInput, AnimalSex, AnimalCategory } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { isAdvisorRole, normalizeRole } from '@/lib/roles';
 
 interface BreederCadastrarAnimalProps {
   onBack: () => void;
 }
 
 export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) {
+  const LOCATION_OPTIONS = ['Baia 01', 'Baia 02', 'Baia 03', 'Pasto Maternidade', 'Pasto Norte', 'Pasto Sul', 'Centro de Treinamento', 'Hospedagem Externa'];
+  const SERVICE_TYPE_OPTIONS = ['Reprodução', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
+
+  const getAgeInMonths = (birthDate?: string) => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    return (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  };
+
+  const resolveCategoryByAge = (sex?: string, birthDate?: string): AnimalCategory | '' => {
+    if (!sex || !birthDate) return '';
+    const ageInMonths = getAgeInMonths(birthDate);
+    if (ageInMonths === null) return '';
+    if (ageInMonths < 24) return sex === 'Fêmea' ? 'potra' : 'potro';
+    return sex === 'Fêmea' ? 'egua' : 'garanhao';
+  };
+
+  const isAdultByAgeOrCategory = (animal: { birth_date?: string | null; category?: string | null }) => {
+    const ageInMonths = getAgeInMonths(animal.birth_date || undefined);
+    if (ageInMonths !== null) return ageInMonths >= 24;
+    const key = (animal.category || '').toLowerCase();
+    return key.includes('garanh') || key.includes('egua');
+  };
+
   // Tipos de Entrada
   type EntryType = 'nascimento' | 'avulso' | 'terceiro';
   const [entryType, setEntryType] = useState<EntryType>('nascimento');
@@ -21,7 +48,6 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     nome: string;
     registro: string;
     chip: string;
-    marca: string;
     dataNascimento: string;
     sexo: string;
     categoria: string;
@@ -29,6 +55,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     localizacao: string;
     servicoTipo: string;
     harasOrigem: string;
+    dataRetornoHospedagem: string;
     pelagem: string;
     altura: string;
     peso: string;
@@ -36,13 +63,15 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     pai_id: string;
     mae: string;
     mae_id: string;
+    coberturaNaoRegistrada: boolean;
+    origemEmbriao: '' | 'sociedade' | 'haras';
+    identificacaoEmbriao: string;
     registroFuturoABCCMM: 'sim' | 'nao';
     observacoes: string;
   }>({
     nome: '',
     registro: '',
     chip: '',
-    marca: '',
     dataNascimento: '',
     sexo: '',
     categoria: '',
@@ -50,6 +79,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     localizacao: 'Baia',
     servicoTipo: 'Reprodução',
     harasOrigem: '',
+    dataRetornoHospedagem: '',
     pelagem: '',
     altura: '',
     peso: '',
@@ -57,12 +87,17 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     pai_id: '',
     mae: '',
     mae_id: '',
+    coberturaNaoRegistrada: false,
+    origemEmbriao: '',
+    identificacaoEmbriao: '',
     registroFuturoABCCMM: 'sim',
     observacoes: '',
   });
 
-  const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
-  const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null }[]>([]);
+  const [stallions, setStallions] = useState<{ id: string; name: string; registry_number?: string | null; birth_date?: string | null; category?: string }[]>([]);
+  const [mares, setMares] = useState<{ id: string; name: string; registry_number?: string | null; birth_date?: string | null; category?: string }[]>([]);
+  const [fatherSearch, setFatherSearch] = useState('');
+  const [motherSearch, setMotherSearch] = useState('');
   const [userHarasName, setUserHarasName] = useState('');
   const { stableHarasId, user } = useUser();
   const { data: currentHaras } = useCurrentHaras();
@@ -85,8 +120,8 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
           animalsService.getStallions(harasId, { includeInactive: true, includeAllCategories: true }),
           animalsService.getMares(harasId, { includeInactive: true, includeAllCategories: true })
         ]);
-        setStallions(stallionsData);
-        setMares(maresData);
+        setStallions(stallionsData.filter((item) => isAdultByAgeOrCategory({ birth_date: (item as any).birth_date, category: (item as any).category })));
+        setMares(maresData.filter((item) => isAdultByAgeOrCategory({ birth_date: (item as any).birth_date, category: (item as any).category })));
       });
     }
     loadInitialData();
@@ -106,7 +141,9 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         ...prev,
         harasOrigem: '',
         statusManejo: 'Em observação',
-        servicoTipo: 'Hospedagem'
+        localizacao: 'Hospedagem Externa',
+        servicoTipo: 'Hospedagem',
+        dataRetornoHospedagem: prev.dataRetornoHospedagem || ''
       }));
     } else {
       // Avulso (resetar defaults se necessário)
@@ -115,12 +152,28 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         harasOrigem: '',
         statusManejo: '',
         servicoTipo: '',
+        dataRetornoHospedagem: '',
+        coberturaNaoRegistrada: false,
+        origemEmbriao: '',
+        identificacaoEmbriao: '',
       }));
     }
   }, [entryType, userHarasName]);
 
+  useEffect(() => {
+    const autoCategory = resolveCategoryByAge(formData.sexo, formData.dataNascimento);
+    if (!autoCategory) return;
+    if (formData.categoria !== autoCategory) {
+      setFormData((prev) => ({ ...prev, categoria: autoCategory }));
+    }
+  }, [formData.sexo, formData.dataNascimento]);
+
   const [selectedImages, setSelectedImages] = useState<{ file: File; caption: string; type: 'image' | 'video' }[]>([]);
+  const [selectedCoverToken, setSelectedCoverToken] = useState('');
   const [selectedDocuments, setSelectedDocuments] = useState<File[]>([]);
+  const isSubmittingRef = useRef(false);
+
+  const getMediaToken = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -130,7 +183,12 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         caption: '',
         type: file.type.startsWith('video/') ? 'video' as const : 'image' as const
       }));
-      setSelectedImages([...selectedImages, ...newImages]);
+      const updated = [...selectedImages, ...newImages];
+      setSelectedImages(updated);
+      if (!selectedCoverToken) {
+        const firstImage = updated.find((item) => item.type === 'image');
+        if (firstImage) setSelectedCoverToken(getMediaToken(firstImage.file));
+      }
     }
   };
 
@@ -154,7 +212,14 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   };
 
   const removeImage = (index: number) => {
-    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+    const removed = selectedImages[index];
+    const updated = selectedImages.filter((_, i) => i !== index);
+    setSelectedImages(updated);
+    if (!removed) return;
+    if (getMediaToken(removed.file) === selectedCoverToken) {
+      const nextImage = updated.find((item) => item.type === 'image');
+      setSelectedCoverToken(nextImage ? getMediaToken(nextImage.file) : '');
+    }
   };
 
   const removeDocument = (index: number) => {
@@ -173,7 +238,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
   const showLocationInfo = true;
   const isBirthDateRequired = true;
 
-  const uploadFiles = async (animalId: string, files: File[], folder: 'media' | 'documents') => {
+  const uploadFiles = async (animalId: string, files: File[], folder: 'media' | 'documents' | 'videos') => {
     if (files.length === 0) return [];
     const client = createClient();
     const uploadedUrls: string[] = [];
@@ -206,28 +271,165 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     return uploadedUrls;
   };
 
+  const createUnregisteredBirthWorkflow = async (createdAnimalId: string) => {
+    if (!stableHarasId || !user || !formData.coberturaNaoRegistrada) return;
+
+    const client = createClient();
+    const userDisplayName =
+      (user.user_metadata?.full_name as string | undefined)
+      || (user.email as string | undefined)
+      || 'Usuário do sistema';
+
+    const embryoOriginLabel =
+      formData.origemEmbriao === 'sociedade'
+        ? 'Sociedade'
+        : formData.origemEmbriao === 'haras'
+          ? 'Feito no haras'
+          : 'Não informado';
+
+    const motherName = formData.mae || 'Não informado';
+
+    const { error: pendingError } = await (client as any).from('pending_validations').insert({
+      haras_id: stableHarasId,
+      type: 'nascimento',
+      status: 'pendente',
+      created_by: user.id,
+      data: {
+        fieldData: {
+          motherName,
+          motherId: formData.mae_id && formData.mae_id !== 'external' ? formData.mae_id : null,
+          provisionalSex: formData.sexo || null,
+          observations: formData.observacoes || null,
+          reportedDate: new Date().toISOString(),
+          reportedBy: userDisplayName,
+          location: formData.localizacao || 'Não informado',
+          source: 'web_breeder',
+        },
+        workflow: {
+          unregisteredCovering: true,
+          createdAnimalId,
+          embryoOrigin: formData.origemEmbriao || null,
+          embryoOriginLabel,
+          embryoIdentification: formData.identificacaoEmbriao || null,
+          fatherInformed: Boolean(formData.pai || formData.pai_id),
+        },
+      },
+    });
+
+    if (pendingError) {
+      console.error('Erro ao criar pendência de nascimento:', pendingError);
+      toast.warning('Animal criado, mas a pendência de validação não foi aberta.');
+      return;
+    }
+
+    const { data: profiles, error: profilesError } = await client
+      .from('profiles')
+      .select('id, role')
+      .eq('haras_id', stableHarasId);
+
+    if (profilesError) {
+      console.error('Erro ao buscar equipe para notificação:', profilesError);
+      toast.warning('Animal criado e pendência aberta, mas sem envio de notificação para equipe.');
+      return;
+    }
+
+    const recipients = (profiles || []).filter((profile: { id: string; role: string | null }) => {
+      const role = normalizeRole(profile.role);
+      return role === 'veterinario' || isAdvisorRole(role);
+    });
+
+    if (recipients.length === 0) {
+      toast.warning('Pendência aberta sem destinatários de notificação (vet/assessoria não cadastrados).');
+      return;
+    }
+
+    const notificationsPayload = recipients.map((profile: { id: string }) => ({
+      user_id: profile.id,
+      haras_id: stableHarasId,
+      titulo: 'Nascimento sem cobrição registrada',
+      mensagem: `Foi comunicado um nascimento sem cobrição registrada. Mãe: ${motherName}. Origem do embrião: ${embryoOriginLabel}.`,
+      tipo: 'warning',
+      categoria: 'Reprodução',
+      prioridade: 'alta',
+      lida: false,
+    }));
+
+    const { error: notificationsError } = await (client as any).from('notifications').insert(notificationsPayload);
+
+    if (notificationsError) {
+      console.error('Erro ao enviar notificações:', notificationsError);
+      toast.warning('Pendência criada, mas houve falha no envio das notificações.');
+      return;
+    }
+
+    toast.success('Pendência e notificação enviadas para veterinária e assessoria.');
+  };
+
+  const createReturnReminderEvent = async (createdAnimalId: string) => {
+    if (!stableHarasId || !isThirdParty || !formData.dataRetornoHospedagem) return;
+
+    const client = createClient();
+    const eventDate = `${formData.dataRetornoHospedagem}T08:00:00`;
+
+    const { error } = await (client as any).from('events').insert({
+      haras_id: stableHarasId,
+      animal_id: createdAnimalId,
+      titulo: `Retorno de hospedagem - ${formData.nome}`,
+      tipo: 'Serviço',
+      data_inicio: eventDate,
+      descricao: 'Lembrete automático para retorno de animal hospedado externamente.',
+      local: formData.localizacao || 'Hospedagem Externa',
+      status: 'Pendente',
+      auto_gerado: true,
+      origem: 'hospedagem_retorno',
+      origem_id: createdAnimalId,
+      observacoes: formData.observacoes || null,
+    });
+
+    if (error) {
+      console.error('Erro ao criar lembrete de retorno:', error);
+      toast.warning('Animal cadastrado, mas o lembrete de retorno não foi criado.');
+      return;
+    }
+
+    toast.success('Lembrete de retorno criado na agenda.');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     // Validar Mãe para Nascimento
     if (isBirth && !formData.mae_id) {
       toast.error('O cadastro de nascimento exige a seleção de uma mãe cadastrada.');
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!user) {
       toast.error('Usuário não autenticado');
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!stableHarasId) {
       toast.error('Haras não vinculado ao usuário');
+      isSubmittingRef.current = false;
       return;
     }
 
     // Validar campos obrigatórios
     if (!formData.nome || (isBirthDateRequired && !formData.dataNascimento) || !formData.sexo) {
       toast.error('Preencha todos os campos obrigatórios');
+      isSubmittingRef.current = false;
+      return;
+    }
+
+    if (isThirdParty && !formData.dataRetornoHospedagem) {
+      toast.error('Informe a data prevista de retorno da hospedagem.');
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -236,20 +438,24 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     if (isBirth && formData.registroFuturoABCCMM === 'sim') statusFinal = 'provisorio';
 
     // Mapear campos para CreateAnimalInput
+    const resolvedCategory = resolveCategoryByAge(formData.sexo, formData.dataNascimento) || (formData.categoria as AnimalCategory) || 'potro';
+    const observationSuffix = isThirdParty && formData.dataRetornoHospedagem
+      ? `Retorno previsto da hospedagem: ${formData.dataRetornoHospedagem}`
+      : '';
+
     const animalInput: CreateAnimalInput = {
       haras_id: stableHarasId,
       name: formData.nome,
       sex: formData.sexo as AnimalSex,
       birth_date: formData.dataNascimento || undefined,
-      category: (formData.categoria as AnimalCategory) || 'potro',
+      category: resolvedCategory,
       registry_number: isBirth ? undefined : (formData.registro || undefined),
       chip_number: isBirth ? undefined : (formData.chip || undefined),
-      brand: formData.marca || undefined,
       coat_color: formData.pelagem || undefined,
       location: formData.localizacao || undefined,
       origin_haras: isThirdParty ? undefined : (formData.harasOrigem || undefined),
       proprietario: isThirdParty ? (formData.harasOrigem || undefined) : undefined,
-      observations: formData.observacoes || undefined,
+      observations: [formData.observacoes, observationSuffix].filter(Boolean).join('\n') || undefined,
       status: statusFinal,
       weight: formData.peso ? parseFloat(formData.peso) : undefined,
       height: formData.altura ? parseFloat(formData.altura) : undefined,
@@ -262,6 +468,23 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
     };
 
     try {
+      const client = createClient();
+      const { data: duplicateRows, error: duplicateError } = await client
+        .from('animals')
+        .select('id')
+        .eq('haras_id', stableHarasId)
+        .eq('nome', formData.nome.trim())
+        .eq('sexo', formData.sexo)
+        .eq('data_nascimento', formData.dataNascimento)
+        .limit(1);
+
+      if (duplicateError) {
+        console.warn('Falha na verificação de duplicidade:', duplicateError);
+      } else if ((duplicateRows || []).length > 0) {
+        toast.error('Já existe um animal com mesmo nome, sexo e data de nascimento.');
+        return;
+      }
+
       const createdAnimal = await createAnimalMutation.mutateAsync(animalInput);
 
       const hasMedia = selectedImages.length > 0;
@@ -271,10 +494,33 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         let mediaUrls: string[] = [];
         let documentUrls: string[] = [];
 
+        const imageItems = selectedImages.filter((item) => item.type === 'image');
+        const videoItems = selectedImages.filter((item) => item.type === 'video');
+
         if (hasMedia) toast.info('Fazendo upload das fotos/vídeos...');
-        const mediaFiles = selectedImages.map(item => item.file);
-        if (mediaFiles.length > 0) {
-          mediaUrls = await uploadFiles(createdAnimal.id, mediaFiles, 'media');
+        if (imageItems.length > 0) {
+          mediaUrls = await uploadFiles(createdAnimal.id, imageItems.map((item) => item.file), 'media');
+        }
+
+        if (videoItems.length > 0) {
+          const videoUrls = await uploadFiles(createdAnimal.id, videoItems.map((item) => item.file), 'videos');
+          if (videoUrls.length > 0) {
+            const videoPayload = videoUrls.map((url, index) => ({
+              animal_id: createdAnimal.id,
+              haras_id: stableHarasId,
+              title: videoItems[index]?.caption || videoItems[index]?.file.name || `Vídeo ${index + 1}`,
+              url,
+              type: 'Upload',
+              visibility: 'Privado',
+              source: 'upload',
+              caption: videoItems[index]?.caption || null,
+            }));
+            const { error: videosError } = await (client as any).from('animal_videos').insert(videoPayload);
+            if (videosError) {
+              console.error('Erro ao salvar vídeos do animal:', videosError);
+              toast.warning('Vídeos enviados, mas houve falha ao registrar metadados.');
+            }
+          }
         }
 
         if (hasDocs) toast.info('Fazendo upload dos documentos...');
@@ -284,10 +530,15 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
 
         if (mediaUrls.length > 0 || documentUrls.length > 0) {
           try {
+            const coverIndexInImages = imageItems.findIndex((item) => getMediaToken(item.file) === selectedCoverToken);
+            const mainImageUrl = mediaUrls.length > 0
+              ? mediaUrls[Math.max(0, coverIndexInImages)] || mediaUrls[0]
+              : undefined;
+
             await updateAnimalMutation.mutateAsync({
               id: createdAnimal.id,
               images: mediaUrls,
-              main_image_url: mediaUrls[0],
+              main_image_url: mainImageUrl,
               documents: documentUrls,
             });
           } catch (updateError) {
@@ -297,11 +548,21 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         }
       }
 
+      if (isBirth && formData.coberturaNaoRegistrada) {
+        await createUnregisteredBirthWorkflow(createdAnimal.id);
+      }
+
+      if (isThirdParty && formData.dataRetornoHospedagem) {
+        await createReturnReminderEvent(createdAnimal.id);
+      }
+
       toast.success('Animal cadastrado com sucesso!');
       onBack();
     } catch (error) {
       console.error('Erro ao cadastrar animal:', error);
       toast.error('Erro ao cadastrar animal. Tente novamente.');
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -365,14 +626,14 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               }`}
           >
             <span className="text-2xl">🤝</span>
-            <span className="font-medium">Terceiro</span>
+            <span className="font-medium">Hospedagem Externa</span>
           </button>
         </div>
 
         <div className="mt-4 p-4 bg-muted/50 dark:bg-[#111] rounded-lg text-sm text-muted-foreground">
           {entryType === 'nascimento' && 'Cadastro de animal nascido no haras. Haras de origem bloqueado no seu haras e fluxo preparado para registro ABCCMM futuro.'}
           {isAvulso && 'Cadastro de animal do plantel sem dependência imediata da ABCCMM. Pode ter registro e chip normalmente.'}
-          {isThirdParty && 'Animal de terceiro hospedado no haras. Informe o proprietário para rastreabilidade.'}
+          {isThirdParty && 'Animal do seu plantel hospedado em sócio/CTE. Informe o local e a data prevista de retorno.'}
         </div>
       </div>
 
@@ -446,22 +707,6 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               </div>
             )}
 
-            {/* Marca - Hidden for Genealogy */}
-            {showPhysicalInfo && (
-              <div>
-                <label className="block text-sm text-foreground dark:text-white mb-2">
-                  Marca
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Marca do Chip"
-                  value={formData.marca}
-                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-                />
-              </div>
-            )}
-
             {/* Data de Nascimento */}
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
@@ -504,7 +749,7 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
               >
                 <option value="">Selecione a categoria</option>
                 <option value="potro">Potro</option>
-                <option value="potra">Potranca</option>
+                <option value="potra">Potra</option>
                 <option value="garanhao">Garanhão</option>
                 <option value="egua">Égua</option>
                 <option value="castrado">Castrado</option>
@@ -544,13 +789,14 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                 <label className="block text-sm text-foreground dark:text-white mb-2">
                   Localização
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Baia"
+                <NativeSelect
                   value={formData.localizacao}
                   onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
-                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-                />
+                >
+                  {LOCATION_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </NativeSelect>
               </div>
             )}
 
@@ -560,13 +806,15 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                 <label className="block text-sm text-foreground dark:text-white mb-2">
                   Tipo de Serviço
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Reprodução"
+                <NativeSelect
                   value={formData.servicoTipo}
                   onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
-                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-                />
+                >
+                  <option value="">Selecione o tipo</option>
+                  {SERVICE_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </NativeSelect>
               </div>
             )}
 
@@ -584,6 +832,20 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                 className={`w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20 ${isBirth ? 'opacity-50 cursor-not-allowed' : ''}`}
               />
             </div>
+
+            {isThirdParty && (
+              <div>
+                <label className="block text-sm text-foreground dark:text-white mb-2">
+                  Data prevista de retorno <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.dataRetornoHospedagem}
+                  onChange={(e) => setFormData({ ...formData, dataRetornoHospedagem: e.target.value })}
+                  className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                />
+              </div>
+            )}
 
             {/* Pelagem */}
             <div>
@@ -642,12 +904,70 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
           <h2 className="text-xl text-foreground dark:text-white mb-6">Genealogia</h2>
 
+          {isBirth && (
+            <div className="mb-4 p-4 rounded-lg border border-border dark:border-[#3a3a3a] bg-muted/40 dark:bg-[#111]">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.coberturaNaoRegistrada}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    coberturaNaoRegistrada: e.target.checked,
+                    origemEmbriao: e.target.checked ? formData.origemEmbriao : '',
+                    identificacaoEmbriao: e.target.checked ? formData.identificacaoEmbriao : '',
+                  })}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="text-sm text-foreground dark:text-white">Nascimento sem cobrição registrada</p>
+                  <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
+                    Abre uma pendência para validação da veterinária e da assessoria com os dados do embrião.
+                  </p>
+                </div>
+              </label>
+
+              {formData.coberturaNaoRegistrada && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Origem do embrião</label>
+                    <NativeSelect
+                      value={formData.origemEmbriao}
+                      onChange={(e) => setFormData({ ...formData, origemEmbriao: e.target.value as '' | 'sociedade' | 'haras' })}
+                    >
+                      <option value="">Não informado</option>
+                      <option value="sociedade">Veio de sociedade</option>
+                      <option value="haras">Feito no haras</option>
+                    </NativeSelect>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Identificação do embrião</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Embrião #A12"
+                      value={formData.identificacaoEmbriao}
+                      onChange={(e) => setFormData({ ...formData, identificacaoEmbriao: e.target.value })}
+                      className="w-full h-10 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Pai */}
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Pai
+                {isBirth && formData.coberturaNaoRegistrada ? 'Pai (opcional)' : 'Pai'}
               </label>
+              <input
+                type="text"
+                value={fatherSearch}
+                onChange={(e) => setFatherSearch(e.target.value)}
+                placeholder="Buscar pai por nome"
+                className="w-full h-10 px-4 mb-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+              />
               <div className="flex gap-2">
                   <NativeSelect
                     value={formData.pai_id || ''}
@@ -681,7 +1001,9 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                     className="flex-1"
                   >
                   <option value="">Selecione ou deixe em branco</option>
-                  {stallions.map((stallion) => (
+                  {stallions
+                    .filter((stallion) => stallion.name.toLowerCase().includes(fatherSearch.trim().toLowerCase()))
+                    .map((stallion) => (
                     <option key={stallion.id} value={stallion.id}>
                       {stallion.name} {stallion.registry_number ? `(${stallion.registry_number})` : ''}
                     </option>
@@ -703,8 +1025,15 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
             {/* Mãe */}
             <div>
               <label className="block text-sm text-foreground dark:text-white mb-2">
-                Mãe
+                {isBirth ? 'Mãe (Receptora/Matriz) *' : 'Mãe'}
               </label>
+              <input
+                type="text"
+                value={motherSearch}
+                onChange={(e) => setMotherSearch(e.target.value)}
+                placeholder="Buscar mãe por nome"
+                className="w-full h-10 px-4 mb-2 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+              />
               <div className="flex gap-2">
                   <NativeSelect
                     value={formData.mae_id || ''}
@@ -737,8 +1066,10 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                     }}
                     className="flex-1"
                   >
-                  <option value="">Selecione ou deixe em branco</option>
-                  {mares.map((mare) => (
+                  <option value="">{isBirth ? 'Selecione a receptora/matriz' : 'Selecione ou deixe em branco'}</option>
+                  {mares
+                    .filter((mare) => mare.name.toLowerCase().includes(motherSearch.trim().toLowerCase()))
+                    .map((mare) => (
                     <option key={mare.id} value={mare.id}>
                       {mare.name} {mare.registry_number ? `(${mare.registry_number})` : ''}
                     </option>
@@ -875,6 +1206,18 @@ export function BreederCadastrarAnimal({ onBack }: BreederCadastrarAnimalProps) 
                           </>
                         )}
                       </div>
+                      {image.type === 'image' && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCoverToken(getMediaToken(image.file))}
+                          className={`absolute bottom-2 left-2 px-2 py-1 text-xs rounded-md ${selectedCoverToken === getMediaToken(image.file)
+                            ? 'bg-primary text-white'
+                            : 'bg-black/70 text-white'
+                            }`}
+                        >
+                          {selectedCoverToken === getMediaToken(image.file) ? 'Foto de capa' : 'Definir capa'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeImage(index)}

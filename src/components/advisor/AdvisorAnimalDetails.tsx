@@ -10,7 +10,6 @@ interface Animal {
   registration?: string;
   registry?: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   harasOrigem?: string;
@@ -85,63 +84,32 @@ export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'ove
     return `${day}/${month}/${year}`;
   }
 
-  // Mock data para completar as abas
   const genealogyData = {
-    father: animal.father || 'Trovão Branco',
-    fatherRegistry: 'MM-2019-2468',
-    mother: animal.mother || 'Bella Vista',
-    motherRegistry: 'MM-2021-7890',
-    paternalGrandfather: 'Rei da Marcha',
-    paternalGrandfatherRegistry: 'MM-2015-1234',
-    paternalGrandmother: 'Lua Prateada',
-    paternalGrandmotherRegistry: 'MM-2016-5678',
-    maternalGrandfather: 'Vento Sul',
-    maternalGrandfatherRegistry: 'MM-2017-9012',
-    maternalGrandmother: 'Rosa Branca',
-    maternalGrandmotherRegistry: 'MM-2018-3456',
+    father: animal.father || 'Não informado',
+    fatherRegistry: '-',
+    mother: animal.mother || 'Não informada',
+    motherRegistry: '-',
+    paternalGrandfather: '-',
+    paternalGrandfatherRegistry: '-',
+    paternalGrandmother: '-',
+    paternalGrandmotherRegistry: '-',
+    maternalGrandfather: '-',
+    maternalGrandfatherRegistry: '-',
+    maternalGrandmother: '-',
+    maternalGrandmotherRegistry: '-',
   };
 
-  const reproductionHistory = [
-    { id: 1, type: 'Cobertura', partner: 'Trovão Dourado', date: '15/01/2024', status: 'Confirmada', result: 'Prenha' },
-    { id: 2, type: 'Parto', offspring: 'Potro Macho - Cometa da Estrela', date: '20/11/2023', status: 'Sucesso', observations: 'Sem complicações, potro saudável' },
-    { id: 3, type: 'Cobertura', partner: 'Rei da Marcha', date: '10/02/2023', status: 'Confirmada', result: 'Vazia' },
-  ];
+  const reproductionHistory: any[] = [];
 
-  const awards = [
-    { id: 1, event: 'Expo Nacional Mangalarga 2024', category: 'Marcha Picada - Fêmeas', position: '1º Lugar', date: '15/08/2024', location: 'Belo Horizonte - MG' },
-    { id: 2, event: 'Campeonato Regional Sul', category: 'Melhor Conjunto', position: '2º Lugar', date: '20/05/2024', location: 'Curitiba - PR' },
-    { id: 3, event: 'Ranking ABCCMM 2023', category: 'Top 10 Fêmeas', position: '7º Lugar', date: '10/12/2023', location: 'Nacional' },
-  ];
+  const awards: any[] = [];
 
-  const offspring = [
-    { id: 1, name: 'Cometa da Estrela', sex: 'Macho', birthDate: '20/11/2023', father: 'Trovão Dourado', registration: 'MM-12360', status: 'Ativo', image: 'https://images.unsplash.com/photo-1598632640487-6ea4a4e8b6f1?w=200' },
-    { id: 2, name: 'Lua Crescente', sex: 'Fêmea', birthDate: '15/10/2022', father: 'Rei da Marcha', registration: 'MM-12350', status: 'Vendido', image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=200' },
-    { id: 3, name: 'Vento Forte', sex: 'Macho', birthDate: '05/09/2021', father: 'Trovão Dourado', registration: 'MM-12340', status: 'Ativo', image: 'https://images.unsplash.com/photo-1587463272036-4cb85a5a7c88?w=200' },
-  ];
+  const offspring: any[] = [];
 
-  const documents = [
-    { id: 1, type: 'GIA', name: 'Guia de Ingresso - Estrela Mangalarga', date: '15/11/2024', status: 'Assinado', size: '1.2 MB' },
-    { id: 2, type: 'Registro', name: 'Certificado de Registro ABCCMM', date: '10/03/2018', status: 'Assinado', size: '856 KB' },
-    { id: 3, type: 'Exame', name: 'Atestado Sanitário', date: '08/01/2025', status: 'Assinado', size: '524 KB' },
-    { id: 4, type: 'Contrato', name: 'Contrato de Cobertura', date: '15/01/2024', status: 'Assinado', size: '1.8 MB' },
-  ];
+  const documents: any[] = [];
 
-  const healthRecords = [
-    { id: 1, type: 'Vacina', name: 'Raiva', date: '10/01/2025', veterinarian: 'Dr. Carlos Silva', observations: 'Aplicada sem intercorrências' },
-    { id: 2, type: 'Vermífugo', name: 'Ivermectina', date: '05/01/2025', veterinarian: 'Dra. Maria Santos', observations: 'Peso: 450kg' },
-    { id: 3, type: 'Consulta', name: 'Check-up Anual', date: '20/12/2024', veterinarian: 'Dr. Carlos Silva', observations: 'Animal saudável, sem alterações' },
-    { id: 4, type: 'Vacina', name: 'Influenza Equina', date: '15/11/2024', veterinarian: 'Dra. Maria Santos', observations: 'Reforço anual aplicado' },
-    { id: 5, type: 'Tratamento', name: 'Tratamento de Casco', date: '01/11/2024', veterinarian: 'João Ferrador', observations: 'Casqueamento e ferrageamento' },
-  ];
+  const healthRecords: any[] = [];
 
-  const historyEvents = [
-    { id: 1, type: 'award', title: '1º Lugar - Expo Nacional', date: '15/08/2024', icon: Award, color: 'text-yellow-500' },
-    { id: 2, type: 'reproduction', title: 'Cobertura Confirmada', date: '15/01/2024', icon: Heart, color: 'text-pink-500' },
-    { id: 3, type: 'health', title: 'Check-up Anual', date: '20/12/2024', icon: Stethoscope, color: 'text-green-500' },
-    { id: 4, type: 'offspring', title: 'Nascimento: Cometa da Estrela', date: '20/11/2023', icon: Baby, color: 'text-blue-500' },
-    { id: 5, type: 'health', title: 'Vacina Raiva', date: '10/01/2025', icon: Syringe, color: 'text-green-500' },
-    { id: 6, type: 'document', title: 'GIA Assinado', date: '15/11/2024', icon: FileText, color: 'text-gray-500' },
-  ];
+  const historyEvents: any[] = [];
 
   return (
     <div className="space-y-6">
@@ -352,12 +320,6 @@ export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'ove
                         <div>
                           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Chip RFID</p>
                           <p className="text-sm text-foreground dark:text-white font-medium">{animal.chip}</p>
-                        </div>
-                      )}
-                      {animal.marca && (
-                        <div>
-                          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Marca/Ferro</p>
-                          <p className="text-sm text-foreground dark:text-white font-medium">{animal.marca}</p>
                         </div>
                       )}
                       {animal.sex && (

@@ -19,11 +19,13 @@ export const healthKeys = {
     summary: (harasId: string) => [...healthKeys.all, 'summary', harasId] as const,
 }
 
-export function useAnimalHealthRecords(animalId: string) {
+export function useAnimalHealthRecords(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: healthKeys.recordsByAnimal(animalId),
         queryFn: () => healthService.listHealthRecords(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -38,11 +40,13 @@ export function useCreateHealthRecord() {
     })
 }
 
-export function useAnimalVaccines(animalId: string) {
+export function useAnimalVaccines(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: healthKeys.vaccinesByAnimal(animalId),
         queryFn: () => healthService.listVaccines(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -57,11 +61,13 @@ export function useCreateVaccine() {
     })
 }
 
-export function useAnimalExams(animalId: string) {
+export function useAnimalExams(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: healthKeys.examsByAnimal(animalId),
         queryFn: () => healthService.listExams(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
     })
 }
 

@@ -33,26 +33,11 @@ export function RegisterShowParticipationModal({ onClose, onRegister }: Register
   const [breeder, setBreeder] = useState('');
   const [observations, setObservations] = useState('');
 
-  const events = [
-    { id: '1', name: 'Exposição Nacional de Mangalarga Marchador', date: '2025-03-15', location: 'Belo Horizonte, MG' },
-    { id: '2', name: 'Campeonato Regional Sul de Minas', date: '2025-02-20', location: 'Pouso Alegre, MG' },
-    { id: '3', name: 'Prova Funcional de Marcha', date: '2025-01-30', location: 'Três Corações, MG' },
-  ];
+  const events: Array<{ id: string; name: string; date: string; location: string }> = [];
 
-  const animals: Animal[] = [
-    { id: '1', name: 'Estrela da Manhã', registry: '123456', gender: 'femea', age: 5, category: 'Adulto Fêmea' },
-    { id: '2', name: 'Trovão Negro', registry: '123457', gender: 'macho', age: 7, category: 'Adulto Macho' },
-    { id: '3', name: 'Lua Cheia', registry: '123458', gender: 'femea', age: 4, category: 'Adulto Fêmea' },
-    { id: '4', name: 'Sol Nascente', registry: '123459', gender: 'macho', age: 3, category: 'Júnior Macho' },
-    { id: '5', name: 'Bella Vista', registry: '123460', gender: 'femea', age: 6, category: 'Adulto Fêmea' },
-    { id: '6', name: 'Imperador', registry: '123461', gender: 'macho', age: 8, category: 'Adulto Macho' },
-  ];
+  const animals: Animal[] = [];
 
-  const tropas: Tropa[] = [
-    { id: '1', name: 'Tropa Principal', animalCount: 12 },
-    { id: '2', name: 'Tropa Júnior', animalCount: 8 },
-    { id: '3', name: 'Tropa Sênior', animalCount: 15 },
-  ];
+  const tropas: Tropa[] = [];
 
   const toggleAnimal = (animalId: string) => {
     if (selectedAnimals.includes(animalId)) {

@@ -8,7 +8,6 @@ interface Animal {
   name: string;
   registry: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   category: string;
@@ -49,7 +48,6 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
     nome: animal.name,
     registro: animal.registry,
     chip: animal.chip || '',
-    marca: animal.marca || '',
     categoria: animal.category,
     sexo: animal.sex || 'Macho',
     dataNascimento: animal.birthDate || '2020-01-15',
@@ -77,9 +75,7 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
   const [newMedia, setNewMedia] = useState<{ file: File; caption: string; type: 'image' | 'video' }[]>([]);
 
   // Estado para documentos existentes e novos
-  const [existingDocuments, setExistingDocuments] = useState<DocumentItem[]>([
-    { id: 'doc-1', name: 'Registro ABCCMM.pdf', url: '#', isExisting: true },
-  ]);
+  const [existingDocuments, setExistingDocuments] = useState<DocumentItem[]>([]);
 
   const [newDocuments, setNewDocuments] = useState<File[]>([]);
 
@@ -217,17 +213,6 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
               </div>
 
               <div>
-                <label className="block text-sm text-foreground dark:text-white mb-2">Marca</label>
-                <input
-                  type="text"
-                  value={formData.marca}
-                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                  className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-                  placeholder="Ex: Marca XYZ"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm text-foreground dark:text-white mb-2">Categoria *</label>
                 <NativeSelect
                   value={formData.categoria}
@@ -244,7 +229,7 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
                 <label className="block text-sm text-foreground dark:text-white mb-2">Sexo *</label>
                 <NativeSelect
                   value={formData.sexo}
-                  onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, sexo: e.target.value as 'Macho' | 'Fêmea' })}
                 >
                   <option value="Macho">Macho</option>
                   <option value="Fêmea">Fêmea</option>

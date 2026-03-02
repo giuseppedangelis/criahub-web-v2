@@ -20,7 +20,7 @@ export interface LocationChangeData {
 }
 
 const LOCATION_TYPES: AnimalLocationType[] = ['Baia', 'Pasto', 'Servico'];
-const SERVICE_TYPES: AnimalServiceType[] = ['Reproducao', 'Trabalho', 'Repouso', 'Outro'];
+const SERVICE_TYPES: AnimalServiceType[] = ['Reproducao', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
 
 export function LocationChangeModal({ currentLocation, onClose, onSave, isSaving }: LocationChangeModalProps) {
   const [formData, setFormData] = useState<LocationChangeData>({

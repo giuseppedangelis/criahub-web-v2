@@ -5,53 +5,7 @@ export function PeonPregnanciesContent() {
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [selectedPregnancy, setSelectedPregnancy] = useState<any>(null);
 
-  const pregnancies = [
-    {
-      id: 1,
-      mare: 'Bella Vista',
-      sire: 'Relâmpago Negro',
-      progress: 95,
-      dueDate: '20/11/2024',
-      daysPregnant: 320,
-      status: 'Em acompanhamento',
-    },
-    {
-      id: 2,
-      mare: 'Estrela Mangalarga',
-      sire: 'Trovão Branco',
-      progress: 88,
-      dueDate: '25/11/2024',
-      daysPregnant: 295,
-      status: 'Confirmada',
-    },
-    {
-      id: 3,
-      mare: 'Lua Dourada',
-      sire: 'Relâmpago Negro',
-      progress: 75,
-      dueDate: '05/12/2024',
-      daysPregnant: 252,
-      status: 'Confirmada',
-    },
-    {
-      id: 4,
-      mare: 'Sol Nascente',
-      sire: 'Trovão Branco',
-      progress: 45,
-      dueDate: '15/01/2025',
-      daysPregnant: 150,
-      status: 'Aguardando confirmação',
-    },
-    {
-      id: 5,
-      mare: 'Noite Estrelada',
-      sire: 'Vento Sul',
-      progress: 15,
-      dueDate: '28/02/2025',
-      daysPregnant: 50,
-      status: 'Aguardando confirmação',
-    },
-  ];
+  const pregnancies: Array<{ id: number; mare: string; sire: string; progress: number; dueDate: string; daysPregnant: number; status: string }> = [];
 
   const getProgressColor = (progress: number) => {
     if (progress >= 80) return 'bg-green-500';

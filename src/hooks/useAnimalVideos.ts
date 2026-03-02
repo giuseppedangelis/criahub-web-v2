@@ -16,11 +16,13 @@ export const animalVideoKeys = {
     detail: (id: string) => [...animalVideoKeys.details(), id] as const,
 }
 
-export function useAnimalVideos(animalId: string) {
+export function useAnimalVideos(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: animalVideoKeys.listByAnimal(animalId),
         queryFn: () => animalVideosService.listByAnimal(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 

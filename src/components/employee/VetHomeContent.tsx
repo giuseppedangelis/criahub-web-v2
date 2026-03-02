@@ -66,21 +66,21 @@ export function VetHomeContent() {
         <div className="space-y-3">
           <FollowUpCard
             title="Última Vacinação"
-            animal="Estrela Mangalarga"
+            animal="-"
             description="Antirrábica - 15/10/2024"
             status="Em dia"
             statusColor="bg-green-500"
           />
           <FollowUpCard
             title="Próximo Ultrassom"
-            animal="Bella Vista"
+            animal="-"
             description="Previsto para 20/11/2024"
             status="Próximo"
             statusColor="bg-blue-500"
           />
           <FollowUpCard
             title="Tratamento Ativo"
-            animal="Lua Dourada"
+            animal="-"
             description="Antibiótico - Dose amanhã"
             status="Atenção"
             statusColor="bg-yellow-500"

@@ -2,29 +2,9 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-// Lista de animais sugeridos (pode ser importada de um arquivo de dados)
-const suggestedAnimals = [
-  'Estrela Mangalarga',
-  'Relâmpago Negro',
-  'Lua Dourada',
-  'Trovão Branco',
-  'Bella Vista',
-  'Vento Sul',
-  'Aurora',
-  'Diamante Negro',
-  'Serena',
-  'Jade'
-];
+const suggestedAnimals: string[] = [];
 
-const suggestedStallions = [
-  'Rei da Serra',
-  'Relâmpago Negro',
-  'Trovão Branco',
-  'Vento Sul',
-  'Diamante Negro',
-  'Vale Verde',
-  'Estância dos Ventos'
-];
+const suggestedStallions: string[] = [];
 
 interface Coverage {
   id: string;

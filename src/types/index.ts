@@ -35,6 +35,12 @@ export type AnimalStatus =
     | 'emprestado'
     | 'em_servico';
 
+export type AnimalEnvironment =
+    | 'oficial'
+    | 'avulsos'
+    | 'vinculacao'
+    | 'condominio';
+
 export interface ABCCMMImportResult {
     newAnimals: number;
     updatedAnimals: number;
@@ -116,7 +122,7 @@ export type AnimalVideoSource = 'upload' | 'youtube' | 'vimeo' | 'link';
 
 export type AnimalLocationType = 'Baia' | 'Pasto' | 'Servico';
 
-export type AnimalServiceType = 'Reproducao' | 'Trabalho' | 'Repouso' | 'Outro';
+export type AnimalServiceType = 'Reproducao' | 'Trabalho' | 'Repouso' | 'Hospedagem' | 'Compra' | 'Nascimento' | 'Outro';
 
 export type ReportType =
     | 'animal'
@@ -182,7 +188,6 @@ export interface Animal {
     name: string;
     registry_number: string | null;
     chip_number: string | null;
-    brand: string | null;
     sex: AnimalSex;
     category: AnimalCategory;
     birth_date: string | null;
@@ -559,7 +564,6 @@ export interface CreateAnimalInput {
     name: string;
     registry_number?: string;
     chip_number?: string;
-    brand?: string;
     sex: AnimalSex;
     category: AnimalCategory | string;
     birth_date?: string;
@@ -741,6 +745,40 @@ export interface AnimalFilters {
     category?: AnimalCategory;
     status?: AnimalStatus;
     search?: string;
+    environment?: AnimalEnvironment;
+}
+
+export interface AnimalLinkQueueItem {
+    id: string;
+    haras_id: string;
+    provisional_animal_id: string;
+    official_animal_id: string | null;
+    official_abccmm_rowid: string | null;
+    official_registry: string | null;
+    match_type: 'manual' | 'name_birth_sex' | 'registro' | 'chip' | 'mixed';
+    confidence: number | null;
+    status: 'pending' | 'linked' | 'dismissed';
+    payload: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+    provisional_animal?: Pick<Animal, 'id' | 'name' | 'registry_number' | 'birth_date' | 'sex'> | null;
+    official_animal?: Pick<Animal, 'id' | 'name' | 'registry_number' | 'birth_date' | 'sex'> | null;
+}
+
+export interface CondominiumShareImportResult {
+    processedRows: number;
+    insertedShares: number;
+    updatedShares: number;
+    warnings: string[];
+    errors: string[];
+}
+
+export interface AwardImportResult {
+    processedRows: number;
+    insertedAwards: number;
+    updatedAwards: number;
+    warnings: string[];
+    errors: string[];
 }
 
 export interface TransactionFilters {

@@ -56,10 +56,6 @@ function isAbortError(error: any): boolean {
 export function handleSupabaseError(error: any): never {
     // Ignorar AbortErrors - são cancelamentos do cliente (ex: componente desmontou)
     if (isAbortError(error)) {
-        // Log silencioso em desenvolvimento, não lançar como erro de banco
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Supabase request cancelled (AbortError):', error.message);
-        }
         // Re-lançar como AbortError para que TanStack Query possa tratá-lo corretamente
         throw error;
     }

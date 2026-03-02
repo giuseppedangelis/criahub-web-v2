@@ -199,7 +199,7 @@ export function BreederAgendaContent() {
           }`}
         >
           <Trophy className="w-4 h-4" />
-          Eventos Públicos
+          Eventos
         </button>
       </div>
 
@@ -300,7 +300,7 @@ export function BreederAgendaContent() {
           {/* Items Panel */}
           <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-6 border border-border dark:border-[rgba(255,255,255,0.1)]">
             <h3 className="text-xl text-foreground dark:text-white mb-6">
-              {activeTab === 'services' ? 'Serviços' : 'Eventos'} do Dia {selectedDate}
+              {activeTab === 'services' ? 'Serviços do Haras' : 'Eventos (Leilões, Exposições...)'} do Dia {selectedDate}
             </h3>
             
             {selectedItems.length > 0 ? (

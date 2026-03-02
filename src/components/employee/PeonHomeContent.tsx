@@ -6,17 +6,9 @@ export function PeonHomeContent() {
   const [autoSync, setAutoSync] = useState(true);
   const [pendingSync, setPendingSync] = useState(3);
 
-  const upcomingBirths = [
-    { name: 'Bella Vista', progress: 95, dueDate: '20/11/2024', daysLeft: 2 },
-    { name: 'Estrela Mangalarga', progress: 88, dueDate: '25/11/2024', daysLeft: 7 },
-    { name: 'Lua Dourada', progress: 75, dueDate: '05/12/2024', daysLeft: 17 },
-  ];
+  const upcomingBirths: Array<{ name: string; progress: number; dueDate: string; daysLeft: number }> = [];
 
-  const recentActivities = [
-    { title: 'Nascimento registrado', animal: 'Potro de Sol Nascente', time: '2 horas atrás', type: 'birth' },
-    { title: 'Ocorrência reportada', animal: 'Vento Sul', time: '5 horas atrás', type: 'alert' },
-    { title: 'Atividade registrada', animal: 'Casqueamento - 8 animais', time: '1 dia atrás', type: 'activity' },
-  ];
+  const recentActivities: Array<{ title: string; animal: string; time: string; type: 'birth' | 'alert' | 'activity' }> = [];
 
   return (
     <div className="p-4 space-y-6 max-w-md mx-auto">

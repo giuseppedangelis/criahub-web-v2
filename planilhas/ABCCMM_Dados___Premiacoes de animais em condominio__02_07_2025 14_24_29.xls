@@ -1,0 +1,470 @@
+<style> .textmode { } </style><b><font size='5'> ABCCMM - Dados exportados: Premiações de animais em condomínio - Data do relatório: 02/07/2025</font></b>
+<div>
+	<table class="mGrid" cellspacing="0" rules="all" border="1" id="ctl00_cphConteudo_GrdDados" style="width:100%;border-collapse:collapse;">
+		<tr>
+			<th scope="col">_rowid</th><th scope="col">_nome</th><th scope="col">_evento</th><th scope="col">_cidadeUF</th><th scope="col">_periodo</th><th scope="col">_premiacao</th><th scope="col">_julgados</th>
+		</tr><tr>
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR PVB - PAR&#193; DE MINAS/MG</td><td>PAR&#193; DE MINAS - MG</td><td>4/2014</td><td>5 Pr&#234;mio &#201;gua Categoria-MARCHA BATIDA</td><td>1379</td>
+		</tr><tr class="alt">
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>I COPA DE MARCHA DO CAVALO MANGALARGA MARCHADOR - PASSA TEMPO/MG</td><td>PASSA TEMPO - MG</td><td>5/2013</td><td>Reserv.Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>1033</td>
+		</tr><tr>
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>XII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - CONSELHEIRO LAFAIETE/MG</td><td>CONSELHEIRO LAFAIETE - MG</td><td>5/2013</td><td>1 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>1093</td>
+		</tr><tr class="alt">
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>XII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - CONSELHEIRO LAFAIETE/MG</td><td>CONSELHEIRO LAFAIETE - MG</td><td>5/2013</td><td>3 Pr&#234;mio &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>1093</td>
+		</tr><tr>
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>XXV EXPOSI&#199;&#195;OHERDEIROS DA RA&#199;A DO CAVALO MANGALARGA MARCHADOR - CONTAGEM/MG</td><td>CONTAGEM - MG</td><td>3/2014</td><td>2 Pr&#234;mio &#201;gua Categoria-MARCHA BATIDA</td><td>1359</td>
+		</tr><tr class="alt">
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>XXV EXPOSI&#199;&#195;OHERDEIROS DA RA&#199;A DO CAVALO MANGALARGA MARCHADOR - CONTAGEM/MG</td><td>CONTAGEM - MG</td><td>3/2014</td><td>5 Pr&#234;mio &#201;gua Marcha-MARCHA BATIDA</td><td>1359</td>
+		</tr><tr>
+			<td>201690</td><td>CINDERELA DA FRISUL</td><td>I EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - SETE LAGOAS/MG</td><td>SETE LAGOAS - MG</td><td>4/2014</td><td>2 Pr&#234;mio &#201;gua Categoria-MARCHA BATIDA</td><td>1393</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>37&#170; EXPOFEIRA 2012- FEIRA DE SANTANA/BA</td><td>FEIRA DE SANTANA - BA</td><td>9/2012</td><td>2 Pr&#234;mio Potra Categoria-MARCHA BATIDA</td><td>791</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>3&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO M. MARCHADOR DE SETE LAGOAS</td><td>Sete Lagoas - MG</td><td>4/2016</td><td>5 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>2123</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>3&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO M. MARCHADOR DE SETE LAGOAS</td><td>Sete Lagoas - MG</td><td>4/2016</td><td>5 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>2123</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>27&#170; HERDEIROS DA RA&#199;A E FINAL DO INTER-FAZENDAS-2017</td><td>BELO HORIZONTE - MG</td><td>3/2017</td><td>4 Pr&#234;mio &#201;gua Graduada Categoria-MARCHA BATIDA</td><td>2441</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>27&#170; HERDEIROS DA RA&#199;A E FINAL DO INTER-FAZENDAS-2017</td><td>BELO HORIZONTE - MG</td><td>3/2017</td><td>3 Pr&#234;mio &#201;gua Graduada Marcha-MARCHA BATIDA</td><td>2441</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>57&#170; Exposi&#231;&#227;o Estadual agropecu&#225;ria - Belo Horizonte - Junho 2017</td><td>Belo Horizonte - MG</td><td>5/2017</td><td>3 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>2560</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>57&#170; Exposi&#231;&#227;o Estadual agropecu&#225;ria - Belo Horizonte - Junho 2017</td><td>Belo Horizonte - MG</td><td>5/2017</td><td>Reserv.Campe&#227;o(a) Femea Prova Funcional-MARCHA BATIDA</td><td>2560</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>57&#170; Exposi&#231;&#227;o Estadual agropecu&#225;ria - Belo Horizonte - Junho 2017</td><td>Belo Horizonte - MG</td><td>5/2017</td><td>5 Pr&#234;mio &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2560</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>37&#170; EXPOSI&#199;&#195;O ESPECIALIZADA - ITABUNA 09/2017</td><td>ITABUNA - BA</td><td>9/2017</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>10702</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>37&#170; EXPOSI&#199;&#195;O ESPECIALIZADA - ITABUNA 09/2017</td><td>ITABUNA - BA</td><td>9/2017</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>10702</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXIV ENCONTRO DO CAVALO MANGALARGA MARCHADOR DO ESTADO DO RIO DE JANEIRO - 09/21</td><td>CAMPOS DOS GOYTACAZES - RJ</td><td>9/2021</td><td>5 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>14028</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXIV ENCONTRO DO CAVALO MANGALARGA MARCHADOR DO ESTADO DO RIO DE JANEIRO - 09/21</td><td>CAMPOS DOS GOYTACAZES - RJ</td><td>9/2021</td><td>5 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>14028</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>4&#170; Copa do Cavalo Mangalarga Marchador - Manhua&#231;u 23/06/2018</td><td>Manhua&#231;u - MG</td><td>6/2018</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13018</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>4&#170; Copa do Cavalo Mangalarga Marchador - Manhua&#231;u 23/06/2018</td><td>Manhua&#231;u - MG</td><td>6/2018</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13018</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE PAR&#193; DE MINAS 06/19</td><td>PAR&#193; DE MINAS - MG</td><td>6/2019</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13433</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE PAR&#193; DE MINAS 06/19</td><td>PAR&#193; DE MINAS - MG</td><td>6/2019</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13433</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>I COPA DE MARCHA DO CAVALO M. MARCHADOR-REST. PANELA DE PEDRA MATOZINHOS/MG</td><td>MATOZINHOS - MG</td><td>9/2016</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2282</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>I COPA DE MARCHA DO CAVALO M. MARCHADOR-REST. PANELA DE PEDRA MATOZINHOS/MG</td><td>MATOZINHOS - MG</td><td>9/2016</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2282</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>30&#170; FENAGRO - Exposi&#231;&#227;o Especializada C. M.M. - Salvador 11/2017</td><td>SALVADOR - BA</td><td>11/2017</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>12795</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>30&#170; FENAGRO - Exposi&#231;&#227;o Especializada C. M.M. - Salvador 11/2017</td><td>SALVADOR - BA</td><td>11/2017</td><td>2 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>12795</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>III COPA DE MARCHA C. MANGALARGA MARCHADOR DO HARAS LITORAL - ITAPEMIRIM-ES 02/21</td><td>ITAPEMIRIM - ES</td><td>2/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13814</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II ETAPA DO INTER-FAZENDAS DO CAVALO MANGALARGA MARCHADOR HARAS VIS&#195;O</td><td>LAGOA SANTA - MG</td><td>9/2016</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2311</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>37&#170; Exposi&#231;&#227;o Nacional do Cavalo Mangalarga Marchador</td><td>Belo Horizonte - mg</td><td>7/2018</td><td>2 Men&#231;&#227;o Honrosa &#201;gua Master Categoria-MARCHA BATIDA</td><td>12913</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>6 exposi&#231;&#227;o do cavalo mangalarga marchador 05/19</td><td>Divin&#243;polis - MG</td><td>5/2019</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13398</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>6 exposi&#231;&#227;o do cavalo mangalarga marchador 05/19</td><td>Divin&#243;polis - MG</td><td>5/2019</td><td>2 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13398</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO N&#218;CLEO DO VALE DO A&#199;O E REGI&#195;O Ipatinga 06/18</td><td>IPATINGA - MG</td><td>6/2018</td><td>2 Pr&#234;mio &#201;gua Graduada Marcha-MARCHA BATIDA</td><td>12981</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO N&#218;CLEO DO VALE DO A&#199;O E REGI&#195;O Ipatinga 06/18</td><td>IPATINGA - MG</td><td>6/2018</td><td>2 Pr&#234;mio &#201;gua Graduada Categoria-MARCHA BATIDA</td><td>12981</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXX EXPOSI&#199;&#195;O ESTADUAL DO CAVALO MANGALARGA MARCHADOR CAPIXABA - 07/21</td><td>VILA VELHA - ES</td><td>7/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua Master Prova Funcional-MARCHA BATIDA</td><td>13912</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXX EXPOSI&#199;&#195;O ESTADUAL DO CAVALO MANGALARGA MARCHADOR CAPIXABA - 07/21</td><td>VILA VELHA - ES</td><td>7/2021</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Master Categoria-MARCHA BATIDA</td><td>13912</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXX EXPOSI&#199;&#195;O ESTADUAL DO CAVALO MANGALARGA MARCHADOR CAPIXABA - 07/21</td><td>VILA VELHA - ES</td><td>7/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua Master Marcha-MARCHA BATIDA</td><td>13912</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>3&#170; ETAPA DO INTER-FAZENDAS DO CAVALO M. MARCHADOR DO HARAS DO LAY</td><td>CAPIM BRANCO - MG</td><td>11/2016</td><td>Reserv.Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2376</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>exposi&#231;&#227;o regional de DIVIN&#211;POLIS 11/19</td><td>divin&#243;polis - mg</td><td>11/2019</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13621</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>exposi&#231;&#227;o regional de DIVIN&#211;POLIS 11/19</td><td>divin&#243;polis - mg</td><td>11/2019</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13621</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>Campe&#227;o(a) Ra&#231;a Adulto - F&#234;mea Marchador Ideal-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>1 Pr&#234;mio da Ra&#231;a Ra&#231;a Adulto - F&#234;mea Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Prova Funcional-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>II Exposi&#231;&#227;o Especializada do Mangalarga Marchador de M&#225;rio Campos - III Copa de Marcha N&#250;cleo Vale do Paraopeba </td><td>M&#225;rio Campos - MG</td><td>10/2019</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13582</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>1&#176; COPA DE MARCHA DO CAVALO MANGALARGA MARCHADOR DE PAPAGAIOS-MG 10/22</td><td>PAPAGAIOS - mg</td><td>10/2022</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>14401</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>Reserv.Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>Reserv.Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - F&#234;mea Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>1 Pr&#234;mio Ra&#231;a Adulto - F&#234;mea Marchador Ideal-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XXXV Especializada Mangalarga Marchador de Bras&#237;lia</td><td>Brasilia - DF</td><td>11/2018</td><td>1 Men&#231;&#227;o Honrosa &#201;gua Master Categoria-MARCHA BATIDA</td><td>13215</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>1:copa de marcha do haras lvm (marcha batida) 09/20</td><td>s&#227;o jos&#233; da varginha - mg</td><td>9/2020</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13719</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>FENAGRO-2018-EXPOSI&#199;&#195;O ESPECIALIZADA DO C.M.MARCHADOR -SALVADOR-BA 11/18</td><td>SALVADOR - BA</td><td>11/2018</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13229</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>FENAGRO-2018-EXPOSI&#199;&#195;O ESPECIALIZADA DO C.M.MARCHADOR -SALVADOR-BA 11/18</td><td>SALVADOR - BA</td><td>11/2018</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13229</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>I EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR TERRA DO POETA - 06/21</td><td>CASIMIRO DE ABREU - RJ</td><td>6/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13880</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>I EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR TERRA DO POETA - 06/21</td><td>CASIMIRO DE ABREU - RJ</td><td>6/2021</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Prova Funcional-MARCHA BATIDA</td><td>13880</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>I EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR TERRA DO POETA - 06/21</td><td>CASIMIRO DE ABREU - RJ</td><td>6/2021</td><td>2 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13880</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>2&#170; Copa de Marcha Haras litoral s&#225;bado 10/20</td><td>iTAPEMIRIM  - es</td><td>10/2020</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13754</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XVII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - JEQUI&#201;/BA</td><td>JEQUI&#201; - BA</td><td>5/2012</td><td>1 Pr&#234;mio Potra Jovem Categoria-MARCHA BATIDA</td><td>696</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>3&#176; COPA DE MARCHA DO CAVALO M.M DO HARAS BOROVICA ON&#199;A DE PITANGUI-MG 06/22</td><td>on&#231;a de pitangui - mg</td><td>6/2022</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>14298</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>3&#176; COPA DE MARCHA DO CAVALO M.M DO HARAS BOROVICA ON&#199;A DE PITANGUI-MG 06/22</td><td>on&#231;a de pitangui - mg</td><td>6/2022</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>14298</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Campe&#227;o(a) Femea Prova Funcional-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - F&#234;mea Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Campe&#227;o(a) Ra&#231;a Adulto - F&#234;mea Marchador Ideal-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>38&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DA CAVALO M. MARCHADOR/ITABUNA/BA 09/18</td><td>ITABUNA - BA</td><td>9/2018</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13132</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Prova Funcional-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr class="alt">
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>34&#170; EXPOSI&#199;AO ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE ITAPERUNA  08/21</td><td>ITAPERUNA - RJ</td><td>8/2021</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>13954</td>
+		</tr><tr>
+			<td>496703</td><td>FRAGATA CEDRO DA SERRA</td><td>34&#170; EXPOSI&#199;AO ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE ITAPERUNA  08/21</td><td>ITAPERUNA - RJ</td><td>8/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>13954</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>37&#170; Exposi&#231;&#227;o Nacional do Cavalo Mangalarga Marchador</td><td>Belo Horizonte - mg</td><td>7/2018</td><td>1 Pr&#234;mio Potro Jovem Categoria-MARCHA BATIDA</td><td>12913</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; Copa de Marcha do Cavalo Mangalarga Marchador de Juatuba (03/10/2020)</td><td>juatuba - mg</td><td>10/2020</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - Macho Marcha-MARCHA BATIDA</td><td>13742</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; Copa de Marcha do Cavalo Mangalarga Marchador de Juatuba (03/10/2020)</td><td>juatuba - mg</td><td>10/2020</td><td>Campe&#227;o(a) Cavalo J&#250;nior Marcha-MARCHA BATIDA</td><td>13742</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>IV etapa interfazendas - II COPA DE MARCHA HARAS BELAGI - 01/08/2020</td><td>SANTA MARIA DE ITABIRA - MG</td><td>8/2020</td><td>Reserv.Campe&#227;o(a) Cavalo J&#250;nior Marcha-MARCHA BATIDA</td><td>13675</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR DE MARIO CAMPOS 04/18</td><td>MARIO CAMPOS  - MG</td><td>4/2018</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Jovem Ra&#231;a Jovem - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>12906</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR DE MARIO CAMPOS 04/18</td><td>MARIO CAMPOS  - MG</td><td>4/2018</td><td>Campe&#227;o(&#227;) - Jovem Potro Mirim Categoria-MARCHA BATIDA</td><td>12906</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>2&#186; EXPOSI&#199;&#195;O ESPECIALIZADA M.M. PATROC&#205;NIO-MG 06/18</td><td>PATROC&#205;NIO - MG</td><td>6/2018</td><td>Reserv.Campe&#227;o(&#227;) - Jovem Potro Mirim Categoria-MARCHA BATIDA</td><td>13006</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE PAR&#193; DE MINAS 06/19</td><td>PAR&#193; DE MINAS - MG</td><td>6/2019</td><td>Reserv.Campe&#227;o(&#227;) - Jovem Potro Jovem Categoria-MARCHA BATIDA</td><td>13433</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>Campe&#227;o(a) Ra&#231;a Adulto - Macho Marchador Ideal-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - Macho Marcha-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>16&#170; Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de montes claros 04/18</td><td>Montes Claros - MG</td><td>4/2018</td><td>1 Pr&#234;mio Potro Mirim Categoria-MARCHA BATIDA</td><td>12910</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; COPA DE MARCHA DO CAVALO MANGALARGA MARCHADOR DE PAPAGAIOS-MG 10/22</td><td>PAPAGAIOS - mg</td><td>10/2022</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - Macho Marcha-MARCHA BATIDA</td><td>14401</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; COPA DE MARCHA DO CAVALO MANGALARGA MARCHADOR DE PAPAGAIOS-MG 10/22</td><td>PAPAGAIOS - mg</td><td>10/2022</td><td>Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>14401</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>5&#186; EXPOSI&#199;&#195;O HARAS RAPHAELA - N&#218;CLEO BANDEIRANTES - 23 a 29-11-20</td><td>S&#227;o Paulo - MG</td><td>11/2020</td><td>3 Pr&#234;mio Cavalo J&#250;nior Categoria-MARCHA BATIDA</td><td>13788</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>58&#170;EXPOSI&#199;&#195;O ESTADUAL MANGALARGA MACHADOR uberl&#226;ndia-mg 06/21</td><td>UBERLANDIA - MG</td><td>6/2021</td><td>Reserv.Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>13858</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>58&#170;EXPOSI&#199;&#195;O ESTADUAL MANGALARGA MACHADOR uberl&#226;ndia-mg 06/21</td><td>UBERLANDIA - MG</td><td>6/2021</td><td>Reserv.Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>13858</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>58&#170;EXPOSI&#199;&#195;O ESTADUAL MANGALARGA MACHADOR uberl&#226;ndia-mg 06/21</td><td>UBERLANDIA - MG</td><td>6/2021</td><td>Reserv.Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>13858</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>39&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>BELO HORIZONTE - MG</td><td>7/2022</td><td>5 Pr&#234;mio Cavalo Adulto Categoria-MARCHA BATIDA</td><td>14307</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; EXPOSI&#199;&#195;O REGIONAL DO CAVALO MANGALARGA MARCHADOR DE ABAET&#201;/MG  04/22</td><td>ABAET&#201; - MG</td><td>4/2022</td><td>Reserv.Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>14202</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; EXPOSI&#199;&#195;O REGIONAL DO CAVALO MANGALARGA MARCHADOR DE ABAET&#201;/MG  04/22</td><td>ABAET&#201; - MG</td><td>4/2022</td><td>Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>14202</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; EXPOSI&#199;&#195;O REGIONAL DO CAVALO MANGALARGA MARCHADOR DE ABAET&#201;/MG  04/22</td><td>ABAET&#201; - MG</td><td>4/2022</td><td>1 Pr&#234;mio Ra&#231;a Adulto - Macho Marchador Ideal-MARCHA BATIDA</td><td>14202</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#170; EXPOSI&#199;&#195;O REGIONAL DO CAVALO MANGALARGA MARCHADOR DE ABAET&#201;/MG  04/22</td><td>ABAET&#201; - MG</td><td>4/2022</td><td>Reserv.Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>14202</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE JACARE&#205; 08/20</td><td>JACARE&#205; - SP</td><td>8/2020</td><td>Campe&#227;o(&#227;) - Adulto Cavalo J&#250;nior Categoria-MARCHA BATIDA</td><td>13697</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE JACARE&#205; 08/20</td><td>JACARE&#205; - SP</td><td>8/2020</td><td>Reserv.Campe&#227;o(a) Cavalo J&#250;nior Marcha-MARCHA BATIDA</td><td>13697</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - Macho Marcha-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(a) Ra&#231;a Adulto - Macho Marchador Ideal-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>1 Pr&#234;mio Cavalo Jovem Prova Funcional-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - Macho Marcha-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>4&#176; EXPOSI&#199;&#195;O REGIONAL NATALINA DIVIN&#211;POLIS-MG 12/22</td><td>DIVINOPOLIS - MG</td><td>12/2022</td><td>Reserv.Campe&#227;o(a) Ra&#231;a Adulto - Macho Marchador Ideal-MARCHA BATIDA</td><td>14499</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>Campe&#227;o(&#227;) - Jovem Potro Categoria-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Jovem Ra&#231;a Jovem - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>exposi&#231;&#227;o especializada do cavalo mangalarga marchador de para de minas-mg 10/20</td><td>para de minas - mg</td><td>10/2020</td><td>2 Pr&#234;mio Cavalo J&#250;nior Marcha-MARCHA BATIDA</td><td>13761</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>exposi&#231;&#227;o especializada do cavalo mangalarga marchador de para de minas-mg 10/20</td><td>para de minas - mg</td><td>10/2020</td><td>Reserv.Campe&#227;o(&#227;) - Adulto Cavalo J&#250;nior Categoria-MARCHA BATIDA</td><td>13761</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>40&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>BELO HORIZONTE - MG</td><td>7/2023</td><td>5 Pr&#234;mio Cavalo S&#234;nior Categoria-MARCHA BATIDA</td><td>14661</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(a) Cavalo Jovem Marcha-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Campe&#227;o(&#227;) - Adulto Cavalo Jovem Categoria-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr>
+			<td>761884</td><td>NETUNO R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Campe&#227;o(a) Ra&#231;a Adulto - Macho Marchador Ideal-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr class="alt">
+			<td>761884</td><td>NETUNO R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Campe&#227;o(&#227;) da Ra&#231;a - Adulto(a) Ra&#231;a Adulto - Macho Campe&#227;o(a) da Ra&#231;a-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>1&#170; Copa de Marcha do Cavalo Mangalarga Marchador de Juatuba (03/10/2020)</td><td>juatuba - mg</td><td>10/2020</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13742</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>1&#170; Copa de Marcha do Cavalo Mangalarga Marchador de Juatuba (03/10/2020)</td><td>juatuba - mg</td><td>10/2020</td><td>Campe&#227;o(a) &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13742</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>2&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>13900</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>2&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>13900</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>3&#176; COPA DE MARCHA DO CAVALO M.M DO HARAS BOROVICA ON&#199;A DE PITANGUI-MG 06/22</td><td>on&#231;a de pitangui - mg</td><td>6/2022</td><td>3 Pr&#234;mio &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>14298</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>3&#186; EXPOSI&#199;AO REGIONAL MANGALARGA MARCHADOR DE DIVINOPOLIS-MG 01/22</td><td>DIVINOPOLIS - MG</td><td>1/2022</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>14106</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>3&#186; EXPOSI&#199;AO REGIONAL MANGALARGA MARCHADOR DE DIVINOPOLIS-MG 01/22</td><td>DIVINOPOLIS - MG</td><td>1/2022</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>14106</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>3&#186; EXPOSI&#199;AO REGIONAL MANGALARGA MARCHADOR DE DIVINOPOLIS-MG 01/22</td><td>DIVINOPOLIS - MG</td><td>1/2022</td><td>Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>14106</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>3&#186; EXPOSI&#199;AO REGIONAL MANGALARGA MARCHADOR DE DIVINOPOLIS-MG 01/22</td><td>DIVINOPOLIS - MG</td><td>1/2022</td><td>1 Pr&#234;mio da Ra&#231;a Ra&#231;a Adulto - F&#234;mea Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>14106</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>10&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE PATOS DE MINAS 06/22</td><td>PATOS DE MINAS - MG</td><td>6/2022</td><td>3 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>14274</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>10&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE PATOS DE MINAS 06/22</td><td>PATOS DE MINAS - MG</td><td>6/2022</td><td>2 Pr&#234;mio &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>14274</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>IV EXPO ESPECIALIZADA M.M. DE PATROC&#205;NIO -MG 07/21</td><td>PATROC&#205;NIO/MG - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>13925</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>8&#170; Exposi&#231;&#227;o de In&#233;ditos de Itabira 06/18</td><td>Itabira - MG</td><td>6/2018</td><td>Reserv.Campe&#227;o(&#227;) - Jovem Potra Mirim Categoria-MARCHA BATIDA</td><td>13029</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE JACARE&#205; 08/20</td><td>JACARE&#205; - SP</td><td>8/2020</td><td>4 Pr&#234;mio &#201;gua J&#250;nior Categoria-MARCHA BATIDA</td><td>13697</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DE JACARE&#205; 08/20</td><td>JACARE&#205; - SP</td><td>8/2020</td><td>4 Pr&#234;mio &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13697</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>1&#176; EXPOSI&#199;&#195;O REGIONAL DE S&#195;O JOSE DA Vargnha 07/21</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Categoria-MARCHA BATIDA</td><td>13899</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE PAR&#193; DE MINAS 06/19</td><td>PAR&#193; DE MINAS - MG</td><td>6/2019</td><td>1 Pr&#234;mio Potra Categoria-MARCHA BATIDA</td><td>13433</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>3 Pr&#234;mio &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>VI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador - Itatiaiu&#231;u 11 a 15/05</td><td>Belo Horizonte - MG</td><td>5/2021</td><td>3 Pr&#234;mio &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>13837</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>6 exposi&#231;&#227;o do cavalo mangalarga marchador 05/19</td><td>Divin&#243;polis - MG</td><td>5/2019</td><td>1 Pr&#234;mio Potra Jovem Categoria-MARCHA BATIDA</td><td>13398</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>1&#176;COPA DE MARCHA TAQUARA&#199;U MINAS-MG 11/21</td><td>TAQUARA&#199;U DE MINAS - MG</td><td>11/2021</td><td>Reserv.Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>14075</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>IV COPA DE MARCHA DE NEPOMUCENO (SEXTA) 09/20</td><td>NEPOMUCENO - MG</td><td>9/2020</td><td>Campe&#227;o(a) &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13738</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>IV COPA DE MARCHA DE NEPOMUCENO (SEXTA) 09/20</td><td>NEPOMUCENO - MG</td><td>9/2020</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13738</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>1:copa de marcha do haras lvm (marcha batida) 09/20</td><td>s&#227;o jos&#233; da varginha - mg</td><td>9/2020</td><td>1 Pr&#234;mio &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13719</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>XI Exposi&#231;&#227;o Especializada do Cavalo Mangalarga Marchador de Barbacena 04/19</td><td>BARBACENA - MG</td><td>4/2019</td><td>1 Pr&#234;mio Potra Categoria-MARCHA BATIDA</td><td>13325</td>
+		</tr><tr class="alt">
+			<td>682382</td><td>NORMALISTA R3</td><td>exposi&#231;&#227;o especializada do cavalo mangalarga marchador de para de minas-mg 10/20</td><td>para de minas - mg</td><td>10/2020</td><td>Campe&#227;o(a) &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13761</td>
+		</tr><tr>
+			<td>682382</td><td>NORMALISTA R3</td><td>exposi&#231;&#227;o especializada do cavalo mangalarga marchador de para de minas-mg 10/20</td><td>para de minas - mg</td><td>10/2020</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua J&#250;nior Categoria-MARCHA BATIDA</td><td>13761</td>
+		</tr><tr class="alt">
+			<td>779628</td><td>ORGIA R3</td><td>EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR DE PAR&#193; DE MINAS 06/19</td><td>PAR&#193; DE MINAS - MG</td><td>6/2019</td><td>2 Pr&#234;mio Potra Jovem Categoria-MARCHA BATIDA</td><td>13433</td>
+		</tr><tr>
+			<td>779628</td><td>ORGIA R3</td><td>6 EXPOSI&#199;&#195;O DE IN&#201;DITOS DE DIVIN&#211;POLIS-MG 03/19</td><td>divin&#243;polis - MG</td><td>3/2019</td><td>1 Pr&#234;mio Potra Mirim Categoria-MARCHA BATIDA</td><td>13288</td>
+		</tr><tr class="alt">
+			<td>779628</td><td>ORGIA R3</td><td>EXPOSI&#199;&#195;O DE IN&#201;DITOS S&#195;O JOSE DA VARGINHA</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua J&#250;nior Categoria-MARCHA BATIDA</td><td>13902</td>
+		</tr><tr>
+			<td>779628</td><td>ORGIA R3</td><td>EXPOSI&#199;&#195;O DE IN&#201;DITOS S&#195;O JOSE DA VARGINHA</td><td>SAO JOSE DA VARGINHA - MG</td><td>7/2021</td><td>1 Pr&#234;mio &#201;gua J&#250;nior Marcha-MARCHA BATIDA</td><td>13902</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>II CAMP. DE MARCHA DO C. M. MARCHADOR DO C. L. MINEIRO - INTER-FAZENDAS-HARAS RIGOR-2&#170; ETAPA</td><td>SANTA MARIA DE ITABIRA - MG</td><td>10/2016</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>2346</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DO CAVALO m. MARCHADOR EM SARZEDO</td><td>sarzedo - mg</td><td>6/2016</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2230</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DO CAVALO m. MARCHADOR EM SARZEDO</td><td>sarzedo - mg</td><td>6/2016</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2230</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>I COPA DE MARCHA DO C. M. MARCHADOR-4&#170; ETAPA DA COPA CENTRO OESTE BOM DESPACHO</td><td>BOM DESPACHO - MG</td><td>9/2016</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2299</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>I COPA DE MARCHA DO C. M. MARCHADOR-4&#170; ETAPA DA COPA CENTRO OESTE BOM DESPACHO</td><td>BOM DESPACHO - MG</td><td>9/2016</td><td>Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>2299</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>I CAMPEONATO DE MARCHA DO C. M. MARCHADOR INTER-FAZENDAS 7&#170; ETAPA</td><td>PONTE NOVA - MG</td><td>5/2016</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>2175</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>36&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>Belo Horizonte - MG</td><td>7/2017</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Maior Marcha-MARCHA BATIDA</td><td>2508</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>36&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>Belo Horizonte - MG</td><td>7/2017</td><td>5 Pr&#234;mio &#201;gua S&#234;nior Maior Categoria-MARCHA BATIDA</td><td>2508</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>27&#170; EXPOSI&#199;&#195;O ESTADUAL CAPIXABA MM - GUARAPARI 10/2017</td><td>Guarapari - ES</td><td>10/2017</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>10731</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>27&#170; EXPOSI&#199;&#195;O ESTADUAL CAPIXABA MM - GUARAPARI 10/2017</td><td>Guarapari - ES</td><td>10/2017</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>10731</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>27&#170; EXPOSI&#199;&#195;O ESTADUAL CAPIXABA MM - GUARAPARI 10/2017</td><td>Guarapari - ES</td><td>10/2017</td><td>1 Pr&#234;mio Femea Prova Funcional-MARCHA BATIDA</td><td>10731</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>27&#170; EXPOSI&#199;&#195;O ESTADUAL CAPIXABA MM - GUARAPARI 10/2017</td><td>Guarapari - ES</td><td>10/2017</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>10731</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>27&#170; EXPOSI&#199;&#195;O ESTADUAL CAPIXABA MM - GUARAPARI 10/2017</td><td>Guarapari - ES</td><td>10/2017</td><td>1 Pr&#234;mio Ra&#231;a Adulto - F&#234;mea Marchador Ideal-MARCHA BATIDA</td><td>10731</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>2&#186; EXPOSI&#199;&#195;O ESPECIALIZADA M.M. PATROC&#205;NIO-MG 06/18</td><td>PATROC&#205;NIO - MG</td><td>6/2018</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>13006</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>2&#186; EXPOSI&#199;&#195;O ESPECIALIZADA M.M. PATROC&#205;NIO-MG 06/18</td><td>PATROC&#205;NIO - MG</td><td>6/2018</td><td>1 Pr&#234;mio da Ra&#231;a Ra&#231;a Adulto - F&#234;mea Reservado(a) da Ra&#231;a-MARCHA BATIDA</td><td>13006</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>2&#186; EXPOSI&#199;&#195;O ESPECIALIZADA M.M. PATROC&#205;NIO-MG 06/18</td><td>PATROC&#205;NIO - MG</td><td>6/2018</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>13006</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>2&#186; EXPOSI&#199;&#195;O ESPECIALIZADA M.M. PATROC&#205;NIO-MG 06/18</td><td>PATROC&#205;NIO - MG</td><td>6/2018</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>13006</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DO N&#218;CLEO VAP DO CAVALO M. MARCHADOR - 1&#170; ETAPA IBIRIT&#201;</td><td>IBIRIT&#201; - MG</td><td>5/2016</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>2164</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DO N&#218;CLEO VAP DO CAVALO M. MARCHADOR - 1&#170; ETAPA IBIRIT&#201;</td><td>IBIRIT&#201; - MG</td><td>5/2016</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2164</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>37&#170; Exposi&#231;&#227;o Nacional do Cavalo Mangalarga Marchador</td><td>Belo Horizonte - mg</td><td>7/2018</td><td>Campe&#227;o(a) &#201;gua Master Marcha-MARCHA BATIDA</td><td>12913</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>37&#170; Exposi&#231;&#227;o Nacional do Cavalo Mangalarga Marchador</td><td>Belo Horizonte - mg</td><td>7/2018</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>12913</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>37&#170; Exposi&#231;&#227;o Nacional do Cavalo Mangalarga Marchador</td><td>Belo Horizonte - mg</td><td>7/2018</td><td>3 Pr&#234;mio &#201;gua Master Categoria-MARCHA BATIDA</td><td>12913</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>XXII EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR DE MACA&#201;- ESMMAM 2017</td><td>MACA&#201; - RJ</td><td>5/2017</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2547</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>XXII EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR DE MACA&#201;- ESMMAM 2017</td><td>MACA&#201; - RJ</td><td>5/2017</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2547</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>XXII EXPOSI&#199;&#195;O DO CAVALO MANGALARGA MARCHADOR DE MACA&#201;- ESMMAM 2017</td><td>MACA&#201; - RJ</td><td>5/2017</td><td>2 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>2547</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Categoria-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>56&#170; EXPOSI&#199;&#195;O ESTADUAL AGROPECU&#193;RIA De MINAS GERAIS COM C.M.MARCHADOR-BELO HORIZONTE</td><td>BELO HORIZONTE - MG</td><td>5/2016</td><td>Reserv.Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>2185</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>II CAMP. DE MARCHA INTER-FAZENDAS DO C. M. MARCHADOR DO CENTRO LESTE MINEIRO-1&#170; ETAPA</td><td>SANTA MARIA DE ITABIRA - mg</td><td>9/2016</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>2329</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>35&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>BELO HORIZONTE - MG</td><td>7/2016</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2122</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>35&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR</td><td>BELO HORIZONTE - MG</td><td>7/2016</td><td>4 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>2122</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>20&#170; EXPOSI&#199;&#195;O ESPEC. DO CAVALO M. MARCHADOR DE PARA DE MINAS</td><td>PAR&#193; DE MINAS - MG</td><td>9/2016</td><td>3 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>2307</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>20&#170; EXPOSI&#199;&#195;O ESPEC. DO CAVALO M. MARCHADOR DE PARA DE MINAS</td><td>PAR&#193; DE MINAS - MG</td><td>9/2016</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2307</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>20&#170; EXPOSI&#199;&#195;O ESPEC. DO CAVALO M. MARCHADOR DE PARA DE MINAS</td><td>PAR&#193; DE MINAS - MG</td><td>9/2016</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>2307</td>
+		</tr><tr>
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DAS GERAIS DO CAVALO M. MARCHADOR CURVELO</td><td>CURVELO - MG</td><td>10/2016</td><td>Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>2340</td>
+		</tr><tr class="alt">
+			<td>509225</td><td>PLEN&#205;TUDE BAV&#193;RIA</td><td>1&#170; COPA DE MARCHA DAS GERAIS DO CAVALO M. MARCHADOR CURVELO</td><td>CURVELO - MG</td><td>10/2016</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>2340</td>
+		</tr><tr>
+			<td>877764</td><td>ROLEX R3</td><td>3&#186; EXPOSI&#199;AO REGIONAL MANGALARGA MARCHADOR DE DIVINOPOLIS-MG 01/22</td><td>DIVINOPOLIS - MG</td><td>1/2022</td><td>1 Pr&#234;mio Potro Mirim Categoria-MARCHA BATIDA</td><td>14106</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO-2012</td><td>SALVADOR - BA</td><td>11/2012</td><td>Reserv.Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>903</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO-2012</td><td>SALVADOR - BA</td><td>11/2012</td><td>1 Pr&#234;mio &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>903</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO-2012</td><td>SALVADOR - BA</td><td>11/2012</td><td>Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>903</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VII EXPOVER&#195;O DA COSTA DO DESCOBRIMENTO DO C. MANGALARGA MARCHADOR -ARRAIAL D&#39;AJUDA/PORTO SEGURO/BA</td><td>ARRAIAL D&#39;JUDA/PORTO SEGURO - BA</td><td>2/2014</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>1345</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO / 2013</td><td>salvador - ba</td><td>11/2013</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>1338</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXIII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>vitoria da conquista - ba</td><td>3/2015</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>1710</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXIII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>vitoria da conquista - ba</td><td>3/2015</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>1710</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXIII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>vitoria da conquista - ba</td><td>3/2015</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Categoria-MARCHA BATIDA</td><td>1710</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XVI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - ITABIRA/MG</td><td>ITABIRA - MG</td><td>4/2013</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>977</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XVI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - ITABIRA/MG</td><td>ITABIRA - MG</td><td>4/2013</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>977</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXVII CBM - CAMPEONATO BRASILEIRO DE MARCHA DO CAVALO MANGALARGA MARCHADOR - SALVADOR/BA</td><td>salvador - ba</td><td>11/2013</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>1334</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>VIT&#211;RIA DA CONQUISTA - BA</td><td>3/2013</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>950</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>VIT&#211;RIA DA CONQUISTA - BA</td><td>3/2013</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>950</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>32&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR/33&#170; EXPOITA - ITABUNA/BA</td><td>ITABUNA - BA</td><td>10/2014</td><td>Reserv.Campe&#227;o(a) &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>1602</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>32&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR/33&#170; EXPOITA - ITABUNA/BA</td><td>ITABUNA - BA</td><td>10/2014</td><td>2 Pr&#234;mio &#201;gua Jovem Categoria-MARCHA BATIDA</td><td>1602</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - JOA&#205;MA/MG</td><td>JOA&#205;MA - MG</td><td>3/2015</td><td>1 Pr&#234;mio Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>1699</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - JOA&#205;MA/MG</td><td>JOA&#205;MA - MG</td><td>3/2015</td><td>1 Pr&#234;mio Ra&#231;a Adulto - F&#234;mea Marchador Ideal-MARCHA BATIDA</td><td>1699</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - JOA&#205;MA/MG</td><td>JOA&#205;MA - MG</td><td>3/2015</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>1699</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>1&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - JOA&#205;MA/MG</td><td>JOA&#205;MA - MG</td><td>3/2015</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua Categoria-MARCHA BATIDA</td><td>1699</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>14&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - NANUQUE/MG</td><td>NANUQUE - MG</td><td>6/2012</td><td>3 Pr&#234;mio &#201;gua Jovem Marcha-MARCHA BATIDA</td><td>721</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>34&#170; EXPOSI&#199;&#195;O AGROPECU&#193;RIA DO CAVALO MANGALARGA MARCHADOR DE TEIXEIRA DE FREITAS</td><td>TEIXEIRA DE FREITAS - BA</td><td>9/2015</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>1925</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>34&#170; EXPOSI&#199;&#195;O AGROPECU&#193;RIA DO CAVALO MANGALARGA MARCHADOR DE TEIXEIRA DE FREITAS</td><td>TEIXEIRA DE FREITAS - BA</td><td>9/2015</td><td>Camp.dos Campe&#245;es(&#227;s) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>1925</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>34&#170; EXPOSI&#199;&#195;O AGROPECU&#193;RIA DO CAVALO MANGALARGA MARCHADOR DE TEIXEIRA DE FREITAS</td><td>TEIXEIRA DE FREITAS - BA</td><td>9/2015</td><td>1 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>1925</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - DOMINGOS MARTINS/ES</td><td>domingos martins - es</td><td>5/2014</td><td>Reserv.Campe&#227;o(&#227;) - Adulto &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>1419</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - DOMINGOS MARTINS/ES</td><td>domingos martins - es</td><td>5/2014</td><td>Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>1419</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - DOMINGOS MARTINS/ES</td><td>domingos martins - es</td><td>5/2014</td><td>Reserv.Campe&#227;o(a) Marcha Adulto - F&#234;mea Marcha-MARCHA BATIDA</td><td>1419</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>33&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR - BELO HORIZONTE/MG</td><td>BELO HORIZONTE - MG</td><td>7/2014</td><td>Reserv.Campe&#227;o(a) &#201;gua Graduada Marcha-MARCHA BATIDA</td><td>1390</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>28&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - CURVELO/MG</td><td>CURVELO - MG</td><td>5/2014</td><td>Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>1431</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>28&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - CURVELO/MG</td><td>CURVELO - MG</td><td>5/2014</td><td>1 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>1431</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>VIT&#211;RIA DA CONQUISTA - BA</td><td>3/2014</td><td>Reserv.Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>1361</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>XXII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR - VIT&#211;RIA DA CONQUISTA/BA</td><td>VIT&#211;RIA DA CONQUISTA - BA</td><td>3/2014</td><td>2 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>1361</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR-DOMINGOS MARTINS/ES</td><td>DOMINGOS MARTINS - ES</td><td>4/2015</td><td>Reserv.Campe&#227;o(a) &#201;gua Adulta Marcha-MARCHA BATIDA</td><td>1754</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VII EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR-DOMINGOS MARTINS/ES</td><td>DOMINGOS MARTINS - ES</td><td>4/2015</td><td>3 Pr&#234;mio &#201;gua Adulta Categoria-MARCHA BATIDA</td><td>1754</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>34&#170; EXPOSI&#199;&#195;O NACIONAL DO CAVALO MANGALARGA MARCHADOR - BELO HORIZONTE/MG</td><td>BELO HORIZONTE - MG</td><td>7/2015</td><td>1 Pr&#234;mio &#201;gua Graduada Marcha-MARCHA BATIDA</td><td>1781</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR/GUANAMBI/BA</td><td>GUANAMBI - BA</td><td>11/2015</td><td>2 Pr&#234;mio &#201;gua Categoria-MARCHA BATIDA</td><td>1981</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOSI&#199;&#195;O ESPECIALIZADA DO CAVALO MANGALARGA MARCHADOR/GUANAMBI/BA</td><td>GUANAMBI - BA</td><td>11/2015</td><td>1 Pr&#234;mio &#201;gua Marcha-MARCHA BATIDA</td><td>1981</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO 2015 DO CAVALO MANGALARGA MARCHADOR - SALVADOR/BA</td><td>SALVADOR - BA</td><td>11/2015</td><td>3 Pr&#234;mio &#201;gua S&#234;nior Categoria-MARCHA BATIDA</td><td>2001</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>FENAGRO 2015 DO CAVALO MANGALARGA MARCHADOR - SALVADOR/BA</td><td>SALVADOR - BA</td><td>11/2015</td><td>Reserv.Campe&#227;o(a) &#201;gua S&#234;nior Marcha-MARCHA BATIDA</td><td>2001</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO C.MANGALARGA MARCHADOR DE CURVELO-MG</td><td>CURVELO - MG</td><td>5/2016</td><td>Reserv.Campe&#227;o(a) &#201;gua Master Marcha-MARCHA BATIDA</td><td>2210</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>30&#170; EXPOSI&#199;&#195;O ESPECIALIZADA DO C.MANGALARGA MARCHADOR DE CURVELO-MG</td><td>CURVELO - MG</td><td>5/2016</td><td>Campe&#227;o(&#227;) - Adulto &#201;gua Master Categoria-MARCHA BATIDA</td><td>2210</td>
+		</tr><tr class="alt">
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOVER&#195;O DA COSTA DO DESCOBRIMENTO DO C. M. MARCHADOR -ARRAIAL D&#39;AJUDA/PORTO SEGURO/BA</td><td>ARRAIAL D&#39;AJUDA/PORTO SEGURO - BA</td><td>2/2013</td><td>Campe&#227;o(a) &#201;gua Marcha-MARCHA BATIDA</td><td>918</td>
+		</tr><tr>
+			<td>201816</td><td>URANITA DO PORTO PALMEIRA</td><td>VI EXPOVER&#195;O DA COSTA DO DESCOBRIMENTO DO C. M. MARCHADOR -ARRAIAL D&#39;AJUDA/PORTO SEGURO/BA</td><td>ARRAIAL D&#39;AJUDA/PORTO SEGURO - BA</td><td>2/2013</td><td>2 Pr&#234;mio &#201;gua Categoria-MARCHA BATIDA</td><td>918</td>
+		</tr>
+	</table>
+</div>

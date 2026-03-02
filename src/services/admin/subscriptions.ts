@@ -469,7 +469,7 @@ function getPlanAmount(plan: string | null): number {
 }
 
 /**
- * Calcula a próxima data de pagamento (simulação)
+ * Calcula a próxima data de pagamento (estimativa)
  */
 function calculateNextPaymentDate(startDate: string): string {
   const date = new Date(startDate);

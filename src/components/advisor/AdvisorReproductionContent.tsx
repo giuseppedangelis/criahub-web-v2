@@ -11,11 +11,7 @@ export function AdvisorReproductionContent() {
     { id: 'pregnancies', label: 'Gestações', icon: Heart },
   ];
 
-  const coverages = [
-    { id: 1, mare: 'Estrela Mangalarga', type: 'IA', stallion: 'Relâmpago Negro', status: 'Confirmada', date: '15/10/2024' },
-    { id: 2, mare: 'Lua Dourada', type: 'Monta Natural', stallion: 'Trovão Branco', status: 'Aguardando', date: '20/10/2024' },
-    { id: 3, mare: 'Bella Vista', type: 'TE', stallion: 'Vento Sul', status: 'Confirmada', date: '10/11/2024' },
-  ];
+  const coverages: Array<{ id: number; mare: string; type: string; stallion: string; status: string; date: string }> = [];
 
   return (
     <div className="space-y-6">

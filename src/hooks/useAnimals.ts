@@ -25,6 +25,7 @@ export const animalKeys = {
     detail: (id: string) => [...animalKeys.details(), id] as const,
     offspring: (id: string) => [...animalKeys.detail(id), 'offspring'] as const,
     genealogy: (id: string) => [...animalKeys.detail(id), 'genealogy'] as const,
+    awards: (id: string, harasId?: string) => [...animalKeys.detail(id), 'awards', harasId || ''] as const,
     stallions: (harasId: string) => [...animalKeys.all, 'stallions', harasId] as const,
     mares: (harasId: string) => [...animalKeys.all, 'mares', harasId] as const,
 }
@@ -54,28 +55,44 @@ export function useAnimal(id: string) {
         queryKey: animalKeys.detail(id),
         queryFn: () => animalsService.getById(id),
         enabled: !!id,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
 /**
  * Hook para buscar filhos de um animal
  */
-export function useAnimalOffspring(animalId: string) {
+export function useAnimalOffspring(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: animalKeys.offspring(animalId),
         queryFn: () => animalsService.getOffspring(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
 /**
  * Hook para buscar genealogia (até bisavós)
  */
-export function useAnimalGenealogy(animalId: string) {
+export function useAnimalGenealogy(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: animalKeys.genealogy(animalId),
         queryFn: () => animalsService.getGenealogy(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+    })
+}
+
+export function useAnimalAwards(animalId: string, harasId?: string, enabled: boolean = true) {
+    return useQuery({
+        queryKey: animalKeys.awards(animalId, harasId),
+        queryFn: () => animalsService.listAwardsByAnimal(animalId, harasId),
+        enabled: enabled && !!animalId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 

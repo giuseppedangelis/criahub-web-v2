@@ -30,20 +30,9 @@ export function RegisterAnimalAuctionModal({ onClose, onRegister }: RegisterAnim
   const [pricingData, setPricingData] = useState<{ [key: string]: { reservePrice: string; estimatedPrice: string; description: string } }>({});
   const [attachments, setAttachments] = useState<any[]>([]);
 
-  const auctions: Auction[] = [
-    { id: '1', name: 'Grande Leilão Virtual Mangalarga Marchador', date: '2025-04-15', location: 'Online', organizer: 'Leilões BH' },
-    { id: '2', name: 'Leilão Elite do Haras Santa Clara', date: '2025-03-22', location: 'Haras Santa Clara, Varginha/MG', organizer: 'Haras Santa Clara' },
-    { id: '3', name: 'Mega Leilão ABCCMM 2025', date: '2025-05-10', location: 'Parque de Exposições, BH/MG', organizer: 'ABCCMM' },
-  ];
+  const auctions: Auction[] = [];
 
-  const animals: Animal[] = [
-    { id: '1', name: 'Estrela da Manhã', registry: '123456', gender: 'femea', age: 5 },
-    { id: '2', name: 'Trovão Negro', registry: '123457', gender: 'macho', age: 7 },
-    { id: '3', name: 'Lua Cheia', registry: '123458', gender: 'femea', age: 4 },
-    { id: '4', name: 'Sol Nascente', registry: '123459', gender: 'macho', age: 3 },
-    { id: '5', name: 'Bella Vista', registry: '123460', gender: 'femea', age: 6 },
-    { id: '6', name: 'Imperador', registry: '123461', gender: 'macho', age: 8 },
-  ];
+  const animals: Animal[] = [];
 
   const toggleAnimal = (animalId: string) => {
     if (selectedAnimals.includes(animalId)) {

@@ -1,6 +1,4 @@
-import { X, Download, Upload, Trophy, Medal, Award as AwardIcon, Calendar, MapPin, Plus } from 'lucide-react';
-import { useState } from 'react';
-import { RegisterAwardModal } from './RegisterAwardModal';
+import { X, Download, Trophy, Medal, Award as AwardIcon, Calendar, MapPin } from 'lucide-react';
 
 interface Award {
   id: number;
@@ -23,8 +21,6 @@ interface AwardsDetailModalProps {
 }
 
 export function AwardsDetailModal({ awards, animalName, onClose }: AwardsDetailModalProps) {
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-  
   // Garantir que awards é sempre um array
   const safeAwards = awards || [];
   
@@ -232,18 +228,6 @@ export function AwardsDetailModal({ awards, animalName, onClose }: AwardsDetailM
         </div>
       </div>
       
-      {/* Modal de Registro */}
-      {showRegisterModal && (
-        <RegisterAwardModal
-          animalName={animalName}
-          onClose={() => setShowRegisterModal(false)}
-          onSave={(data) => {
-            console.log('Nova premiação:', data);
-            // Em produção, salvar no backend
-            setShowRegisterModal(false);
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -15,11 +15,13 @@ export const animalLocationKeys = {
     listByAnimal: (animalId: string) => [...animalLocationKeys.lists(), { animalId }] as const,
 }
 
-export function useAnimalLocationHistory(animalId: string) {
+export function useAnimalLocationHistory(animalId: string, enabled: boolean = true) {
     return useQuery({
         queryKey: animalLocationKeys.listByAnimal(animalId),
         queryFn: () => animalLocationsService.listHistory(animalId),
-        enabled: !!animalId,
+        enabled: enabled && !!animalId,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
     })
 }
 

@@ -21,6 +21,9 @@ const SERVICE_TYPE_DB_MAP: Record<AnimalServiceType, string> = {
     Reproducao: 'Reprodu\u00e7\u00e3o',
     Trabalho: 'Trabalho',
     Repouso: 'Repouso',
+    Hospedagem: 'Hospedagem',
+    Compra: 'Compra',
+    Nascimento: 'Nascimento',
     Outro: 'Outro'
 };
 
@@ -55,6 +58,9 @@ function toUiServiceType(value: string | null | undefined): AnimalServiceType | 
     if (key.includes('reproducao')) return 'Reproducao';
     if (key.includes('trabalho')) return 'Trabalho';
     if (key.includes('repouso')) return 'Repouso';
+    if (key.includes('hospedagem')) return 'Hospedagem';
+    if (key.includes('compra')) return 'Compra';
+    if (key.includes('nascimento')) return 'Nascimento';
     return 'Outro';
 }
 

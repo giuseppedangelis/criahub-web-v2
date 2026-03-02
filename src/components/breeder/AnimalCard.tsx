@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, User, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 
@@ -13,7 +13,6 @@ interface Animal {
   name: string;
   registry: string;
   chip?: string;
-  marca?: string;
   sex?: 'Macho' | 'Fêmea';
   birthDate?: string;
   harasOrigem?: string;
@@ -38,6 +37,7 @@ interface AnimalCardProps {
   onEdit: () => void;
   onViewGenealogy: () => void;
   onViewVideo?: () => void;
+  onDelete?: () => void;
 }
 
 export function AnimalCard({
@@ -46,6 +46,7 @@ export function AnimalCard({
   onEdit,
   onViewGenealogy,
   onViewVideo,
+  onDelete,
 }: AnimalCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isCondominio =
@@ -86,6 +87,11 @@ export function AnimalCard({
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) onDelete();
+  };
+
   return (
     <div
       className="bg-card dark:bg-[#1a1a1a] rounded-2xl border border-border dark:border-[rgba(255,255,255,0.1)] overflow-hidden hover:shadow-lg transition-shadow cursor-pointer relative"
@@ -94,7 +100,7 @@ export function AnimalCard({
       {/* Image with Navigation */}
       <div className="relative w-full h-48 overflow-hidden group">
         <ImageWithFallback
-          src={animal.images[currentImageIndex]}
+          src={animal.images[currentImageIndex] || animal.image}
           alt={animal.name}
           className="w-full h-full object-cover"
         />
@@ -151,6 +157,15 @@ export function AnimalCard({
 
         {/* Action Buttons - Top Right */}
         <div className="absolute top-3 right-3 flex gap-2">
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              className="bg-red-600 text-white rounded-full p-2 hover:opacity-90 transition-opacity shadow-lg"
+              title="Excluir Animal"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={handleVideoClick}
             className="bg-purple-600 dark:bg-purple-500 text-white rounded-full p-2 hover:opacity-90 transition-opacity shadow-lg"
@@ -188,12 +203,6 @@ export function AnimalCard({
       <div className="p-4">
         <p className="text-foreground dark:text-white mb-1">{animal.name}</p>
         <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">{animal.registry}</p>
-
-        {animal.marca && (
-          <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">
-            Marca: {animal.marca}
-          </p>
-        )}
 
         {animal.birthDate && (
           <p className="text-xs text-muted-foreground dark:text-[#99a1af] mt-1">

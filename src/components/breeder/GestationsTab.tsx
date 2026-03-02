@@ -41,6 +41,8 @@ export function GestationsTab({
   onConfirmGestation,
   isSaving,
 }: GestationsTabProps) {
+  const cleanMotherName = (value: string) => value.replace(/\s*\((doadora|matriz|receptora)\)\s*$/i, '').trim();
+
   const [selectedAnimal, setSelectedAnimal] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('');
@@ -79,8 +81,8 @@ export function GestationsTab({
 
       return {
         id: gestation.id,
-        receptora: gestation.mare?.name || 'Não informado',
-        maeBiologica: gestation.donor_mare_id ? 'Mãe biológica' : gestation.mare?.name || 'Não informado',
+        receptora: cleanMotherName(gestation.mare?.name || 'Não informado'),
+        maeBiologica: gestation.donor_mare_id ? 'Mãe biológica' : cleanMotherName(gestation.mare?.name || 'Não informado'),
         garanhao: gestation.stallion?.name || 'Não informado',
         dataCobertura: formatDate(gestation.start_date),
         dataConfirmacao: formatDate(gestation.confirmation_date),
