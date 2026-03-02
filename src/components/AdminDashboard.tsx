@@ -12,6 +12,7 @@ import { AdminCriticalAlertsContent } from './admin/AdminCriticalAlertsContent';
 import { AdminSettingsContent } from './admin/AdminSettingsContent';
 import { AdminHelpContent } from './admin/AdminHelpContent';
 import { NotificationsPanel } from './NotificationsPanel';
+import { BrandLogo } from './branding/BrandLogo';
 import { toast } from 'sonner';
 import type { Notification } from '@/types';
 import { notificationsService } from '@/services/notifications';
@@ -145,7 +146,7 @@ export function AdminDashboard() {
         {/* Header */}
         <div className="h-[101px] px-6 flex items-center justify-between border-b border-border dark:border-[#1a1a1a]">
           <div>
-            <h1 className="text-foreground dark:text-white mb-2">CriaHub</h1>
+            <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto mb-2" />
             <p className="text-muted-foreground dark:text-[#99a1af]">Administrador</p>
           </div>
           {isMobile && (

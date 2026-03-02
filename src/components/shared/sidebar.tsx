@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { BrandLogo } from '@/components/branding/BrandLogo'
 import { useAuth } from '@/contexts/auth-context'
 import type { Database } from '@/types/database.types'
 
@@ -91,14 +92,13 @@ export function Sidebar({ role }: SidebarProps) {
             <div className="flex h-full flex-col">
                 {/* Logo */}
                 <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-                    {!isCollapsed && (
-                        <Link href="/" className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center">
-                                <span className="text-sm font-bold text-sidebar-primary-foreground">CH</span>
-                            </div>
-                            <span className="font-semibold text-sidebar-foreground">CriaHub</span>
-                        </Link>
-                    )}
+                    <Link href="/" className={cn('flex items-center', isCollapsed ? 'justify-center' : 'pr-2')}>
+                        {isCollapsed ? (
+                            <BrandLogo orientation="icon" className="h-9 w-9" />
+                        ) : (
+                            <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
+                        )}
+                    </Link>
                     <Button
                         variant="ghost"
                         size="icon"

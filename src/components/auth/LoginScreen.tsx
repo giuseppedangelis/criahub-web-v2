@@ -5,6 +5,7 @@ import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useUser } from '../../contexts/UserContext';
+import { BrandLogo } from '../branding/BrandLogo';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -62,10 +63,9 @@ export function LoginScreen({ onLogin, onForgotPassword }: LoginScreenProps) {
         <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl border border-border dark:border-[rgba(255,255,255,0.1)] p-6 md:p-8 space-y-6">
           {/* Logo/Title */}
           <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-primary dark:bg-white rounded-xl mx-auto flex items-center justify-center mb-4">
-              <div className="w-10 h-10 bg-white dark:bg-[#1a1a1a] rounded-lg" />
+            <div className="flex justify-center mb-3">
+              <BrandLogo orientation="horizontal" className="h-11 w-auto" />
             </div>
-            <h1 className="text-3xl text-foreground dark:text-white">CriaHub</h1>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
               Gestão completa de haras
             </p>

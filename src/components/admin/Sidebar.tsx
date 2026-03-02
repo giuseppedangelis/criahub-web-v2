@@ -1,6 +1,7 @@
 import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings } from 'lucide-react';
 import { PageType } from '@/types';
 import { useTheme } from '../../contexts/ThemeContext';
+import { BrandLogo } from '../branding/BrandLogo';
 
 interface SidebarProps {
   currentPage: PageType;
@@ -27,7 +28,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       <div className={`p-6 border-b ${
         theme === 'dark' ? 'border-[#1a1a1a]' : 'border-gray-200'
       }`}>
-        <h1 className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>CriaHub</h1>
+        <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
         <p className={`mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
           Administrador
         </p>

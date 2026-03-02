@@ -10,6 +10,7 @@ import { PeonHerdContent } from './employee/PeonHerdContent';
 import { VetHomeContent } from './employee/VetHomeContent';
 import { VetHerdContent } from './employee/VetHerdContent';
 import { VetCalendarContent } from './employee/VetCalendarContent';
+import { BrandLogo } from './branding/BrandLogo';
 
 export function EmployeeDashboard() {
   const { theme, toggleTheme } = useTheme();
@@ -49,7 +50,7 @@ export function EmployeeDashboard() {
       {/* Mobile Header */}
       <header className="bg-card dark:bg-[#1a1a1a] border-b border-border dark:border-[rgba(255,255,255,0.1)] px-4 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl text-foreground dark:text-white">CriaHub</h1>
+          <BrandLogo orientation="horizontal" tone="dark" className="h-7 w-auto" />
           <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{userTitle}</p>
         </div>
 

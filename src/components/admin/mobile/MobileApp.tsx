@@ -4,6 +4,7 @@ import { MobileDashboard } from './MobileDashboard';
 import { MobileAlerts } from './MobileAlerts';
 import { MobileSubscriptions } from './MobileSubscriptions';
 import { MobileProfile } from './MobileProfile';
+import { BrandLogo } from '../../branding/BrandLogo';
 
 export type MobilePageType = 'dashboard' | 'alerts' | 'subscriptions' | 'profile';
 
@@ -36,7 +37,7 @@ export function MobileApp() {
     <div className="h-screen flex flex-col bg-gray-50 max-w-md mx-auto">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-4">
-        <h1 className="text-gray-900">CriaHub</h1>
+        <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
         <p className="text-gray-500">Administrador</p>
       </header>
 
