@@ -3,7 +3,6 @@ export type NormalizedRole =
   | 'criador'
   | 'breeder'
   | 'assessor'
-  | 'acessor'
   | 'advisor'
   | 'veterinario'
   | 'peao'
@@ -16,7 +15,6 @@ const ROLE_RANK: Record<NormalizedRole, number> = {
   criador: 3,
   breeder: 3,
   assessor: 2,
-  acessor: 2,
   advisor: 2,
   veterinario: 1,
   peao: 1,
@@ -41,8 +39,6 @@ export function normalizeRole(role?: string | null): NormalizedRole {
       return 'breeder'
     case 'assessor':
       return 'assessor'
-    case 'acessor':
-      return 'acessor'
     case 'advisor':
       return 'advisor'
     case 'veterinario':
@@ -69,7 +65,7 @@ export function isCreatorRole(role?: string | null): boolean {
 
 export function isAdvisorRole(role?: string | null): boolean {
   const normalized = normalizeRole(role)
-  return normalized === 'assessor' || normalized === 'acessor' || normalized === 'advisor'
+  return normalized === 'assessor' || normalized === 'advisor'
 }
 
 export function isStaffRole(role?: string | null): boolean {
@@ -92,8 +88,7 @@ export function normalizeRoleForStorage(role?: string | null): string | null {
   switch (normalized) {
     case 'assessor':
     case 'advisor':
-    case 'acessor':
-      return 'acessor'
+      return 'assessor'
     case 'admin':
     case 'criador':
     case 'breeder':

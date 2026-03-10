@@ -1,4 +1,4 @@
--- Update create_collaborator to allow Acessor to create Peão/Veterinário
+-- Update create_collaborator to allow Assessor to create Peão/Veterinário
 -- and prevent creation of Administrador/Criador.
 
 create or replace function public.create_collaborator(
@@ -46,7 +46,7 @@ begin
 
   v_normalized_role := lower(trim(p_role));
   if v_normalized_role in ('assessor', 'advisor') then
-    v_normalized_role := 'acessor';
+    v_normalized_role := 'assessor';
   end if;
 
   if v_normalized_role in ('admin', 'criador', 'breeder') then
@@ -54,15 +54,15 @@ begin
   end if;
 
   if lower(v_caller_role) in ('criador', 'breeder', 'admin') then
-    if v_normalized_role not in ('acessor', 'veterinario', 'peao', 'funcionario') then
+    if v_normalized_role not in ('assessor', 'veterinario', 'peao', 'funcionario') then
       return json_build_object('error', 'Perfil de acesso inválido para criação.');
     end if;
-  elsif lower(v_caller_role) in ('acessor', 'assessor', 'advisor') then
+  elsif lower(v_caller_role) in ('assessor', 'advisor') then
     if v_normalized_role not in ('veterinario', 'peao') then
-      return json_build_object('error', 'Acessor só pode cadastrar Peão ou Veterinário.');
+      return json_build_object('error', 'Assessor só pode cadastrar Peão ou Veterinário.');
     end if;
   else
-    return json_build_object('error', 'Apenas criadores ou acessores podem adicionar colaboradores.');
+    return json_build_object('error', 'Apenas criadores ou assessores podem adicionar colaboradores.');
   end if;
 
   insert into auth.users (

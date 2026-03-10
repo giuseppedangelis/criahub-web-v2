@@ -74,7 +74,7 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
         full_name: formData.fullName,
         email: formData.email,
         password: formData.password,
-        role: formData.role as 'acessor' | 'veterinario' | 'peao',
+        role: formData.role as 'assessor' | 'veterinario' | 'peao',
         haras_id: stableHarasId,
         permissions
       });
@@ -180,7 +180,7 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
                 className="w-full h-10 px-4 bg-muted dark:bg-[#3a3a3a] border-0 rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
               >
                 <option value="">Selecione a função</option>
-                <option value="acessor">Acessor</option>
+                <option value="assessor">Assessor</option>
                 <option value="veterinario">Veterinário</option>
                 <option value="peao">Peão</option>
               </NativeSelect>

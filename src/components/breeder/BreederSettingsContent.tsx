@@ -122,9 +122,8 @@ export function BreederSettingsContent() {
   const ROLE_LABELS: Record<string, string> = {
     criador: 'Criador/Dono de Haras',
     breeder: 'Criador/Dono de Haras',
-    assessor: 'Acessor Administrativo',
-    acessor: 'Acessor Administrativo',
-    advisor: 'Acessor Administrativo',
+    assessor: 'Assessor Administrativo',
+    advisor: 'Assessor Administrativo',
     peao: 'Funcionário de Campo',
     veterinario: 'Veterinário',
     employee: 'Funcionário de Campo',

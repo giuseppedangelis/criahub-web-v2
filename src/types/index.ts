@@ -7,7 +7,7 @@
 // ENUMS
 // ============================================
 
-export type UserRole = 'admin' | 'criador' | 'assessor' | 'acessor';
+export type UserRole = 'admin' | 'criador' | 'assessor';
 
 export type AnimalSex = 'Macho' | 'Fêmea';
 

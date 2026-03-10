@@ -41,8 +41,7 @@ export function UserDropdown({
         return 'Criador'
       case 'advisor':
       case 'assessor':
-      case 'acessor':
-        return 'Acessor'
+        return 'Assessor'
       default:
         return 'Usuário'
     }
@@ -57,7 +56,6 @@ export function UserDropdown({
         return 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
       case 'advisor':
       case 'assessor':
-      case 'acessor':
         return 'bg-green-500/10 text-green-600 dark:text-green-400'
       default:
         return 'bg-gray-500/10 text-gray-600 dark:text-gray-400'

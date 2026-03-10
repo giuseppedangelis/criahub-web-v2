@@ -66,7 +66,6 @@ const menuConfig = {
         { label: 'Ajuda', href: '/criador/ajuda', icon: HelpCircle },
     ],
     assessor: assessorMenu,
-    acessor: assessorMenu,
     advisor: assessorMenu,
 }
 
@@ -127,7 +126,7 @@ export function Sidebar({ role }: SidebarProps) {
                                     className={cn(
                                         'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                                         isActive
-                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm dark:bg-white/10 dark:text-white'
+                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm dark:bg-white dark:text-black'
                                             : 'text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                                     )}
                                 >

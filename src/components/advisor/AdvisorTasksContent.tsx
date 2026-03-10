@@ -80,7 +80,7 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
   const isAdvisor =
     userRole === 'advisor' ||
     userRole === 'assessor' ||
-    userRole === 'acessor';
+    userRole === 'assessor';
 
   const { data: animalsResponse } = useAnimals(
     { haras_id: harasId },

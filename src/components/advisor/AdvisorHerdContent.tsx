@@ -89,7 +89,7 @@ export function AdvisorHerdContent() {
 
   return (
     <div className="space-y-6">
-      {/* Info sobre o papel do Acessor no Plantel */}
+      {/* Info sobre o papel do Assessor no Plantel */}
       <div className="bg-blue-500/10 dark:bg-gray-500/10 border border-blue-500/20 dark:border-gray-500/20 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 bg-blue-500/10 dark:bg-gray-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -98,7 +98,7 @@ export function AdvisorHerdContent() {
           <div className="flex-1">
             <h3 className="text-foreground dark:text-white mb-2">Consulta e Importação de Plantel</h3>
             <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-              Como Acessor Administrativo, você pode <strong>consultar</strong> o plantel e <strong>importar planilhas da ABCCMM</strong> para atualização em massa. Os dados importados são bloqueados para garantir integridade (RN-001). Para cadastro manual de novos animais, solicite ao Criador/Proprietário.
+              Como Assessor Administrativo, você pode <strong>consultar</strong> o plantel e <strong>importar planilhas da ABCCMM</strong> para atualização em massa. Os dados importados são bloqueados para garantir integridade (RN-001). Para cadastro manual de novos animais, solicite ao Criador/Proprietário.
             </p>
           </div>
         </div>

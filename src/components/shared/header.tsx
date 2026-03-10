@@ -54,13 +54,11 @@ export function Header({ title, onMenuClick }: HeaderProps) {
             case 'breeder':
                 return 'Criador'
             case 'advisor':
-                return 'Acessor'
+                return 'Assessor'
             case 'criador':
                 return 'Criador'
             case 'assessor':
-                return 'Acessor'
-            case 'acessor':
-                return 'Acessor'
+                return 'Assessor'
             default:
                 return 'Usuário'
         }

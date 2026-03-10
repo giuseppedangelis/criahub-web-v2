@@ -227,7 +227,7 @@ export function AdvisorTaskEditContent({ taskId, onBack, onSave, initialData }: 
               <option value="João (Peão)">João (Peão)</option>
               <option value="Dra. Maria (Veterinária)">Dra. Maria (Veterinária)</option>
               <option value="Pedro (Treinador)">Pedro (Treinador)</option>
-              <option value="Patrícia (Acessora)">Patrícia (Acessora)</option>
+              <option value="Patrícia (Assessora)">Patrícia (Assessora)</option>
             </NativeSelect>
           </div>
 

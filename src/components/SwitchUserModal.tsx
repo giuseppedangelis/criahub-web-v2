@@ -32,7 +32,7 @@ export function SwitchUserModal({ isOpen, onClose, onSelectRole, currentRole }: 
     },
     {
       role: 'advisor' as UserRole,
-      title: 'Acessor Administrativo',
+      title: 'Assessor Administrativo',
       description: 'Gestão burocrática, documentação e alinhamento com ABCCMM',
       icon: Shield,
       color: 'bg-orange-500',

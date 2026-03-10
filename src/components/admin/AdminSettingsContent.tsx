@@ -1106,8 +1106,8 @@ export function AdminSettingsContent() {
                         ? 'Administrador'
                         : profileData.role === 'criador'
                           ? 'Criador'
-                          : profileData.role === 'assessor' || profileData.role === 'acessor' || profileData.role === 'advisor'
-                            ? 'Acessor'
+                          : profileData.role === 'assessor' || profileData.role === 'advisor'
+                            ? 'Assessor'
                             : profileData.role
                     }
                     disabled

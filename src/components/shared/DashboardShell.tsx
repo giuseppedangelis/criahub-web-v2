@@ -33,7 +33,7 @@ const sidebarItemBaseClass =
   'w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all duration-200'
 
 const sidebarItemActiveClass =
-  'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)] shadow-sm dark:bg-white/10 dark:text-white'
+  'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)] shadow-sm dark:bg-white dark:text-black'
 
 const sidebarItemInactiveClass =
   'text-[color:var(--sidebar-foreground)]/72 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white'
@@ -100,10 +100,12 @@ export function DashboardShell({
                 )}
                 style={
                   isActive
-                    ? {
-                        backgroundColor: 'var(--sidebar-primary)',
-                        color: 'var(--sidebar-primary-foreground)',
-                      }
+                    ? theme === 'dark'
+                      ? { backgroundColor: '#ffffff', color: '#0d0d0d' }
+                      : {
+                          backgroundColor: 'var(--sidebar-primary)',
+                          color: 'var(--sidebar-primary-foreground)',
+                        }
                     : undefined
                 }
               >

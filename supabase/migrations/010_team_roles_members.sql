@@ -144,7 +144,7 @@ select p.haras_id,
     on r.haras_id = p.haras_id
    and r.name = case
      when p.role = 'criador' then 'Administrador'
-     when p.role in ('assessor','acessor') then 'Assessor'
+     when p.role = 'assessor' then 'Assessor'
      when p.role = 'veterinario' then 'Veterinário'
      when p.role = 'peao' then 'Peão'
      else 'Colaborador'

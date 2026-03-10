@@ -1,4 +1,4 @@
--- Padroniza o papel "Acessor" no banco
+-- Padroniza o papel "Assessor" no banco
 
 do $$
 begin
@@ -12,19 +12,19 @@ begin
         from pg_enum e
         join pg_type t on t.oid = e.enumtypid
        where t.typname = 'user_role'
-         and e.enumlabel = 'acessor'
+         and e.enumlabel = 'assessor'
     ) then
-      alter type user_role add value 'acessor';
+      alter type user_role add value 'assessor';
     end if;
   end if;
 end $$;
 
--- Normaliza valores antigos no profile (assessor/advisor -> acessor)
+-- Normaliza valores antigos no profile (assessor/advisor -> assessor)
 update public.profiles
-   set role = 'acessor'
+   set role = 'assessor'
  where role::text in ('assessor', 'advisor');
 
--- Renomeia funções "Assessor" para "Acessor" e evita conflito de nomes
+-- Renomeia funções "Assessor" para "Assessor" e evita conflito de nomes
 do $$
 declare
   r record;
@@ -35,7 +35,7 @@ begin
       from public.haras_roles old_role
       join public.haras_roles new_role
         on old_role.haras_id = new_role.haras_id
-       and lower(new_role.name) = 'acessor'
+       and lower(new_role.name) = 'assessor'
      where lower(old_role.name) = 'assessor'
        and old_role.id <> new_role.id
   loop
@@ -48,6 +48,6 @@ begin
   end loop;
 
   update public.haras_roles
-     set name = 'Acessor'
+     set name = 'Assessor'
    where lower(name) = 'assessor';
 end $$;

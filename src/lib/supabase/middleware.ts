@@ -62,13 +62,12 @@ export async function updateSession(request: NextRequest) {
         const role = (profileData as { role?: UserRole } | null)?.role
         const url = request.nextUrl.clone()
 
-        // Redirect based on role (admin, criador, acessor)
+        // Redirect based on role (admin, criador, assessor)
         switch (role) {
             case 'admin':
                 url.pathname = '/admin'
                 break
             case 'assessor':
-            case 'acessor':
             case 'advisor':
                 url.pathname = '/assessor'
                 break
@@ -93,11 +92,11 @@ export async function updateSession(request: NextRequest) {
         // Check if user has access to the current path
         if (request.nextUrl.pathname.startsWith('/admin') && role !== 'admin') {
             const url = request.nextUrl.clone()
-            url.pathname = role === 'assessor' || role === 'acessor' || role === 'advisor' ? '/assessor' : '/criador'
+            url.pathname = role === 'assessor' || role === 'advisor' ? '/assessor' : '/criador'
             return NextResponse.redirect(url)
         }
 
-        if (request.nextUrl.pathname.startsWith('/assessor') && role !== 'assessor' && role !== 'acessor' && role !== 'advisor' && role !== 'admin') {
+        if (request.nextUrl.pathname.startsWith('/assessor') && role !== 'assessor' && role !== 'advisor' && role !== 'admin') {
             const url = request.nextUrl.clone()
             url.pathname = '/criador'
             return NextResponse.redirect(url)
@@ -105,7 +104,7 @@ export async function updateSession(request: NextRequest) {
 
         if (request.nextUrl.pathname.startsWith('/criador') && role !== 'criador' && role !== 'admin') {
             const url = request.nextUrl.clone()
-            url.pathname = role === 'assessor' || role === 'acessor' || role === 'advisor' ? '/assessor' : '/criador'
+            url.pathname = role === 'assessor' || role === 'advisor' ? '/assessor' : '/criador'
             return NextResponse.redirect(url)
         }
     }

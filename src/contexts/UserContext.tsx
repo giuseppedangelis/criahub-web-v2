@@ -4,8 +4,8 @@ import { createContext, useContext, useState, ReactNode, useEffect, useRef } fro
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
-// Roles mantidos conforme o banco: admin, criador, acessor
-export type UserRole = 'admin' | 'criador' | 'acessor' | 'assessor' | 'breeder' | 'advisor' | 'employee';
+// Roles mantidos conforme o banco: admin, criador, assessor
+export type UserRole = 'admin' | 'criador' | 'assessor' | 'breeder' | 'advisor' | 'employee';
 
 interface UserProfile {
   id: string;
@@ -73,7 +73,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           if (cachedProfile) {
             let mappedRole = cachedProfile.role;
             if (mappedRole === 'criador') mappedRole = 'breeder' as UserRole;
-            if (mappedRole === 'assessor' || mappedRole === 'acessor') mappedRole = 'advisor' as UserRole;
+            if (mappedRole === 'assessor') mappedRole = 'advisor' as UserRole;
             setUserRole(mappedRole);
             if (cachedProfile.haras_id) {
               setStableHarasId(cachedProfile.haras_id);
@@ -128,7 +128,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Map database roles to component roles
         let mappedRole = profileData.role;
         if (mappedRole === 'criador') mappedRole = 'breeder' as UserRole;
-        if (mappedRole === 'assessor' || mappedRole === 'acessor') mappedRole = 'advisor' as UserRole;
+        if (mappedRole === 'assessor') mappedRole = 'advisor' as UserRole;
 
         setUserRole(mappedRole);
       } else {

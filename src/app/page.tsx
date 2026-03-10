@@ -83,7 +83,6 @@ function AppContent() {
         return <BreederDashboard />
       case 'advisor':
       case 'assessor':
-      case 'acessor':
         return <AdvisorDashboard />
       case null:
         return (

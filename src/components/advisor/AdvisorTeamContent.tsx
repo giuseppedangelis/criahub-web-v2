@@ -48,16 +48,15 @@ const ASSIGNABLE_PERMISSION_KEYS: TeamPermissionKey[] = [
 ];
 
 const SYSTEM_ROLE_OPTIONS = [
-  { value: 'acessor', label: 'Acessor' },
+  { value: 'assessor', label: 'Assessor' },
   { value: 'veterinario', label: 'Veterinário' },
   { value: 'peao', label: 'Peão' },
 ];
 
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
   criador: 'Criador/Dono de Haras',
-  assessor: 'Acessor Administrativo',
-  acessor: 'Acessor Administrativo',
-  advisor: 'Acessor Administrativo',
+  assessor: 'Assessor Administrativo',
+  advisor: 'Assessor Administrativo',
   veterinario: 'Veterinário',
   peao: 'Peão',
   funcionario: 'Funcionário',
@@ -109,7 +108,7 @@ export function AdvisorTeamContent() {
     email: '',
     password: '',
     roleId: '',
-    systemRole: isAdvisor && !isCreator ? 'peao' : 'acessor',
+    systemRole: isAdvisor && !isCreator ? 'peao' : 'assessor',
     phone: '',
     status: 'Ativo',
     permissions: emptyPermissions(),
@@ -353,7 +352,7 @@ export function AdvisorTeamContent() {
   };
 
   const resetUserForm = () => {
-    const defaultSystemRole = isAdvisor && !isCreator ? 'peao' : 'acessor';
+    const defaultSystemRole = isAdvisor && !isCreator ? 'peao' : 'assessor';
     const defaultRoleId = !isCreator ? getDefaultRoleIdForSystemRole(defaultSystemRole) : '';
     const defaultPermissions = !isCreator ? resolvePermissionsForRole(defaultRoleId) : emptyPermissions();
     setFormData({
@@ -412,8 +411,8 @@ export function AdvisorTeamContent() {
       toast.error('Você não pode cadastrar este perfil de acesso.');
       return;
     }
-    if (!isCreator && normalizeRole(formData.systemRole) === 'acessor') {
-      toast.error('Somente o criador pode cadastrar acessores.');
+    if (!isCreator && normalizeRole(formData.systemRole) === 'assessor') {
+      toast.error('Somente o criador pode cadastrar assessores.');
       return;
     }
     if (!canDelegatePermissions && !formData.roleId) {
@@ -675,8 +674,8 @@ export function AdvisorTeamContent() {
       toast.error('Você não tem permissão para atribuir este perfil de acesso.');
       return;
     }
-    if (!isCreator && normalizeRole(formData.systemRole) === 'acessor') {
-      toast.error('Somente o criador pode atribuir o perfil de acessor.');
+    if (!isCreator && normalizeRole(formData.systemRole) === 'assessor') {
+      toast.error('Somente o criador pode atribuir o perfil de assessor.');
       return;
     }
     if (!canDelegatePermissions && !formData.roleId) {
@@ -800,7 +799,7 @@ export function AdvisorTeamContent() {
       </div>
       {activeTab === 'team' && isAdvisor && !isCreator && (
         <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-          Acessor pode cadastrar Peão e Veterinário. Permissões são definidas pelo criador.
+          Assessor pode cadastrar Peão e Veterinário. Permissões são definidas pelo criador.
         </p>
       )}
       {activeTab === 'team' && !isAdvisor && !isCreator && (
