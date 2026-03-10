@@ -12,6 +12,22 @@ import type {
   ReportFilters,
 } from '@/types'
 
+const REPORT_SELECT = `
+  id,
+  haras_id,
+  nome,
+  tipo,
+  formato,
+  status,
+  parametros,
+  arquivo_url,
+  tamanho_bytes,
+  agendado_para,
+  criado_por,
+  created_at,
+  updated_at
+`
+
 function mapReportRow(row: any): Report {
   return {
     id: row.id,
@@ -39,7 +55,7 @@ export const reportsService = {
   ): Promise<PaginatedResponse<Report>> {
     let query = supabase
       .from('reports')
-      .select('*', { count: 'exact' })
+      .select(REPORT_SELECT, { count: 'exact' })
 
     if (filters.haras_id) query = query.eq('haras_id', filters.haras_id)
     if (filters.type) query = query.eq('tipo', filters.type)
@@ -60,7 +76,7 @@ export const reportsService = {
   async getRecent(harasId: string, limit: number = 4): Promise<Report[]> {
     const { data, error } = await supabase
       .from('reports')
-      .select('*')
+      .select(REPORT_SELECT)
       .eq('haras_id', harasId)
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -81,11 +97,11 @@ export const reportsService = {
     ] = await Promise.all([
         supabase
           .from('reports')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('haras_id', harasId),
         supabase
           .from('reports')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('haras_id', harasId)
           .eq('status', 'Agendado'),
         supabase
@@ -126,7 +142,7 @@ export const reportsService = {
     const { data, error } = await supabase
       .from('reports')
       .insert(payload)
-      .select('*')
+      .select(REPORT_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -152,7 +168,7 @@ export const reportsService = {
       .from('reports')
       .update(payload)
       .eq('id', id)
-      .select('*')
+      .select(REPORT_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)

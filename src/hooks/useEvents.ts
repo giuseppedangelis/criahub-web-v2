@@ -4,7 +4,7 @@
 // HOOKS - EVENTS (AGENDA)
 // ============================================
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { eventsService } from '@/services/events'
 import type {
   AgendaEventFilters,
@@ -30,6 +30,9 @@ export function useAgendaEvents(
     queryKey: agendaKeys.list(filters, pagination),
     queryFn: () => eventsService.list(filters, pagination),
     enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
 }
 

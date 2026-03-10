@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { animalLocationsService } from '@/services/animalLocations'
 import { animalKeys } from '@/hooks/useAnimals'
+import { useUser } from '@/contexts/UserContext'
 import type { CreateAnimalLocationChangeInput } from '@/types'
 
 export const animalLocationKeys = {
@@ -27,9 +28,15 @@ export function useAnimalLocationHistory(animalId: string, enabled: boolean = tr
 
 export function useCreateAnimalLocationChange() {
     const queryClient = useQueryClient()
+    const { stableHarasId, user } = useUser()
 
     return useMutation({
-        mutationFn: (input: CreateAnimalLocationChangeInput) => animalLocationsService.createChange(input),
+        mutationFn: (input: CreateAnimalLocationChangeInput) =>
+            animalLocationsService.createChange({
+                ...input,
+                haras_id: input.haras_id || stableHarasId || undefined,
+                changed_by: input.changed_by ?? user?.id ?? null,
+            }),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: animalLocationKeys.listByAnimal(data.animal_id) })
             queryClient.invalidateQueries({ queryKey: animalKeys.detail(data.animal_id) })

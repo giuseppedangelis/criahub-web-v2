@@ -30,6 +30,195 @@ import type {
 } from '@/types';
 
 type GestationRow = Record<string, any>;
+type ReproductionProtocolRow = ReproductionProtocol & {
+    steps?: ReproductionProtocolStep[] | null;
+};
+
+const REPRODUCTIVE_EVENT_SELECT = `
+  id,
+  haras_id,
+  animal_id,
+  event_type,
+  event_date,
+  stallion_id,
+  mare_id,
+  veterinarian,
+  protocol,
+  observations,
+  status,
+  semen_type,
+  details,
+  auto_generated,
+  priority,
+  created_at,
+  updated_at,
+  animal:animals!reproductive_events_animal_id_fkey(id, name:nome, registry_number:registro),
+  stallion:animals!reproductive_events_stallion_id_fkey(id, name:nome),
+  mare:animals!reproductive_events_mare_id_fkey(id, name:nome)
+`
+
+const COVERING_SELECT = `
+  id,
+  haras_id,
+  mare_id:egua_id,
+  stallion_id:garanhao_id,
+  event_date:data_cobertura,
+  type:tipo,
+  semen_type:tipo_semen,
+  veterinarian:veterinario,
+  observations:observacoes,
+  created_at,
+  updated_at,
+  mare:animals!coverings_egua_id_fkey(id, name:nome, registry_number:registro),
+  stallion:animals!coverings_garanhao_id_fkey(id, name:nome, registry_number:registro)
+`
+
+const COVERING_MUTATION_SELECT = `
+  id,
+  haras_id,
+  mare_id:egua_id,
+  stallion_id:garanhao_id,
+  event_date:data_cobertura,
+  type:tipo,
+  semen_type:tipo_semen,
+  veterinarian:veterinario,
+  observations:observacoes,
+  created_at,
+  updated_at
+`
+
+const GESTATION_SELECT = `
+  id,
+  haras_id,
+  mare_id:egua_id,
+  stallion_id:garanhao_id,
+  reproductive_event_id:covering_id,
+  confirmation_date:data_diagnostico,
+  expected_birth_date:data_prevista_parto,
+  actual_birth_date:data_parto,
+  status,
+  foal_id:potro_id,
+  observations:observacoes,
+  created_at,
+  updated_at,
+  mare:animals!gestations_egua_id_fkey(id, name:nome, registry_number:registro),
+  stallion:animals!gestations_garanhao_id_fkey(id, name:nome),
+  foal:animals!gestations_potro_id_fkey(id, name:nome),
+  covering:coverings!gestations_covering_id_fkey(id, data_cobertura, tipo, tipo_semen, veterinario)
+`
+
+const GESTATION_MUTATION_SELECT = `
+  id,
+  haras_id,
+  mare_id:egua_id,
+  stallion_id:garanhao_id,
+  reproductive_event_id:covering_id,
+  confirmation_date:data_diagnostico,
+  expected_birth_date:data_prevista_parto,
+  actual_birth_date:data_parto,
+  status,
+  foal_id:potro_id,
+  observations:observacoes,
+  created_at,
+  updated_at
+`
+
+const OVULE_SELECT = `
+  id,
+  haras_id,
+  donor_id,
+  collection_date,
+  quantity,
+  available,
+  quality,
+  method,
+  status,
+  veterinarian,
+  observations,
+  created_at,
+  updated_at,
+  donor:animals!ovules_donor_id_fkey(id, name:nome, registry_number:registro)
+`
+
+const EMBRYO_SELECT = `
+  id,
+  haras_id,
+  donor_id,
+  stallion_id,
+  production_date,
+  quantity,
+  available,
+  grade,
+  storage_type,
+  method,
+  status,
+  veterinarian,
+  observations,
+  created_at,
+  updated_at,
+  donor:animals!embryos_donor_id_fkey(id, name:nome, registry_number:registro),
+  stallion:animals!embryos_stallion_id_fkey(id, name:nome, registry_number:registro)
+`
+
+const REPRODUCTION_DOCUMENT_SELECT = `
+  id,
+  haras_id,
+  animal_id,
+  reproductive_event_id,
+  gestation_id,
+  ovule_id,
+  embryo_id,
+  title,
+  document_type,
+  file_url,
+  file_name,
+  file_size,
+  file_type,
+  created_by,
+  created_at
+`
+
+const REPRODUCTION_PROTOCOL_STEP_SELECT = `
+  id,
+  protocol_id,
+  name,
+  day_offset,
+  description,
+  step_type,
+  sort_order,
+  created_at
+`
+
+const REPRODUCTION_PROTOCOL_SELECT = `
+  id,
+  haras_id,
+  name,
+  type,
+  description,
+  total_days,
+  is_active,
+  created_by,
+  created_at,
+  updated_at
+`
+
+const REPRODUCTION_PROTOCOL_WITH_STEPS_SELECT = `
+  ${REPRODUCTION_PROTOCOL_SELECT},
+  steps:reproduction_protocol_steps(${REPRODUCTION_PROTOCOL_STEP_SELECT})
+`
+
+const REPRODUCTION_PROTOCOL_APPLICATION_SELECT = `
+  id,
+  haras_id,
+  protocol_id,
+  animal_id,
+  start_date,
+  status,
+  notes,
+  created_by,
+  created_at,
+  updated_at
+`
 
 const mapDbGestationStatus = (status?: string | null): Gestation['status'] => {
     switch (status) {
@@ -83,6 +272,21 @@ const mapGestationRow = (row: GestationRow): Gestation => ({
     foal: row.foal ?? null,
 });
 
+const sortProtocolSteps = (steps?: ReproductionProtocolStep[] | null): ReproductionProtocolStep[] => {
+    if (!steps || steps.length === 0) return [];
+
+    return [...steps].sort((left, right) => {
+        const leftOrder = left.sort_order ?? left.day_offset ?? 0;
+        const rightOrder = right.sort_order ?? right.day_offset ?? 0;
+        return leftOrder - rightOrder;
+    });
+};
+
+const mapProtocolRow = (row: ReproductionProtocolRow): ReproductionProtocol => ({
+    ...row,
+    steps: sortProtocolSteps(row.steps),
+});
+
 export const reproductionService = {
     // ============================================
     // EVENTOS REPRODUTIVOS
@@ -97,12 +301,7 @@ export const reproductionService = {
     ): Promise<PaginatedResponse<ReproductiveEvent>> {
         let query = supabase
             .from('reproductive_events')
-            .select(`
-        *,
-        animal:animals!reproductive_events_animal_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!reproductive_events_stallion_id_fkey(id, name:nome),
-        mare:animals!reproductive_events_mare_id_fkey(id, name:nome)
-      `, { count: 'exact' })
+            .select(REPRODUCTIVE_EVENT_SELECT, { count: 'exact' })
             .eq('haras_id', harasId)
             .order('event_date', { ascending: false });
 
@@ -122,7 +321,7 @@ export const reproductionService = {
         const { data, error } = await supabase
             .from('reproductive_events')
             .insert(input)
-            .select()
+            .select(REPRODUCTIVE_EVENT_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -136,11 +335,7 @@ export const reproductionService = {
     async getEventsByAnimal(animalId: string): Promise<ReproductiveEvent[]> {
         const { data, error } = await supabase
             .from('reproductive_events')
-            .select(`
-        *,
-        stallion:animals!reproductive_events_stallion_id_fkey(id, name:nome),
-        mare:animals!reproductive_events_mare_id_fkey(id, name:nome)
-      `)
+            .select(REPRODUCTIVE_EVENT_SELECT)
             .or(`animal_id.eq.${animalId},stallion_id.eq.${animalId},mare_id.eq.${animalId}`)
             .order('event_date', { ascending: false });
 
@@ -162,21 +357,7 @@ export const reproductionService = {
     ): Promise<PaginatedResponse<Covering>> {
         let query = supabase
             .from('coverings')
-            .select(`
-        id,
-        haras_id,
-        mare_id:egua_id,
-        stallion_id:garanhao_id,
-        event_date:data_cobertura,
-        type:tipo,
-        semen_type:tipo_semen,
-        veterinarian:veterinario,
-        observations:observacoes,
-        created_at,
-        updated_at,
-        mare:animals!coverings_egua_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!coverings_garanhao_id_fkey(id, name:nome, registry_number:registro)
-      `, { count: 'exact' })
+            .select(COVERING_SELECT, { count: 'exact' })
             .eq('haras_id', harasId)
             .order('data_cobertura', { ascending: false });
 
@@ -205,19 +386,7 @@ export const reproductionService = {
                 veterinario: input.veterinarian || null,
                 observacoes: input.observations || null,
             })
-            .select(`
-        id,
-        haras_id,
-        mare_id:egua_id,
-        stallion_id:garanhao_id,
-        event_date:data_cobertura,
-        type:tipo,
-        semen_type:tipo_semen,
-        veterinarian:veterinario,
-        observations:observacoes,
-        created_at,
-        updated_at
-      `)
+            .select(COVERING_MUTATION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -238,25 +407,7 @@ export const reproductionService = {
     ): Promise<PaginatedResponse<Gestation>> {
         let query = supabase
             .from('gestations')
-            .select(`
-        id,
-        haras_id,
-        mare_id:egua_id,
-        stallion_id:garanhao_id,
-        reproductive_event_id:covering_id,
-        confirmation_date:data_diagnostico,
-        expected_birth_date:data_prevista_parto,
-        actual_birth_date:data_parto,
-        status,
-        foal_id:potro_id,
-        observations:observacoes,
-        created_at,
-        updated_at,
-        mare:animals!gestations_egua_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!gestations_garanhao_id_fkey(id, name:nome),
-        foal:animals!gestations_potro_id_fkey(id, name:nome),
-        covering:coverings!gestations_covering_id_fkey(id, data_cobertura, tipo, tipo_semen, veterinario)
-      `, { count: 'exact' });
+            .select(GESTATION_SELECT, { count: 'exact' });
 
         if (filters.haras_id) {
             query = query.eq('haras_id', filters.haras_id);
@@ -285,25 +436,7 @@ export const reproductionService = {
     async getGestationById(id: string): Promise<Gestation | null> {
         const { data, error } = await supabase
             .from('gestations')
-            .select(`
-        id,
-        haras_id,
-        mare_id:egua_id,
-        stallion_id:garanhao_id,
-        reproductive_event_id:covering_id,
-        confirmation_date:data_diagnostico,
-        expected_birth_date:data_prevista_parto,
-        actual_birth_date:data_parto,
-        status,
-        foal_id:potro_id,
-        observations:observacoes,
-        created_at,
-        updated_at,
-        mare:animals!gestations_egua_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!gestations_garanhao_id_fkey(id, name:nome),
-        foal:animals!gestations_potro_id_fkey(id, name:nome),
-        covering:coverings!gestations_covering_id_fkey(id, data_cobertura, tipo, tipo_semen, veterinario)
-      `)
+            .select(GESTATION_SELECT)
             .eq('id', id)
             .single();
 
@@ -338,7 +471,7 @@ export const reproductionService = {
                 intervalo_p4: input.p4_interval || null,
                 observacoes: input.observations || null
             })
-            .select()
+            .select(GESTATION_MUTATION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -368,7 +501,7 @@ export const reproductionService = {
             .from('gestations')
             .update(updateData)
             .eq('id', id)
-            .select()
+            .select(GESTATION_MUTATION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -386,24 +519,7 @@ export const reproductionService = {
 
         const { data, error } = await supabase
             .from('gestations')
-            .select(`
-        id,
-        haras_id,
-        mare_id:egua_id,
-        stallion_id:garanhao_id,
-        reproductive_event_id:covering_id,
-        confirmation_date:data_diagnostico,
-        expected_birth_date:data_prevista_parto,
-        actual_birth_date:data_parto,
-        status,
-        foal_id:potro_id,
-        observations:observacoes,
-        created_at,
-        updated_at,
-        mare:animals!gestations_egua_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!gestations_garanhao_id_fkey(id, name:nome),
-        covering:coverings!gestations_covering_id_fkey(id, data_cobertura, tipo, tipo_semen, veterinario)
-      `)
+            .select(GESTATION_SELECT)
             .eq('haras_id', harasId)
             .in('status', ['Em andamento'])
             .lte('data_prevista_parto', futureDate.toISOString().split('T')[0])
@@ -418,32 +534,20 @@ export const reproductionService = {
      * Obtém estatísticas de reprodução
      */
     async getStats(harasId: string, year?: number): Promise<ReproductionStats> {
-        const currentYear = year || new Date().getFullYear();
-        const startDate = `${currentYear}-01-01`;
-        const endDate = `${currentYear}-12-31`;
-
-        const { data, error } = await supabase
-            .from('gestations')
-            .select('status')
-            .eq('haras_id', harasId)
-            .gte('data_diagnostico', startDate)
-            .lte('data_diagnostico', endDate);
+        const { data, error } = await supabase.rpc('get_reproduction_stats', {
+            p_haras_id: harasId,
+            p_year: year ?? null,
+        });
 
         if (error) handleSupabaseError(error);
 
-        const stats: ReproductionStats = {
-            totalGestations: data?.length || 0,
-            confirmedGestations: data?.filter(g => g.status === 'Em andamento').length || 0,
-            births: data?.filter(g => g.status === 'Parto realizado').length || 0,
-            abortions: data?.filter(g => g.status === 'Abortada').length || 0,
-            successRate: 0
+        return {
+            totalGestations: data?.totalGestations ?? 0,
+            confirmedGestations: data?.confirmedGestations ?? 0,
+            births: data?.births ?? 0,
+            abortions: data?.abortions ?? 0,
+            successRate: Number(data?.successRate ?? 0),
         };
-
-        if (stats.totalGestations > 0) {
-            stats.successRate = (stats.births / stats.totalGestations) * 100;
-        }
-
-        return stats;
     },
 
     // ============================================
@@ -456,10 +560,7 @@ export const reproductionService = {
     ): Promise<PaginatedResponse<Ovule>> {
         let query = supabase
             .from('ovules')
-            .select(`
-        *,
-        donor:animals!ovules_donor_id_fkey(id, name:nome, registry_number:registro)
-      `, { count: 'exact' })
+            .select(OVULE_SELECT, { count: 'exact' })
             .eq('haras_id', harasId)
             .order('collection_date', { ascending: false });
 
@@ -487,7 +588,7 @@ export const reproductionService = {
                 veterinarian: input.veterinarian ?? null,
                 observations: input.observations ?? null,
             })
-            .select()
+            .select(OVULE_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -505,11 +606,7 @@ export const reproductionService = {
     ): Promise<PaginatedResponse<Embryo>> {
         let query = supabase
             .from('embryos')
-            .select(`
-        *,
-        donor:animals!embryos_donor_id_fkey(id, name:nome, registry_number:registro),
-        stallion:animals!embryos_stallion_id_fkey(id, name:nome, registry_number:registro)
-      `, { count: 'exact' })
+            .select(EMBRYO_SELECT, { count: 'exact' })
             .eq('haras_id', harasId)
             .order('production_date', { ascending: false });
 
@@ -539,7 +636,7 @@ export const reproductionService = {
                 veterinarian: input.veterinarian ?? null,
                 observations: input.observations ?? null,
             })
-            .select()
+            .select(EMBRYO_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -554,7 +651,7 @@ export const reproductionService = {
     async listDocuments(harasId: string): Promise<ReproductionDocument[]> {
         const { data, error } = await supabase
             .from('reproduction_documents')
-            .select('*')
+            .select(REPRODUCTION_DOCUMENT_SELECT)
             .eq('haras_id', harasId)
             .order('created_at', { ascending: false });
 
@@ -567,7 +664,7 @@ export const reproductionService = {
         const { data, error } = await supabase
             .from('reproduction_documents')
             .insert(input)
-            .select()
+            .select(REPRODUCTION_DOCUMENT_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -582,16 +679,13 @@ export const reproductionService = {
     async listProtocols(harasId: string): Promise<ReproductionProtocol[]> {
         const { data, error } = await supabase
             .from('reproduction_protocols')
-            .select(`
-        *,
-        steps:reproduction_protocol_steps(*)
-      `)
+            .select(REPRODUCTION_PROTOCOL_WITH_STEPS_SELECT)
             .eq('haras_id', harasId)
             .order('created_at', { ascending: false });
 
         if (error) handleSupabaseError(error);
 
-        return data as ReproductionProtocol[];
+        return ((data || []) as ReproductionProtocolRow[]).map(mapProtocolRow);
     },
 
     async createProtocol(
@@ -601,7 +695,7 @@ export const reproductionService = {
         const { data: protocol, error } = await supabase
             .from('reproduction_protocols')
             .insert(input)
-            .select()
+            .select(REPRODUCTION_PROTOCOL_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -631,7 +725,7 @@ export const reproductionService = {
             .from('reproduction_protocols')
             .update(input)
             .eq('id', id)
-            .select()
+            .select(REPRODUCTION_PROTOCOL_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -688,7 +782,7 @@ export const reproductionService = {
                 status: input.status ?? 'ativo',
                 notes: input.notes ?? null,
             })
-            .select()
+            .select(REPRODUCTION_PROTOCOL_APPLICATION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -699,11 +793,7 @@ export const reproductionService = {
     async listProtocolApplications(harasId: string): Promise<ReproductionProtocolApplication[]> {
         const { data, error } = await supabase
             .from('reproduction_protocol_applications')
-            .select(`
-        *,
-        protocol:reproduction_protocols(*),
-        animal:animals(id, name:nome, registry_number:registro)
-      `)
+            .select(REPRODUCTION_PROTOCOL_APPLICATION_SELECT)
             .eq('haras_id', harasId)
             .order('created_at', { ascending: false });
 

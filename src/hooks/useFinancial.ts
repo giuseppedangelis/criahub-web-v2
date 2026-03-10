@@ -5,7 +5,7 @@
 // Hooks para gerenciar finanças com TanStack Query
 // ============================================
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { financialService } from '@/services/financial'
 import type {
     TransactionFilters,
@@ -40,6 +40,9 @@ export function useTransactions(
         queryKey: financialKeys.transactionsList(filters, pagination),
         queryFn: () => financialService.list(filters, pagination),
         enabled,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -51,6 +54,8 @@ export function useTransaction(id: string) {
         queryKey: financialKeys.transactionDetail(id),
         queryFn: () => financialService.getById(id),
         enabled: !!id,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -62,6 +67,8 @@ export function useRecentTransactions(harasId: string, limit: number = 5) {
         queryKey: financialKeys.recent(harasId, limit),
         queryFn: () => financialService.getRecent(harasId, limit),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -125,6 +132,8 @@ export function useFinancialSummary(
         queryKey: financialKeys.summary(harasId, startDate, endDate),
         queryFn: () => financialService.getSummary(harasId, startDate, endDate),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -136,5 +145,7 @@ export function useMonthlyFinancialData(harasId: string, year: number) {
         queryKey: financialKeys.monthly(harasId, year),
         queryFn: () => financialService.getMonthlyData(harasId, year),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }

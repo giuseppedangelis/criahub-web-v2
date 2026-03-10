@@ -3,7 +3,7 @@
 // Gerencia vídeos vinculados aos animais
 // ============================================
 
-import { supabase, handleSupabaseError, getCurrentHarasId } from './base';
+import { supabase, handleSupabaseError } from './base';
 import type {
     AnimalVideo,
     CreateAnimalVideoInput,
@@ -26,6 +26,28 @@ const UI_VISIBILITY_MAP: Record<string, AnimalVideoVisibility> = {
     'publico': 'Público',
     'privado': 'Privado'
 };
+
+const ANIMAL_VIDEO_SELECT = 'id, animal_id, haras_id, title, url, source, type, visibility, caption, duration, thumbnail_url, created_at, updated_at';
+
+interface HarasLookupRow {
+    haras_id?: string | null;
+}
+
+interface AnimalVideoRow {
+    id: string;
+    animal_id: string;
+    haras_id?: string | null;
+    title: string;
+    url: string;
+    source?: string | null;
+    type?: string | null;
+    visibility?: string | null;
+    caption?: string | null;
+    duration?: string | null;
+    thumbnail_url?: string | null;
+    created_at: string;
+    updated_at: string;
+}
 
 function normalizeVisibilityToDb(value?: string | null): 'publico' | 'privado' {
     if (!value) return 'publico';
@@ -52,8 +74,6 @@ function normalizeSource(source?: AnimalVideoSource, url?: string): AnimalVideoS
 
 async function resolveHarasId(animalId: string, explicitHarasId?: string): Promise<string | null> {
     if (explicitHarasId) return explicitHarasId;
-    const currentHarasId = await getCurrentHarasId();
-    if (currentHarasId) return currentHarasId;
 
     const { data, error } = await supabase
         .from('animals')
@@ -62,10 +82,10 @@ async function resolveHarasId(animalId: string, explicitHarasId?: string): Promi
         .single();
 
     if (error) handleSupabaseError(error);
-    return (data as { haras_id?: string | null })?.haras_id || null;
+    return (data as HarasLookupRow | null)?.haras_id || null;
 }
 
-function mapRowToVideo(row: any): AnimalVideo {
+function mapRowToVideo(row: AnimalVideoRow): AnimalVideo {
     return {
         id: row.id,
         animal_id: row.animal_id,
@@ -87,13 +107,13 @@ export const animalVideosService = {
     async listByAnimal(animalId: string): Promise<AnimalVideo[]> {
         const { data, error } = await supabase
             .from('animal_videos')
-            .select('*')
+            .select(ANIMAL_VIDEO_SELECT)
             .eq('animal_id', animalId)
             .order('created_at', { ascending: false });
 
         if (error) handleSupabaseError(error);
 
-        return (data || []).map(mapRowToVideo);
+        return ((data as AnimalVideoRow[] | null) || []).map(mapRowToVideo);
     },
 
     async create(input: CreateAnimalVideoInput): Promise<AnimalVideo> {
@@ -118,17 +138,17 @@ export const animalVideosService = {
         const { data, error } = await supabase
             .from('animal_videos')
             .insert(dbInput)
-            .select('*')
+            .select(ANIMAL_VIDEO_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return mapRowToVideo(data);
+        return mapRowToVideo(data as AnimalVideoRow);
     },
 
     async update(input: UpdateAnimalVideoInput): Promise<AnimalVideo> {
         const { id, ...updateData } = input;
-        const dbInput: any = { updated_at: new Date().toISOString() };
+        const dbInput: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
         if (updateData.title !== undefined) dbInput.title = updateData.title;
         if (updateData.url !== undefined) dbInput.url = updateData.url;
@@ -145,12 +165,12 @@ export const animalVideosService = {
             .from('animal_videos')
             .update(dbInput)
             .eq('id', id)
-            .select('*')
+            .select(ANIMAL_VIDEO_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return mapRowToVideo(data);
+        return mapRowToVideo(data as AnimalVideoRow);
     },
 
     async delete(id: string): Promise<void> {

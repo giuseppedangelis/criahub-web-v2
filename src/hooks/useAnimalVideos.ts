@@ -6,6 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { animalVideosService } from '@/services/animalVideos'
+import { useUser } from '@/contexts/UserContext'
 import type { CreateAnimalVideoInput, UpdateAnimalVideoInput } from '@/types'
 
 export const animalVideoKeys = {
@@ -28,9 +29,14 @@ export function useAnimalVideos(animalId: string, enabled: boolean = true) {
 
 export function useCreateAnimalVideo() {
     const queryClient = useQueryClient()
+    const { stableHarasId } = useUser()
 
     return useMutation({
-        mutationFn: (input: CreateAnimalVideoInput) => animalVideosService.create(input),
+        mutationFn: (input: CreateAnimalVideoInput) =>
+            animalVideosService.create({
+                ...input,
+                haras_id: input.haras_id || stableHarasId || undefined,
+            }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: animalVideoKeys.listByAnimal(variables.animal_id) })
         },

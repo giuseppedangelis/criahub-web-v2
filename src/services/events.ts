@@ -14,6 +14,27 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
+const EVENT_SELECT = `
+  id,
+  haras_id,
+  titulo,
+  tipo,
+  data_inicio,
+  data_fim,
+  descricao,
+  local,
+  status,
+  animal_id,
+  auto_gerado,
+  origem,
+  origem_id,
+  responsavel,
+  observacoes,
+  created_at,
+  updated_at,
+  animal:animals(id, nome, registro)
+`
+
 export const HOSPEDAGEM_REMINDER_ORIGIN = 'hospedagem_retorno'
 
 const EVENT_TYPES: AgendaEventType[] = [
@@ -103,13 +124,7 @@ export const eventsService = {
   ): Promise<PaginatedResponse<AgendaEvent>> {
     let query = supabase
       .from('events')
-      .select(
-        `
-        *,
-        animal:animals(id, nome, registro)
-      `,
-        { count: 'exact' }
-      )
+      .select(EVENT_SELECT, { count: 'exact' })
 
     if (filters.haras_id) {
       query = query.eq('haras_id', filters.haras_id)
@@ -174,7 +189,7 @@ export const eventsService = {
     const { data, error } = await supabase
       .from('events')
       .insert(payload)
-      .select()
+      .select(EVENT_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -210,7 +225,7 @@ export const eventsService = {
       .from('events')
       .update(payload)
       .eq('id', id)
-      .select()
+      .select(EVENT_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -229,12 +244,7 @@ export const eventsService = {
   async findHospedagemReturnReminder(harasId: string, animalId: string): Promise<AgendaEvent | null> {
     const { data, error } = await supabase
       .from('events')
-      .select(
-        `
-        *,
-        animal:animals(id, nome, registro)
-      `
-      )
+      .select(EVENT_SELECT)
       .eq('haras_id', harasId)
       .eq('origem', HOSPEDAGEM_REMINDER_ORIGIN)
       .eq('origem_id', animalId)

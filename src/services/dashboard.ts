@@ -1,6 +1,6 @@
 // ============================================
 // DASHBOARD SERVICE
-// Gerencia dados do dashboard do criador
+// Snapshot otimizado do dashboard do criador
 // ============================================
 
 import { supabase, handleSupabaseError } from './base';
@@ -59,362 +59,117 @@ export interface RecentActivity {
     type: 'cobertura' | 'animal' | 'receita' | 'servico';
 }
 
-export const dashboardService = {
-    /**
-     * Obtém estatísticas gerais do dashboard
-     */
-    async getStats(harasId: string): Promise<DashboardStats> {
-        // Contar animais
-        const { data: animals, error: animalsError } = await supabase
-            .from('animals')
-            .select('sexo, status, categoria')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
+export interface DashboardSnapshot {
+    stats: DashboardStats;
+    categoryDistribution: CategoryDistribution[];
+    pelagemDistribution: PelagemDistribution[];
+    growthData: GrowthData[];
+    ageDistribution: AgeDistribution[];
+    upcomingEvents: UpcomingEvent[];
+    recentActivities: RecentActivity[];
+}
 
-        if (animalsError) handleSupabaseError(animalsError);
+interface DashboardSnapshotOptions {
+    months?: number;
+    eventsLimit?: number;
+    activitiesLimit?: number;
+}
 
-        // Contar gestações ativas
-        const { count: gestationsCount, error: gestationsError } = await supabase
-            .from('gestations')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .in('status', ['Em andamento']);
-
-        if (gestationsError) console.error('Gestations error:', gestationsError);
-
-        // Contar serviços pendentes
-        const { count: servicesCount, error: servicesError } = await supabase
-            .from('service_orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .in('status', ['pendente', 'em_andamento']);
-
-        if (servicesError) console.error('Services error:', servicesError);
-
-        // Contar eventos de hoje
-        const today = new Date().toISOString().split('T')[0];
-        const { count: eventsToday, error: eventsError } = await supabase
-            .from('events')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .gte('data_inicio', `${today}T00:00:00`)
-            .lte('data_inicio', `${today}T23:59:59`)
-            .neq('status', 'Cancelado');
-
-        if (eventsError) console.error('Events error:', eventsError);
-
-        // Calcular receitas/despesas do mês
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
-        const { data: transactions, error: transError } = await supabase
-            .from('transactions')
-            .select('tipo, valor')
-            .eq('haras_id', harasId)
-            .gte('data_transacao', firstDay)
-            .lte('data_transacao', lastDay);
-
-        if (transError) console.error('Transactions error:', transError);
-
-        let monthlyRevenue = 0;
-        let monthlyExpenses = 0;
-        transactions?.forEach((t: { tipo: string; valor: number }) => {
-            if (t.tipo === 'Receita') {
-                monthlyRevenue += Number(t.valor);
-            } else {
-                monthlyExpenses += Number(t.valor);
-            }
-        });
-
-        // Contar notificações não lidas
-        const { data: { user } } = await supabase.auth.getUser();
-        let unreadNotifications = 0;
-
-        if (user) {
-            const { count } = await supabase
-                .from('notifications')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', user.id)
-                .eq('lida', false);
-
-            unreadNotifications = count || 0;
+interface DashboardRpcClient {
+    rpc: (
+        fn: 'get_dashboard_snapshot',
+        args: {
+            p_haras_id: string;
+            p_months: number;
+            p_events_limit: number;
+            p_activities_limit: number;
         }
+    ) => Promise<{ data: DashboardSnapshotResponse | null; error: unknown }>;
+}
 
-        // Contar animais que precisam de cuidados (com próximo procedimento agendado)
-        const todayStr = new Date().toISOString().split('T')[0];
-        const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const { count: animalsNeedingCare } = await supabase
-            .from('health_records')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .gte('proximadata', todayStr)
-            .lte('proximadata', nextWeek);
+interface DashboardSnapshotResponse {
+    stats?: Partial<DashboardStats> | null;
+    categoryDistribution?: CategoryDistribution[] | null;
+    pelagemDistribution?: PelagemDistribution[] | null;
+    growthData?: Array<{
+        month_start: string;
+        total: number;
+        machos: number;
+        femeas: number;
+    }> | null;
+    ageDistribution?: AgeDistribution[] | null;
+    upcomingEvents?: Array<{
+        id: string;
+        title: string;
+        starts_at: string;
+        type: string;
+        status?: string | null;
+    }> | null;
+    recentActivities?: Array<{
+        id: string;
+        title: string;
+        description: string;
+        created_at: string;
+        type: RecentActivity['type'];
+    }> | null;
+}
 
-        return {
-            totalAnimals: animals?.length || 0,
-            totalMales: animals?.filter((a: { sexo: string }) => a.sexo === 'Macho').length || 0,
-            totalFemales: animals?.filter((a: { sexo: string }) => a.sexo === 'Fêmea').length || 0,
-            activeGestations: gestationsCount || 0,
-            pendingServices: servicesCount || 0,
-            scheduledEventsToday: eventsToday || 0,
-            animalsNeedingCare: animalsNeedingCare || 0,
-            monthlyRevenue,
-            monthlyExpenses,
-            unreadNotifications
-        };
+const EMPTY_SNAPSHOT: DashboardSnapshot = {
+    stats: {
+        totalAnimals: 0,
+        totalMales: 0,
+        totalFemales: 0,
+        activeGestations: 0,
+        pendingServices: 0,
+        scheduledEventsToday: 0,
+        animalsNeedingCare: 0,
+        monthlyRevenue: 0,
+        monthlyExpenses: 0,
+        unreadNotifications: 0,
     },
-
-    /**
-     * Obtém distribuição por categoria
-     */
-    async getCategoryDistribution(harasId: string): Promise<CategoryDistribution[]> {
-        const { data, error } = await supabase
-            .from('animals')
-            .select('categoria')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
-
-        if (error) handleSupabaseError(error);
-
-        const counts: Record<string, number> = {};
-        data?.forEach((item: { categoria: string }) => {
-            const cat = item.categoria || 'Outros';
-            counts[cat] = (counts[cat] || 0) + 1;
-        });
-
-        const colors: Record<string, string> = {
-            'Potro': '#10b981',
-            'Potranca': '#f59e0b',
-            'Potra': '#f59e0b',
-            'Garanhão': '#3b82f6',
-            'Égua': '#8b5cf6',
-            'Castrado': '#6b7280',
-            'Outros': '#4b5563'
-        };
-
-        const labels: Record<string, string> = {
-            'Potro': 'Potro',
-            'Potranca': 'Potra',
-            'Potra': 'Potra',
-            'Garanhão': 'Garanhão',
-            'Égua': 'Égua',
-            'Castrado': 'Castrado',
-            'Outros': 'Outros'
-        };
-
-        return Object.entries(counts).map(([key, value]) => ({
-            name: labels[key] || key,
-            value,
-            color: colors[key] || '#4b5563'
-        }));
-    },
-
-    /**
-     * Obtém distribuição por pelagem
-     */
-    async getPelagemDistribution(harasId: string): Promise<PelagemDistribution[]> {
-        const { data, error } = await supabase
-            .from('animals')
-            .select('pelagem')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
-
-        if (error) handleSupabaseError(error);
-
-        const counts: Record<string, number> = {};
-        data?.forEach((item: { pelagem: string | null }) => {
-            const pelagem = item.pelagem || 'Outros';
-            counts[pelagem] = (counts[pelagem] || 0) + 1;
-        });
-
-        const colors: Record<string, string> = {
-            'Castanha': '#92400e',
-            'Tordilha': '#9ca3af',
-            'Alazã': '#dc2626',
-            'Preta': '#1f2937',
-            'Pampa': '#f97316',
-            'Baio': '#d97706',
-            'Rosilha': '#a78bfa',
-            'Outros': '#4b5563'
-        };
-
-        return Object.entries(counts).map(([key, value]) => ({
-            name: key,
-            value,
-            color: colors[key] || '#4b5563'
-        }));
-    },
-
-    /**
-     * Obtém dados de crescimento do plantel
-     */
-    async getGrowthData(harasId: string, months: number = 6): Promise<GrowthData[]> {
-        const result: GrowthData[] = [];
-        const now = new Date();
-
-        for (let i = months - 1; i >= 0; i--) {
-            const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-            const monthStr = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-
-            const { data, error } = await supabase
-                .from('animals')
-                .select('sexo')
-                .eq('haras_id', harasId)
-                .lte('created_at', endOfMonth.toISOString())
-                .eq('status', 'Ativo');
-
-            if (error) console.error('Growth data error:', error);
-
-            const total = data?.length || 0;
-            const machos = data?.filter((a: { sexo: string }) => a.sexo === 'Macho').length || 0;
-            const femeas = data?.filter((a: { sexo: string }) => a.sexo === 'Fêmea').length || 0;
-
-            result.push({
-                month: monthStr.charAt(0).toUpperCase() + monthStr.slice(1),
-                total,
-                machos,
-                femeas
-            });
-        }
-
-        return result;
-    },
-
-    /**
-     * Obtém próximos eventos/serviços
-     */
-    async getUpcomingEvents(harasId: string, limit: number = 5): Promise<UpcomingEvent[]> {
-        const today = new Date().toISOString();
-
-        const { data, error } = await supabase
-            .from('events')
-            .select('id, titulo, data_inicio, tipo, status')
-            .eq('haras_id', harasId)
-            .gte('data_inicio', today)
-            .neq('status', 'Cancelado')
-            .order('data_inicio', { ascending: true })
-            .limit(limit);
-
-        if (error) {
-            console.error('Upcoming events error:', error);
-            return [];
-        }
-
-        return (data || []).map(event => {
-            const date = new Date(event.data_inicio);
-            const isToday = date.toDateString() === new Date().toDateString();
-            const isTomorrow = date.toDateString() === new Date(Date.now() + 86400000).toDateString();
-
-            let dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            if (isToday) dateStr = 'Hoje';
-            if (isTomorrow) dateStr = 'Amanhã';
-
-            return {
-                id: event.id,
-                title: event.titulo,
-                date: dateStr,
-                time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                type: event.tipo || 'servico',
-                priority: 'medium' as const
-            };
-        });
-    },
-
-    /**
-     * Obtém atividades recentes
-     */
-    async getRecentActivities(harasId: string, limit: number = 5): Promise<RecentActivity[]> {
-        // Por enquanto, buscar de múltiplas tabelas e combinar
-        const activities: RecentActivity[] = [];
-
-        // Buscar últimos animais cadastrados
-        const { data: recentAnimals } = await supabase
-            .from('animals')
-            .select('id, nome, created_at')
-            .eq('haras_id', harasId)
-            .order('created_at', { ascending: false })
-            .limit(3);
-
-        recentAnimals?.forEach((animal: { id: string; nome: string; created_at: string | null }) => {
-            activities.push({
-                id: animal.id,
-                title: 'Animal cadastrado',
-                description: animal.nome || 'Sem nome',
-                time: formatTimeAgo(animal.created_at || new Date().toISOString()),
-                type: 'animal'
-            });
-        });
-
-        // Buscar últimas transações
-        const { data: recentTransactions } = await supabase
-            .from('transactions')
-            .select('id, descricao, tipo, valor, created_at')
-            .eq('haras_id', harasId)
-            .order('created_at', { ascending: false })
-            .limit(3);
-
-        recentTransactions?.forEach(trans => {
-            activities.push({
-                id: trans.id,
-                title: trans.tipo === 'Receita' ? 'Receita registrada' : 'Despesa registrada',
-                description: `${trans.descricao} - R$ ${Number(trans.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                time: formatTimeAgo(trans.created_at || new Date().toISOString()),
-                type: 'receita'
-            });
-        });
-
-        // Ordenar por tempo e limitar
-        return activities
-            .sort((a, b) => getTimeAgoSeconds(b.time) - getTimeAgoSeconds(a.time))
-            .slice(0, limit);
-    },
-
-    /**
-     * Obtém distribuição por idade
-     */
-    async getAgeDistribution(harasId: string): Promise<AgeDistribution[]> {
-        const { data, error } = await supabase
-            .from('animals')
-            .select('data_nascimento')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
-
-        if (error) handleSupabaseError(error);
-
-        const ageRanges = [
-            { age: '0-2 anos', min: 0, max: 2, count: 0 },
-            { age: '3-5 anos', min: 3, max: 5, count: 0 },
-            { age: '6-10 anos', min: 6, max: 10, count: 0 },
-            { age: '11-15 anos', min: 11, max: 15, count: 0 },
-            { age: '16+ anos', min: 16, max: 100, count: 0 },
-        ];
-
-        const now = new Date();
-        data?.forEach((item: { data_nascimento: string | null }) => {
-            if (!item.data_nascimento) return;
-            const birthDate = new Date(item.data_nascimento);
-            const age = Math.floor((now.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-
-            for (const range of ageRanges) {
-                if (age >= range.min && age <= range.max) {
-                    range.count++;
-                    break;
-                }
-            }
-        });
-
-        return ageRanges.map(r => ({ age: r.age, count: r.count }));
-    }
+    categoryDistribution: [],
+    pelagemDistribution: [],
+    growthData: [],
+    ageDistribution: [],
+    upcomingEvents: [],
+    recentActivities: [],
 };
 
-// Helpers
+function formatMonthLabel(monthStart: string): string {
+    const date = new Date(`${monthStart}T00:00:00Z`);
+    const label = new Intl.DateTimeFormat('pt-BR', {
+        month: 'short',
+        year: '2-digit',
+        timeZone: 'UTC',
+    }).format(date).replace('.', '');
+
+    return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function formatUpcomingEvent(startsAt: string, event: { id: string; title: string; type: string }): UpcomingEvent {
+    const date = new Date(startsAt);
+    const isToday = date.toDateString() === new Date().toDateString();
+    const isTomorrow = date.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+    let dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (isToday) dateStr = 'Hoje';
+    if (isTomorrow) dateStr = 'Amanhã';
+
+    return {
+        id: event.id,
+        title: event.title,
+        date: dateStr,
+        time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        type: event.type || 'servico',
+        priority: 'medium',
+    };
+}
+
 function formatTimeAgo(dateStr: string): string {
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
@@ -424,13 +179,82 @@ function formatTimeAgo(dateStr: string): string {
     return `${diffDays} dias atrás`;
 }
 
-function getTimeAgoSeconds(timeAgo: string): number {
-    const match = timeAgo.match(/(\d+)\s+(minutos?|horas?|dias?)/);
-    if (!match) return 0;
-    const value = parseInt(match[1]);
-    const unit = match[2];
-    if (unit.startsWith('minuto')) return value * 60;
-    if (unit.startsWith('hora')) return value * 3600;
-    if (unit.startsWith('dia')) return value * 86400;
-    return 0;
+function normalizeSnapshot(data: DashboardSnapshotResponse | null | undefined): DashboardSnapshot {
+    if (!data) return EMPTY_SNAPSHOT;
+
+    return {
+        stats: {
+            ...EMPTY_SNAPSHOT.stats,
+            ...(data.stats || {}),
+        },
+        categoryDistribution: data.categoryDistribution || [],
+        pelagemDistribution: data.pelagemDistribution || [],
+        growthData: (data.growthData || []).map((item) => ({
+            month: formatMonthLabel(item.month_start),
+            total: Number(item.total) || 0,
+            machos: Number(item.machos) || 0,
+            femeas: Number(item.femeas) || 0,
+        })),
+        ageDistribution: data.ageDistribution || [],
+        upcomingEvents: (data.upcomingEvents || []).map((event) =>
+            formatUpcomingEvent(event.starts_at, {
+                id: event.id,
+                title: event.title,
+                type: event.type,
+            })
+        ),
+        recentActivities: (data.recentActivities || []).map((activity) => ({
+            id: activity.id,
+            title: activity.title,
+            description: activity.description,
+            time: formatTimeAgo(activity.created_at),
+            type: activity.type,
+        })),
+    };
 }
+
+export const dashboardService = {
+    async getSnapshot(
+        harasId: string,
+        options: DashboardSnapshotOptions = {}
+    ): Promise<DashboardSnapshot> {
+        const { data, error } = await (supabase as DashboardRpcClient).rpc('get_dashboard_snapshot', {
+            p_haras_id: harasId,
+            p_months: Math.max(1, options.months ?? 6),
+            p_events_limit: Math.max(1, options.eventsLimit ?? 5),
+            p_activities_limit: Math.max(1, options.activitiesLimit ?? 5),
+        });
+
+        if (error) handleSupabaseError(error);
+
+        return normalizeSnapshot(data as DashboardSnapshotResponse | null | undefined);
+    },
+
+    async getStats(harasId: string): Promise<DashboardStats> {
+        return (await this.getSnapshot(harasId)).stats;
+    },
+
+    async getCategoryDistribution(harasId: string): Promise<CategoryDistribution[]> {
+        return (await this.getSnapshot(harasId)).categoryDistribution;
+    },
+
+    async getPelagemDistribution(harasId: string): Promise<PelagemDistribution[]> {
+        return (await this.getSnapshot(harasId)).pelagemDistribution;
+    },
+
+    async getGrowthData(harasId: string, months: number = 6): Promise<GrowthData[]> {
+        return (await this.getSnapshot(harasId, { months })).growthData;
+    },
+
+    async getUpcomingEvents(harasId: string, limit: number = 5): Promise<UpcomingEvent[]> {
+        return (await this.getSnapshot(harasId, { eventsLimit: limit })).upcomingEvents;
+    },
+
+    async getRecentActivities(harasId: string, limit: number = 5): Promise<RecentActivity[]> {
+        return (await this.getSnapshot(harasId, { activitiesLimit: limit })).recentActivities;
+    },
+
+    async getAgeDistribution(harasId: string): Promise<AgeDistribution[]> {
+        return (await this.getSnapshot(harasId)).ageDistribution;
+    },
+};

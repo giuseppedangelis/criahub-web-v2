@@ -60,22 +60,18 @@ export function handleSupabaseError(error: any): never {
         throw error;
     }
 
-    console.error('Supabase Error:', error);
-    throw new Error(error.message || 'Erro ao acessar o banco de dados');
+    const errorMessage =
+        typeof error?.message === 'string' && error.message.length > 0
+            ? error.message
+            : 'Erro ao acessar o banco de dados';
+
+    console.error('Supabase Error:', {
+        code: error?.code ?? null,
+        message: errorMessage,
+        details: error?.details ?? null,
+        hint: error?.hint ?? null,
+    });
+
+    throw new Error(errorMessage);
 }
 
-/**
- * Obtém o haras_id do usuário atual
- */
-export async function getCurrentHarasId(): Promise<string | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('haras_id')
-        .eq('id', user.id)
-        .single();
-
-    return profile?.haras_id || null;
-}

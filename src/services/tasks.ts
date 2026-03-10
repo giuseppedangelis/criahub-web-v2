@@ -15,6 +15,26 @@ import type {
   TaskPhoto,
 } from '@/types'
 
+const TASK_SELECT = `
+  id,
+  task_number,
+  haras_id,
+  title,
+  due_date,
+  status,
+  priority,
+  observations,
+  animal_id,
+  responsible_id,
+  documents,
+  photos,
+  created_by,
+  created_at,
+  updated_at,
+  animal:animals!tasks_animal_id_fkey(id, nome),
+  responsible:profiles!tasks_responsible_id_fkey(id, full_name, email)
+`
+
 const STATUS_LABELS: Record<string, string> = {
   pendente: 'Pendente',
   em_andamento: 'Em andamento',
@@ -77,14 +97,7 @@ export const tasksService = {
   ): Promise<PaginatedResponse<Task>> {
     let query = supabase
       .from('tasks')
-      .select(
-        `
-        *,
-        animal:animals!tasks_animal_id_fkey(id, nome),
-        responsible:profiles!tasks_responsible_id_fkey(id, full_name, email)
-      `,
-        { count: 'exact' }
-      )
+      .select(TASK_SELECT, { count: 'exact' })
 
     if (filters.haras_id) {
       query = query.eq('haras_id', filters.haras_id)
@@ -137,13 +150,7 @@ export const tasksService = {
         photos: input.photos ?? [],
         created_by: input.created_by ?? null,
       })
-      .select(
-        `
-        *,
-        animal:animals!tasks_animal_id_fkey(id, nome),
-        responsible:profiles!tasks_responsible_id_fkey(id, full_name, email)
-      `
-      )
+      .select(TASK_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -170,13 +177,7 @@ export const tasksService = {
       .from('tasks')
       .update(payload)
       .eq('id', id)
-      .select(
-        `
-        *,
-        animal:animals!tasks_animal_id_fkey(id, nome),
-        responsible:profiles!tasks_responsible_id_fkey(id, full_name, email)
-      `
-      )
+      .select(TASK_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)

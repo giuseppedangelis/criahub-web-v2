@@ -4,22 +4,41 @@
 // ============================================
 
 import { supabase, handleSupabaseError } from './base';
+import { dashboardService } from './dashboard';
 import type { Haras, HarasMember, Profile, DashboardStats } from '@/types';
+
+const HARAS_SELECT = `
+    id,
+    nome,
+    proprietario,
+    cidade,
+    estado,
+    telefone,
+    email,
+    logo_url,
+    subscription_plan,
+    subscription_status,
+    subscription_due_date,
+    subscription_value,
+    subscription_start_date,
+    created_at,
+    updated_at
+`;
 
 function mapHaras(row: any): Haras {
     return {
         id: row.id,
         name: row.nome ?? row.name ?? '',
-        owner_id: row.owner_id,
+        owner_id: row.owner_id ?? null,
         cnpj: row.cnpj ?? null,
         address: row.address ?? row.endereco ?? null,
         city: row.city ?? row.cidade ?? null,
         state: row.state ?? row.estado ?? null,
         phone: row.phone ?? row.telefone ?? null,
         email: row.email ?? null,
-        logo_url: row.logo_url ?? row.logo ?? null,
-        subscription_plan: row.subscription_plan ?? row.plano ?? '',
-        subscription_status: row.subscription_status ?? row.status_assinatura ?? '',
+        logo_url: row.logo_url ?? null,
+        subscription_plan: row.subscription_plan ?? '',
+        subscription_status: row.subscription_status ?? '',
         subscription_due_date: row.subscription_due_date ?? null,
         subscription_value: row.subscription_value ?? null,
         subscription_start_date: row.subscription_start_date ?? null,
@@ -35,7 +54,7 @@ export const harasService = {
     async getById(id: string): Promise<Haras | null> {
         const { data, error } = await supabase
             .from('haras')
-            .select('*')
+            .select(HARAS_SELECT)
             .eq('id', id)
             .single();
 
@@ -45,24 +64,6 @@ export const harasService = {
         }
 
         return data ? mapHaras(data) : null;
-    },
-
-    /**
-     * Busca haras do usuário atual
-     */
-    async getCurrentUserHaras(): Promise<Haras | null> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
-
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('haras_id')
-            .eq('id', user.id)
-            .single();
-
-        if (!profile?.haras_id) return null;
-
-        return this.getById(profile.haras_id);
     },
 
     /**
@@ -89,7 +90,7 @@ export const harasService = {
             .from('haras')
             .update(payload)
             .eq('id', id)
-            .select()
+            .select(HARAS_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -155,82 +156,21 @@ export const harasService = {
      * Obtém estatísticas do dashboard
      */
     async getDashboardStats(harasId: string): Promise<DashboardStats> {
-        // Contar animais
-        const { data: animals, error: animalsError } = await supabase
-            .from('animals')
-            .select('sexo')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
-
-        if (animalsError) handleSupabaseError(animalsError);
-
-        // Contar gestações ativas
-        const { count: gestationsCount, error: gestationsError } = await supabase
-            .from('gestations')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .in('status', ['confirmada', 'em_andamento']);
-
-        if (gestationsError) handleSupabaseError(gestationsError);
-
-        // Contar serviços pendentes
-        const { count: servicesCount, error: servicesError } = await supabase
-            .from('service_orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('haras_id', harasId)
-            .in('status', ['pendente', 'em_andamento']);
-
-        if (servicesError) handleSupabaseError(servicesError);
-
-        // Calcular receitas/despesas do mês
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-
-        const { data: transactions, error: transError } = await supabase
-            .from('transactions')
-            .select('tipo, valor')
-            .eq('haras_id', harasId)
-            .gte('data_transacao', firstDay)
-            .lte('data_transacao', lastDay);
-
-        if (transError) handleSupabaseError(transError);
-
-        let monthlyRevenue = 0;
-        let monthlyExpenses = 0;
-        transactions?.forEach(t => {
-            const type = (t as any).tipo;
-            const amount = Number((t as any).valor);
-            if (type === 'Receita') {
-                monthlyRevenue += amount;
-            } else {
-                monthlyExpenses += amount;
-            }
+        const snapshot = await dashboardService.getSnapshot(harasId, {
+            months: 1,
+            eventsLimit: 1,
+            activitiesLimit: 1,
         });
 
-        // Contar notificações não lidas
-        const { data: { user } } = await supabase.auth.getUser();
-        let unreadNotifications = 0;
-
-        if (user) {
-            const { count } = await supabase
-                .from('notifications')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', user.id)
-                .eq('lida', false);
-
-            unreadNotifications = count || 0;
-        }
-
         return {
-            totalAnimals: animals?.length || 0,
-            totalMales: animals?.filter(a => a.sexo === 'Macho').length || 0,
-            totalFemales: animals?.filter(a => a.sexo === 'Fêmea').length || 0,
-            activeGestations: gestationsCount || 0,
-            pendingServices: servicesCount || 0,
-            monthlyRevenue,
-            monthlyExpenses,
-            recentNotifications: unreadNotifications
+            totalAnimals: snapshot.stats.totalAnimals,
+            totalMales: snapshot.stats.totalMales,
+            totalFemales: snapshot.stats.totalFemales,
+            activeGestations: snapshot.stats.activeGestations,
+            pendingServices: snapshot.stats.pendingServices,
+            monthlyRevenue: snapshot.stats.monthlyRevenue,
+            monthlyExpenses: snapshot.stats.monthlyExpenses,
+            recentNotifications: snapshot.stats.unreadNotifications,
         };
     }
 };

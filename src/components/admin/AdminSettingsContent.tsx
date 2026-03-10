@@ -202,7 +202,7 @@ export function AdminSettingsContent() {
     try {
       const { data, error } = await (supabase as any)
         .from('subscription_plans')
-        .select('*')
+        .select('id, name, price, max_users, max_horses, storage, active')
         .order('price', { ascending: true });
 
       if (error) throw error;
@@ -235,7 +235,7 @@ export function AdminSettingsContent() {
     try {
       const { data, error } = await (supabase as any)
         .from('integrations')
-        .select('*');
+        .select('id, name, connected, api_key, public_key, status, last_sync');
 
       if (error) throw error;
 

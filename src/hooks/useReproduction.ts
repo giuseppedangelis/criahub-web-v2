@@ -5,7 +5,7 @@
 // Hooks para gerenciar reprodução com TanStack Query
 // ============================================
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { reproductionService } from '@/services/reproduction'
 import type {
     GestationFilters,
@@ -67,6 +67,9 @@ export function useReproductiveEvents(
         queryKey: reproductionKeys.eventsByHaras(harasId, pagination),
         queryFn: () => reproductionService.listEvents(harasId, pagination),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -115,6 +118,9 @@ export function useGestations(
         queryKey: reproductionKeys.gestationsList(filters, pagination),
         queryFn: () => reproductionService.listGestations(filters, pagination),
         enabled: enabled && !!filters.haras_id,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -126,6 +132,8 @@ export function useGestation(id: string) {
         queryKey: reproductionKeys.gestationDetail(id),
         queryFn: () => reproductionService.getGestationById(id),
         enabled: !!id,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -137,6 +145,8 @@ export function useActiveGestations(harasId: string, daysAhead: number = 30) {
         queryKey: reproductionKeys.activeGestations(harasId),
         queryFn: () => reproductionService.getActiveGestations(harasId, daysAhead),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -182,6 +192,8 @@ export function useReproductionStats(harasId: string, year?: number) {
         queryKey: reproductionKeys.stats(harasId, year),
         queryFn: () => reproductionService.getStats(harasId, year),
         enabled: !!harasId,
+        staleTime: 300_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -198,6 +210,9 @@ export function useCoverings(
         queryKey: reproductionKeys.coveringsByHaras(harasId, pagination),
         queryFn: () => reproductionService.listCoverings(harasId, pagination),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -231,6 +246,9 @@ export function useOvules(
         queryKey: reproductionKeys.ovulesByHaras(harasId, pagination),
         queryFn: () => reproductionService.listOvules(harasId, pagination),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -264,6 +282,9 @@ export function useEmbryos(
         queryKey: reproductionKeys.embryosByHaras(harasId, pagination),
         queryFn: () => reproductionService.listEmbryos(harasId, pagination),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     })
 }
 
@@ -293,6 +314,8 @@ export function useReproductionDocuments(harasId: string, enabled: boolean = tru
         queryKey: reproductionKeys.documents(harasId),
         queryFn: () => reproductionService.listDocuments(harasId),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -317,6 +340,8 @@ export function useReproductionProtocols(harasId: string, enabled: boolean = tru
         queryKey: reproductionKeys.protocols(harasId),
         queryFn: () => reproductionService.listProtocols(harasId),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -394,5 +419,7 @@ export function useReproductionProtocolApplications(harasId: string, enabled: bo
         queryKey: reproductionKeys.protocolApplications(harasId),
         queryFn: () => reproductionService.listProtocolApplications(harasId),
         enabled: enabled && !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }

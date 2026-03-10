@@ -15,6 +15,24 @@ import type {
     TransactionType
 } from '@/types';
 
+const TRANSACTION_SELECT = `
+  id,
+  haras_id,
+  tipo,
+  categoria,
+  valor,
+  descricao,
+  data_transacao,
+  animal_id,
+  reference_id,
+  created_by,
+  created_at,
+  updated_at,
+  observacoes,
+  forma_pagamento,
+  animal:animals(id, nome)
+`
+
 const CATEGORY_VALUES: TransactionCategory[] = [
     'venda_animal',
     'servico_reproducao',
@@ -109,10 +127,7 @@ export const financialService = {
     ): Promise<PaginatedResponse<Transaction>> {
         let query = supabase
             .from('transactions')
-            .select(`
-        *,
-        animal:animals(id, nome)
-      `, { count: 'exact' });
+            .select(TRANSACTION_SELECT, { count: 'exact' });
 
         if (filters.haras_id) {
             query = query.eq('haras_id', filters.haras_id);
@@ -151,10 +166,7 @@ export const financialService = {
     async getById(id: string): Promise<Transaction | null> {
         const { data, error } = await supabase
             .from('transactions')
-            .select(`
-        *,
-        animal:animals(id, nome)
-      `)
+            .select(TRANSACTION_SELECT)
             .eq('id', id)
             .single();
 
@@ -183,7 +195,7 @@ export const financialService = {
                 observacoes: input.observations ?? null,
                 forma_pagamento: input.payment_method ?? null,
             })
-            .select()
+            .select(TRANSACTION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -212,7 +224,7 @@ export const financialService = {
             .from('transactions')
             .update(updateData)
             .eq('id', id)
-            .select()
+            .select(TRANSACTION_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
@@ -337,10 +349,7 @@ export const financialService = {
     async getRecent(harasId: string, limit: number = 5): Promise<Transaction[]> {
         const { data, error } = await supabase
             .from('transactions')
-            .select(`
-        *,
-        animal:animals(id, nome)
-      `)
+            .select(TRANSACTION_SELECT)
             .eq('haras_id', harasId)
             .order('data_transacao', { ascending: false })
             .limit(limit);

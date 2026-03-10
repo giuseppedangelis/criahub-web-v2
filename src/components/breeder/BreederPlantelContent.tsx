@@ -1,21 +1,21 @@
 
-import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2, User } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { Search, Filter, Grid, List, Plus, Upload, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2, User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
 import { BreederCadastrarAnimal } from './BreederCadastrarAnimal';
 import { BreederAnimalDetails } from './BreederAnimalDetails';
 import { BreederEditarAnimal } from './BreederEditarAnimal';
-import { QuickGenealogyModal } from './QuickGenealogyModal';
 import { AnimalCard } from './AnimalCard';
 import { AdvancedFiltersModal } from './AdvancedFiltersModal';
-import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
+import { useAnimals, useAnimalSummary, useDeleteAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
 import { animalsService } from '@/services/animals';
 import { getAnimalStatusLabel, getDisplayCategoryLabel, getPlantelStatusActivity, isManualCastradoCategory, resolveManagedCategory } from '@/lib/animal-classification';
 import { toast } from 'sonner';
-import type { AnimalEnvironment } from '@/types';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import type { AnimalCategory, AnimalEnvironment } from '@/types';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {
@@ -56,17 +56,48 @@ function calculateAge(birthDate?: string): string {
   return `${age} anos`;
 }
 
-function normalizeText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
 function resolveDisplayCategory(birthDate: string | undefined, sex: 'Macho' | 'Fêmea' | undefined, fallback: string): string {
   if (isManualCastradoCategory(fallback)) return getDisplayCategoryLabel('castrado');
   return getDisplayCategoryLabel(resolveManagedCategory(sex, birthDate, fallback) || fallback);
 }
+
+function mapCategoryFilter(filterCategoria: string): AnimalCategory | undefined {
+  if (filterCategoria === 'potro') return 'potro';
+  if (filterCategoria === 'potra') return 'potra';
+  if (filterCategoria === 'reprodutor') return 'garanhao';
+  if (filterCategoria === 'reprodutora') return 'egua';
+  return undefined;
+}
+
+function formatDateToIso(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getBirthDateRangeFromAgeFilter(filterIdade: string): { birth_date_from?: string; birth_date_to?: string } {
+  const match = filterIdade.match(/^(\d+)_ano(?:s)?$/);
+  if (!match) return {};
+
+  const age = Number(match[1]);
+  if (!Number.isFinite(age)) return {};
+
+  const today = new Date();
+  const youngerBoundary = new Date(today);
+  youngerBoundary.setFullYear(today.getFullYear() - age);
+
+  const olderBoundary = new Date(today);
+  olderBoundary.setFullYear(today.getFullYear() - age - 1);
+  olderBoundary.setDate(olderBoundary.getDate() + 1);
+
+  return {
+    birth_date_from: formatDateToIso(olderBoundary),
+    birth_date_to: formatDateToIso(youngerBoundary),
+  };
+}
+
+const PAGE_SIZE = 50;
 
 // Interface local para a UI (compatível com AnimalCard)
 interface PlantelAnimal {
@@ -123,6 +154,7 @@ interface PlantelAnimal {
 export function BreederPlantelContent() {
   const [activeEnvironment, setActiveEnvironment] = useState<AnimalEnvironment>('oficial');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showAnimalDetails, setShowAnimalDetails] = useState(false);
   const [showEditarAnimal, setShowEditarAnimal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -144,11 +176,28 @@ export function BreederPlantelContent() {
 
   const { stableHarasId, isLoading: isUserLoading, isSessionReady } = useUser();
   const harasId = isSessionReady ? stableHarasId || undefined : undefined;
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 350);
+  const birthDateRange = useMemo(() => getBirthDateRangeFromAgeFilter(filterIdade), [filterIdade]);
+
+  const animalFilters = useMemo(() => ({
+    haras_id: harasId,
+    environment: activeEnvironment,
+    search: debouncedSearchTerm.trim() || undefined,
+    sex: filterSexo === 'machos' ? 'Macho' : filterSexo === 'femeas' ? 'Fêmea' : undefined,
+    activity_status: filterStatus === 'ativos' ? 'ativo' : filterStatus === 'inativos' ? 'inativo' : undefined,
+    category: mapCategoryFilter(filterCategoria),
+    ...birthDateRange,
+  }), [activeEnvironment, birthDateRange, debouncedSearchTerm, filterCategoria, filterSexo, filterStatus, harasId]);
 
   // Hook de Animais
-  const { data: animalsData, isLoading, refetch } = useAnimals(
+  const { data: animalsData, isLoading, isFetching, refetch } = useAnimals(
+    animalFilters,
+    { page: currentPage, limit: PAGE_SIZE },
+    !!harasId && isSessionReady && !isUserLoading
+  );
+
+  const { data: animalSummary } = useAnimalSummary(
     { haras_id: harasId, environment: activeEnvironment },
-    { page: 1, limit: 1000 }, // Buscando 1000 para permitir filtro client-side de idade/filhos
     !!harasId && isSessionReady && !isUserLoading
   );
 
@@ -165,6 +214,17 @@ export function BreederPlantelContent() {
   const isHarasLoading = !harasId && (isUserLoading || !isSessionReady);
 
   const { mutateAsync: deleteAnimal } = useDeleteAnimal();
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeEnvironment, debouncedSearchTerm, filterCategoria, filterIdade, filterSexo, filterStatus, harasId]);
+
+  useEffect(() => {
+    const totalPages = animalsData?.totalPages || 1;
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [animalsData?.totalPages, currentPage]);
 
   // Mapeamento dos dados da API para o formato da UI
   const animalsList: PlantelAnimal[] = useMemo(() => {
@@ -230,41 +290,6 @@ export function BreederPlantelContent() {
   // Lógica de filtros
   const filteredAnimals = useMemo(() => {
     return animalsList.filter((animal) => {
-      // Busca
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = searchTerm === '' ||
-        animal.name.toLowerCase().includes(searchLower) ||
-        animal.registry.toLowerCase().includes(searchLower) ||
-        (animal.chip && animal.chip.toLowerCase().includes(searchLower)) ||
-        animal.haras.toLowerCase().includes(searchLower);
-
-      // Sexo
-      const matchesSexo = filterSexo === 'todos' ||
-        (filterSexo === 'machos' && animal.sex === 'Macho') ||
-        (filterSexo === 'femeas' && animal.sex === 'Fêmea');
-
-      // Status
-      const matchesStatus = filterStatus === 'todos' ||
-        (filterStatus === 'ativos' && animal.statusAtividade === 'Ativo') ||
-        (filterStatus === 'inativos' && animal.statusAtividade === 'Inativo');
-
-      // Categoria
-      const matchesCategoria = filterCategoria === 'todos' ||
-        normalizeText(animal.category).includes(normalizeText(filterCategoria));
-
-      // Idade
-      let matchesIdade = true;
-      if (filterIdade !== 'todos' && animal.birthDate) {
-        const birthYear = parseInt(animal.birthDate.split('-')[0]);
-        const currentYear = new Date().getFullYear();
-        const age = currentYear - birthYear;
-
-        if (filterIdade === 'menos_1') matchesIdade = age < 1;
-        else if (filterIdade === '1_3') matchesIdade = age >= 1 && age <= 3;
-        else if (filterIdade === '3_5') matchesIdade = age >= 3 && age <= 5;
-        else if (filterIdade === 'mais_5') matchesIdade = age > 5;
-      }
-
       // Filhos & Premiações (TODO: conectar dados reais)
       let matchesFilhos = true;
       if (filterFilhos === 'com_filhos') matchesFilhos = (animal.filhos || 0) > 0;
@@ -274,15 +299,16 @@ export function BreederPlantelContent() {
       if (filterPremiacoes === 'com_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) > 0;
       else if (filterPremiacoes === 'sem_premiacoes') matchesPremiacoes = (animal.premiacoes || 0) === 0;
 
-      return matchesSearch && matchesSexo && matchesStatus && matchesCategoria &&
-        matchesIdade && matchesFilhos && matchesPremiacoes;
-    }).sort((a, b) => {
-      const aHasMedia = (a.images?.length || 0) > 0;
-      const bHasMedia = (b.images?.length || 0) > 0;
-      if (aHasMedia !== bHasMedia) return aHasMedia ? -1 : 1;
-      return a.name.localeCompare(b.name, 'pt-BR');
+      return matchesFilhos && matchesPremiacoes;
     });
-  }, [animalsList, searchTerm, filterSexo, filterStatus, filterCategoria, filterIdade, filterFilhos, filterPremiacoes]);
+  }, [animalsList, filterFilhos, filterPremiacoes]);
+
+  const paginationLabel = useMemo(() => {
+    if (!animalsData?.total) return '0 resultados';
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, animalsData.total);
+    return `${start}-${end} de ${animalsData.total} resultados`;
+  }, [animalsData?.total, currentPage]);
 
   const handleDeleteAnimal = (animal: PlantelAnimal) => {
     setAnimalToDelete(animal);
@@ -434,10 +460,10 @@ export function BreederPlantelContent() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <SummaryCard title="Total" value={isHarasLoading ? '...' : String(animalsList.length)} />
-            <SummaryCard title="Machos" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.sex === 'Macho').length)} />
-            <SummaryCard title="Fêmeas" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.sex === 'Fêmea').length)} />
-            <SummaryCard title="Ativos" value={isHarasLoading ? '...' : String(animalsList.filter(a => a.statusAtividade === 'Ativo').length)} />
+            <SummaryCard title="Total" value={isHarasLoading ? '...' : String(animalSummary?.total ?? 0)} />
+            <SummaryCard title="Machos" value={isHarasLoading ? '...' : String(animalSummary?.males ?? 0)} />
+            <SummaryCard title="Fêmeas" value={isHarasLoading ? '...' : String(animalSummary?.females ?? 0)} />
+            <SummaryCard title="Ativos" value={isHarasLoading ? '...' : String(animalSummary?.active ?? 0)} />
           </div>
 
           <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-4 border border-border dark:border-[rgba(255,255,255,0.1)]">
@@ -551,6 +577,12 @@ export function BreederPlantelContent() {
               </div>
             </div>
 
+            {isFetching && !isLoading && (
+              <div className="mb-4 text-sm text-muted-foreground">
+                Atualizando listagem...
+              </div>
+            )}
+
             {/* Animals Grid/List */}
             {activeEnvironment === 'vinculacao' ? (
               <div className="space-y-3">
@@ -653,6 +685,35 @@ export function BreederPlantelContent() {
             {filteredAnimals.length === 0 && (
               <div className="flex flex-col items-center justify-center p-10 text-muted-foreground">
                 <p>{isHarasLoading ? 'Carregando dados do haras...' : 'Nenhum animal encontrado.'}</p>
+              </div>
+            )}
+
+            {activeEnvironment !== 'vinculacao' && (animalsData?.totalPages || 0) > 1 && (
+              <div className="mt-6 flex flex-col gap-3 border-t border-border dark:border-[#3a3a3a] pt-4 md:flex-row md:items-center md:justify-between">
+                <p className="text-sm text-muted-foreground">{paginationLabel}</p>
+                <div className="flex items-center gap-2 self-end">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#3a3a3a] dark:text-white dark:hover:bg-[#2a2a2a]"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </button>
+                  <span className="min-w-24 text-center text-sm text-muted-foreground">
+                    Página {currentPage} de {animalsData?.totalPages || 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(animalsData?.totalPages || page, page + 1))}
+                    disabled={currentPage >= (animalsData?.totalPages || 1)}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#3a3a3a] dark:text-white dark:hover:bg-[#2a2a2a]"
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>

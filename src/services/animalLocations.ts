@@ -3,7 +3,7 @@
 // Gerencia localizacao e historico de mudancas
 // ============================================
 
-import { supabase, handleSupabaseError, getCurrentHarasId } from './base';
+import { supabase, handleSupabaseError } from './base';
 import { eventsService } from './events';
 import {
     buildAnimalLocationLabel,
@@ -34,6 +34,34 @@ const SERVICE_TYPE_DB_MAP: Record<AnimalServiceType, string> = {
     Nascimento: 'Nascimento',
     Outro: 'Outro'
 };
+
+const LOCATION_HISTORY_SELECT = 'id, animal_id, haras_id, location_type, location_name, service_type, previous_location, new_location, reason, notes, changed_at, changed_by, created_at, changed_by_profile:profiles(full_name)';
+
+interface AnimalContextRow {
+    haras_id?: string | null;
+    nome?: string | null;
+    localizacao?: string | null;
+    tipo_servico?: string | null;
+    status?: string | null;
+}
+
+interface LocationHistoryRow {
+    id: string;
+    animal_id: string;
+    haras_id: string;
+    location_type: string;
+    location_name: string;
+    service_type?: string | null;
+    previous_location?: string | null;
+    new_location: string;
+    reason?: string | null;
+    notes?: string | null;
+    changed_at: string;
+    changed_by?: string | null;
+    changed_by_profile?: { full_name?: string | null } | null;
+    changed_by_name?: string | null;
+    created_at: string;
+}
 
 function normalizeKey(value: string | null | undefined): string {
     if (!value) return '';
@@ -93,27 +121,11 @@ function buildLocationLabel(
     return buildAnimalLocationLabel(type, cleanName, serviceType || undefined);
 }
 
-async function resolveHarasId(animalId: string, explicitHarasId?: string): Promise<string | null> {
-    if (explicitHarasId) return explicitHarasId;
-    const currentHarasId = await getCurrentHarasId();
-    if (currentHarasId) return currentHarasId;
-
-    const { data, error } = await supabase
-        .from('animals')
-        .select('haras_id')
-        .eq('id', animalId)
-        .single();
-
-    if (error) handleSupabaseError(error);
-    return (data as { haras_id?: string | null })?.haras_id || null;
+function toAnimalContextRow(data: unknown): AnimalContextRow {
+    return (data as AnimalContextRow | null) || {};
 }
 
-async function getCurrentUserId(): Promise<string | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.id || null;
-}
-
-function mapRowToHistory(row: any): AnimalLocationHistory {
+function mapRowToHistory(row: LocationHistoryRow): AnimalLocationHistory {
     return {
         id: row.id,
         animal_id: row.animal_id,
@@ -136,42 +148,42 @@ export const animalLocationsService = {
     async listHistory(animalId: string): Promise<AnimalLocationHistory[]> {
         const { data, error } = await supabase
             .from('animal_location_history')
-            .select('*, changed_by_profile:profiles(full_name)')
+            .select(LOCATION_HISTORY_SELECT)
             .eq('animal_id', animalId)
             .order('changed_at', { ascending: false });
 
         if (error) handleSupabaseError(error);
 
-        return (data || []).map(mapRowToHistory);
+        return ((data as LocationHistoryRow[] | null) || []).map(mapRowToHistory);
     },
 
     async createChange(input: CreateAnimalLocationChangeInput): Promise<AnimalLocationHistory> {
-        const harasId = await resolveHarasId(input.animal_id, input.haras_id);
-        if (!harasId) {
-            throw new Error('Haras nao encontrado para registrar a localizacao.');
-        }
-
         const { data: animalData, error: animalError } = await supabase
             .from('animals')
-            .select('nome, localizacao, tipo_servico, status')
+            .select('haras_id, nome, localizacao, tipo_servico, status')
             .eq('id', input.animal_id)
             .single();
 
         if (animalError) handleSupabaseError(animalError);
+        const animalContext = toAnimalContextRow(animalData);
+        const harasId = input.haras_id || animalContext.haras_id || null;
+        if (!harasId) {
+            throw new Error('Haras nao encontrado para registrar a localizacao.');
+        }
 
         const newLocation = buildLocationLabel(input.location_type, input.location_name, input.service_type);
         const changedAt = input.changed_at || new Date().toISOString();
-        const changedBy = input.changed_by || await getCurrentUserId();
+        const changedBy = input.changed_by || null;
         const serviceTypeLabel =
             input.location_type === 'Servico'
                 ? getServiceTypeLabel(normalizeServiceType(input.service_type) || input.service_type || 'Outro')
                 : null;
         const willBeHospedagem = input.location_type === 'Servico' && isHospedagemLocation(newLocation, input.service_type);
         const wasHospedagem = isHospedagemLocation(
-            (animalData as { localizacao?: string | null })?.localizacao,
-            (animalData as { tipo_servico?: string | null })?.tipo_servico
+            animalContext.localizacao,
+            animalContext.tipo_servico
         );
-        const currentStatus = normalizeAnimalStatus((animalData as { status?: string | null })?.status);
+        const currentStatus = normalizeAnimalStatus(animalContext.status);
         const nextStatus =
             willBeHospedagem
                 ? 'em_servico'
@@ -208,19 +220,19 @@ export const animalLocationsService = {
                 location_type: toDbLocationType(input.location_type),
                 location_name: input.location_name,
                 service_type: input.location_type === 'Servico' ? toDbServiceType(input.service_type) : null,
-                previous_location: (animalData as { localizacao?: string | null })?.localizacao ?? null,
+                previous_location: animalContext.localizacao ?? null,
                 new_location: newLocation,
                 reason: input.reason || null,
                 notes: input.notes || null,
                 changed_at: changedAt,
                 changed_by: changedBy
             })
-            .select('*, changed_by_profile:profiles(full_name)')
+            .select(LOCATION_HISTORY_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
 
-        const animalName = (animalData as { nome?: string | null })?.nome || 'Animal';
+        const animalName = animalContext.nome || 'Animal';
 
         if (willBeHospedagem && input.return_date) {
             await eventsService.syncHospedagemReturnReminder({
@@ -235,6 +247,6 @@ export const animalLocationsService = {
             await eventsService.deleteHospedagemReturnReminder(harasId, input.animal_id);
         }
 
-        return mapRowToHistory(data);
+        return mapRowToHistory(data as LocationHistoryRow);
     }
 };

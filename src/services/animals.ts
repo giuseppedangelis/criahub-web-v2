@@ -222,6 +222,91 @@ function normalizeRegistro(value: unknown): string {
     return normalizeSpaces(raw).toUpperCase();
 }
 
+async function resolveEnvironmentAnimalIds(filters: Pick<AnimalFilters, 'haras_id' | 'environment'>): Promise<string[] | null> {
+    if (!filters.haras_id) return null;
+
+    if (filters.environment === 'condominio') {
+        const { data: shares, error: sharesError } = await (supabase as any)
+            .from('animal_ownership_shares')
+            .select('animal_id')
+            .eq('haras_id', filters.haras_id)
+            .or(`end_date.is.null,end_date.gte.${new Date().toISOString().slice(0, 10)}`);
+
+        if (sharesError) handleSupabaseError(sharesError);
+
+        return Array.from(new Set((shares || []).map((row: { animal_id: string }) => row.animal_id)));
+    }
+
+    if (filters.environment === 'vinculacao') {
+        const { data: queueRows, error: queueError } = await (supabase as any)
+            .from('animal_link_queue')
+            .select('provisional_animal_id')
+            .eq('haras_id', filters.haras_id)
+            .eq('status', 'pending');
+
+        if (queueError) handleSupabaseError(queueError);
+
+        return Array.from(new Set((queueRows || []).map((row: { provisional_animal_id: string }) => row.provisional_animal_id)));
+    }
+
+    return null;
+}
+
+function applyAnimalListFilters(query: any, filters: AnimalFilters, environmentAnimalIds: string[] | null): any {
+    let nextQuery = query;
+
+    if (filters.haras_id) {
+        nextQuery = nextQuery.eq('haras_id', filters.haras_id);
+    }
+    if (filters.environment === 'oficial') {
+        nextQuery = nextQuery.not('abccmm_rowid', 'is', null);
+    }
+    if (filters.environment === 'avulsos') {
+        nextQuery = nextQuery.is('abccmm_rowid', null);
+    }
+    if (environmentAnimalIds && environmentAnimalIds.length > 0) {
+        nextQuery = nextQuery.in('id', environmentAnimalIds);
+    }
+    if (filters.sex) {
+        nextQuery = nextQuery.eq('sexo', filters.sex);
+    }
+    if (filters.category) {
+        nextQuery = nextQuery.eq('categoria', CATEGORY_MAPPING[filters.category] || filters.category);
+    }
+    if (filters.status) {
+        const normalizedStatus = normalizeAnimalStatus(filters.status);
+        const dbStatus = normalizedStatus ? REVERSE_STATUS_MAPPING[normalizedStatus] : filters.status;
+        const possibleStatusValues = Array.from(
+            new Set([dbStatus, normalizedStatus, filters.status].filter(Boolean))
+        );
+        if (possibleStatusValues.length === 1) {
+            nextQuery = nextQuery.eq('status', possibleStatusValues[0] as string);
+        } else {
+            nextQuery = nextQuery.in('status', possibleStatusValues as string[]);
+        }
+    }
+    if (filters.activity_status === 'ativo') {
+        nextQuery = nextQuery.not('status', 'in', '("Vendido","Óbito","Falecido")');
+    }
+    if (filters.activity_status === 'inativo') {
+        nextQuery = nextQuery.in('status', ['Vendido', 'Óbito', 'Falecido']);
+    }
+    if (filters.search) {
+        const search = filters.search.trim();
+        if (search) {
+            nextQuery = nextQuery.or(`nome.ilike.%${search}%,registro.ilike.%${search}%,chip.ilike.%${search}%`);
+        }
+    }
+    if (filters.birth_date_from) {
+        nextQuery = nextQuery.gte('data_nascimento', filters.birth_date_from);
+    }
+    if (filters.birth_date_to) {
+        nextQuery = nextQuery.lte('data_nascimento', filters.birth_date_to);
+    }
+
+    return nextQuery;
+}
+
 function normalizeNameKey(value: string | null | undefined): string {
     if (!value) return '';
     return value
@@ -581,35 +666,9 @@ export const animalsService = {
             return formatPaginatedResponse([], 0, pagination);
         }
 
-        let environmentAnimalIds: string[] | null = null;
-        if (filters.environment === 'condominio') {
-            const { data: shares, error: sharesError } = await (supabase as any)
-                .from('animal_ownership_shares')
-                .select('animal_id')
-                .eq('haras_id', filters.haras_id)
-                .or(`end_date.is.null,end_date.gte.${new Date().toISOString().slice(0, 10)}`);
-
-            if (sharesError) handleSupabaseError(sharesError);
-
-            environmentAnimalIds = Array.from(new Set((shares || []).map((row: { animal_id: string }) => row.animal_id)));
-            if (environmentAnimalIds.length === 0) {
-                return formatPaginatedResponse([], 0, pagination);
-            }
-        }
-
-        if (filters.environment === 'vinculacao') {
-            const { data: queueRows, error: queueError } = await (supabase as any)
-                .from('animal_link_queue')
-                .select('provisional_animal_id')
-                .eq('haras_id', filters.haras_id)
-                .eq('status', 'pending');
-
-            if (queueError) handleSupabaseError(queueError);
-
-            environmentAnimalIds = Array.from(new Set((queueRows || []).map((row: { provisional_animal_id: string }) => row.provisional_animal_id)));
-            if (environmentAnimalIds.length === 0) {
-                return formatPaginatedResponse([], 0, pagination);
-            }
+        const environmentAnimalIds = await resolveEnvironmentAnimalIds(filters);
+        if (environmentAnimalIds && environmentAnimalIds.length === 0) {
+            return formatPaginatedResponse([], 0, pagination);
         }
 
         let query = supabase
@@ -624,41 +683,7 @@ export const animalsService = {
                 created_at, updated_at
             `, { count: 'exact' });
 
-        // Aplicar filtros
-        if (filters.haras_id) {
-            query = query.eq('haras_id', filters.haras_id);
-        }
-        if (filters.environment === 'oficial') {
-            query = query.not('abccmm_rowid', 'is', null);
-        }
-        if (filters.environment === 'avulsos') {
-            query = query.is('abccmm_rowid', null);
-        }
-        if (environmentAnimalIds && environmentAnimalIds.length > 0) {
-            query = query.in('id', environmentAnimalIds);
-        }
-        if (filters.sex) {
-            query = query.eq('sexo', filters.sex);
-        }
-        if (filters.category) {
-            query = query.eq('categoria', CATEGORY_MAPPING[filters.category] || filters.category);
-        }
-        if (filters.status) {
-            // Mapear status do filtro para status do banco
-            const normalizedStatus = normalizeAnimalStatus(filters.status);
-            const dbStatus = normalizedStatus ? REVERSE_STATUS_MAPPING[normalizedStatus] : filters.status;
-            const possibleStatusValues = Array.from(
-                new Set([dbStatus, normalizedStatus, filters.status].filter(Boolean))
-            );
-            if (possibleStatusValues.length === 1) {
-                query = query.eq('status', possibleStatusValues[0] as string);
-            } else {
-                query = query.in('status', possibleStatusValues as string[]);
-            }
-        }
-        if (filters.search) {
-            query = query.or(`nome.ilike.%${filters.search}%,registro.ilike.%${filters.search}%`);
-        }
+        query = applyAnimalListFilters(query, filters, environmentAnimalIds);
 
         // Ordenar e paginar
         query = query.order('nome', { ascending: true });
@@ -702,6 +727,55 @@ export const animalsService = {
         }));
 
         return formatPaginatedResponse(mappedData as Animal[], count || 0, pagination);
+    },
+
+    async getSummary(filters: AnimalFilters = {}): Promise<{
+        total: number;
+        males: number;
+        females: number;
+        active: number;
+    }> {
+        if (!filters.haras_id) {
+            return { total: 0, males: 0, females: 0, active: 0 };
+        }
+
+        const environmentAnimalIds = await resolveEnvironmentAnimalIds(filters);
+        if (environmentAnimalIds && environmentAnimalIds.length === 0) {
+            return { total: 0, males: 0, females: 0, active: 0 };
+        }
+
+        const buildQuery = (extraFilters: Partial<AnimalFilters> = {}) =>
+            applyAnimalListFilters(
+                supabase
+                    .from('animals')
+                    .select('id', { count: 'exact', head: true }),
+                { ...filters, ...extraFilters },
+                environmentAnimalIds
+            );
+
+        const [
+            { count: total, error: totalError },
+            { count: males, error: malesError },
+            { count: females, error: femalesError },
+            { count: active, error: activeError },
+        ] = await Promise.all([
+            buildQuery(),
+            buildQuery({ sex: 'Macho' }),
+            buildQuery({ sex: 'Fêmea' }),
+            buildQuery({ activity_status: 'ativo' }),
+        ]);
+
+        if (totalError) handleSupabaseError(totalError);
+        if (malesError) handleSupabaseError(malesError);
+        if (femalesError) handleSupabaseError(femalesError);
+        if (activeError) handleSupabaseError(activeError);
+
+        return {
+            total: total || 0,
+            males: males || 0,
+            females: females || 0,
+            active: active || 0,
+        };
     },
 
     /**
@@ -2357,17 +2431,24 @@ export const animalsService = {
      * Conta animais por sexo
      */
     async countBySex(harasId: string): Promise<{ males: number; females: number }> {
-        const { data, error } = await supabase
-            .from('animals')
-            .select('sexo')
-            .eq('haras_id', harasId)
-            .eq('status', 'Ativo');
+        const [{ count: males, error: malesError }, { count: females, error: femalesError }] = await Promise.all([
+            supabase
+                .from('animals')
+                .select('id', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('status', 'Ativo')
+                .eq('sexo', 'Macho'),
+            supabase
+                .from('animals')
+                .select('id', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('status', 'Ativo')
+                .eq('sexo', 'Fêmea'),
+        ]);
 
-        if (error) handleSupabaseError(error);
+        if (malesError) handleSupabaseError(malesError);
+        if (femalesError) handleSupabaseError(femalesError);
 
-        const males = data?.filter((a: any) => a.sexo === 'Macho').length || 0;
-        const females = data?.filter((a: any) => a.sexo === 'Fêmea').length || 0;
-
-        return { males, females };
+        return { males: males || 0, females: females || 0 };
     }
 };

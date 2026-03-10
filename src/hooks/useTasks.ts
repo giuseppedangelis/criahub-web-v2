@@ -4,7 +4,7 @@
 // HOOKS - TASKS
 // ============================================
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tasksService } from '@/services/tasks'
 import type { CreateTaskInput, UpdateTaskInput, TaskFilters, PaginationParams } from '@/types'
 
@@ -24,6 +24,9 @@ export function useTasks(
     queryKey: taskKeys.list(filters, pagination),
     queryFn: () => tasksService.list(filters, pagination),
     enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
 }
 

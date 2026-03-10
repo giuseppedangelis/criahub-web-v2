@@ -36,7 +36,7 @@ const formatNotificationTime = (dateValue?: string | null) => {
 
 export function AdminDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userName, userEmail, profile, logout } = useUser();
+  const { user, userRole, userName, userEmail, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -46,21 +46,24 @@ export function AdminDashboard() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const loadNotifications = useCallback(async () => {
+    if (!user?.id) return;
     setIsLoadingNotifications(true);
     try {
-      const response = await notificationsService.list({ page: 1, limit: 50 });
+      const response = await notificationsService.list({ page: 1, limit: 50 }, false, user.id);
       setNotifications(response.data);
+      setHasLoadedNotifications(true);
     } catch (error: any) {
       console.error('Erro ao carregar notificações:', error);
       toast.error(error.message || 'Erro ao carregar notificações.');
     } finally {
       setIsLoadingNotifications(false);
     }
-  }, []);
+  }, [user?.id]);
 
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
@@ -70,8 +73,24 @@ export function AdminDashboard() {
   }, [isMobile]);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    if (!user?.id) {
+      setNotifications([]);
+      setHasLoadedNotifications(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || hasLoadedNotifications || isLoadingNotifications) return;
+    if (!showNotifications && !showNotificationsPanel) return;
+    void loadNotifications();
+  }, [
+    hasLoadedNotifications,
+    isLoadingNotifications,
+    loadNotifications,
+    showNotifications,
+    showNotificationsPanel,
+    user?.id,
+  ]);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -83,8 +102,9 @@ export function AdminDashboard() {
   ];
 
   const handleMarkAllAsRead = async () => {
+    if (!user?.id) return;
     try {
-      await notificationsService.markAllAsRead();
+      await notificationsService.markAllAsRead(user.id);
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
     } catch (error: any) {
       console.error('Erro ao marcar notificações:', error);

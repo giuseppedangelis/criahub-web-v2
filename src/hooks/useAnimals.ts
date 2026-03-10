@@ -5,10 +5,9 @@
 // Hooks para gerenciar estado de animais com TanStack Query
 // ============================================
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { animalsService } from '@/services/animals'
 import type {
-    Animal,
     AnimalFilters,
     CreateAnimalInput,
     UpdateAnimalInput,
@@ -44,6 +43,24 @@ export function useAnimals(
         queryKey: animalKeys.list(filters, pagination),
         queryFn: () => animalsService.list(filters, pagination),
         enabled: enabled && hasHarasFilter,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
+    })
+}
+
+export function useAnimalSummary(
+    filters: AnimalFilters = {},
+    enabled: boolean = true
+) {
+    const hasHarasFilter = !!filters.haras_id
+
+    return useQuery({
+        queryKey: [...animalKeys.all, 'summary', filters],
+        queryFn: () => animalsService.getSummary(filters),
+        enabled: enabled && hasHarasFilter,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -104,6 +121,8 @@ export function useStallions(harasId: string) {
         queryKey: animalKeys.stallions(harasId),
         queryFn: () => animalsService.getStallions(harasId),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -115,6 +134,8 @@ export function useMares(harasId: string) {
         queryKey: animalKeys.mares(harasId),
         queryFn: () => animalsService.getMares(harasId),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }
 
@@ -173,5 +194,7 @@ export function useAnimalCountBySex(harasId: string) {
         queryKey: [...animalKeys.all, 'count', 'sex', harasId],
         queryFn: () => animalsService.countBySex(harasId),
         enabled: !!harasId,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
     })
 }

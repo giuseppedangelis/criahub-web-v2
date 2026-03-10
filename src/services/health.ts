@@ -3,7 +3,7 @@
 // Gerencia procedimentos, vacinas e exames
 // ============================================
 
-import { supabase, handleSupabaseError, getCurrentHarasId } from './base';
+import { supabase, handleSupabaseError } from './base';
 import type {
     HealthRecord,
     VaccineRecord,
@@ -25,6 +25,59 @@ const PROCEDURE_TYPE_DB_MAP: Record<string, string> = {
     emergencia: 'Outro'
 };
 
+const HEALTH_RECORD_SELECT = 'id, animal_id, haras_id, data_procedimento, tipo, veterinario, descricao, custo, proximadata, observacoes, created_at, updated_at';
+const VACCINE_SELECT = 'id, animal_id, haras_id, nome_vacina, data_aplicacao, data_proxima_dose, lote, fabricante, veterinario, observacoes, created_at, updated_at';
+const EXAM_SELECT = 'id, animal_id, haras_id, tipo_exame, data_exame, veterinario, laboratorio, resultado, file_urls, observacoes, created_at, updated_at';
+
+interface HarasLookupRow {
+    haras_id?: string | null;
+}
+
+interface HealthRecordRow {
+    id: string;
+    animal_id: string;
+    haras_id: string;
+    data_procedimento: string;
+    tipo: string;
+    veterinario?: string | null;
+    descricao?: string | null;
+    custo?: number | null;
+    proximadata?: string | null;
+    observacoes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+interface VaccineRow {
+    id: string;
+    animal_id: string;
+    haras_id: string;
+    nome_vacina: string;
+    data_aplicacao: string;
+    data_proxima_dose?: string | null;
+    lote?: string | null;
+    fabricante?: string | null;
+    veterinario?: string | null;
+    observacoes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+interface ExamRow {
+    id: string;
+    animal_id: string;
+    haras_id: string;
+    tipo_exame: string;
+    data_exame: string;
+    veterinario?: string | null;
+    laboratorio?: string | null;
+    resultado?: string | null;
+    file_urls?: string[] | null;
+    observacoes?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 function normalizeKey(value: string | null | undefined): string {
     if (!value) return '';
     return value
@@ -41,8 +94,6 @@ function toDbProcedureType(value: string): string {
 
 async function resolveHarasId(animalId: string, explicitHarasId?: string): Promise<string | null> {
     if (explicitHarasId) return explicitHarasId;
-    const currentHarasId = await getCurrentHarasId();
-    if (currentHarasId) return currentHarasId;
 
     const { data, error } = await supabase
         .from('animals')
@@ -51,7 +102,7 @@ async function resolveHarasId(animalId: string, explicitHarasId?: string): Promi
         .single();
 
     if (error) handleSupabaseError(error);
-    return (data as { haras_id?: string | null })?.haras_id || null;
+    return (data as HarasLookupRow | null)?.haras_id || null;
 }
 
 async function uploadExamFiles(animalId: string, files?: File[]): Promise<string[]> {
@@ -78,7 +129,7 @@ async function uploadExamFiles(animalId: string, files?: File[]): Promise<string
     return uploaded;
 }
 
-function mapHealthRecord(row: any): HealthRecord {
+function mapHealthRecord(row: HealthRecordRow): HealthRecord {
     return {
         id: row.id,
         animal_id: row.animal_id,
@@ -95,7 +146,7 @@ function mapHealthRecord(row: any): HealthRecord {
     };
 }
 
-function mapVaccine(row: any): VaccineRecord {
+function mapVaccine(row: VaccineRow): VaccineRecord {
     return {
         id: row.id,
         animal_id: row.animal_id,
@@ -112,7 +163,7 @@ function mapVaccine(row: any): VaccineRecord {
     };
 }
 
-function mapExam(row: any): ExamRecord {
+function mapExam(row: ExamRow): ExamRecord {
     return {
         id: row.id,
         animal_id: row.animal_id,
@@ -133,12 +184,12 @@ export const healthService = {
     async listHealthRecords(animalId: string): Promise<HealthRecord[]> {
         const { data, error } = await supabase
             .from('health_records')
-            .select('*')
+            .select(HEALTH_RECORD_SELECT)
             .eq('animal_id', animalId)
             .order('data_procedimento', { ascending: false });
 
         if (error) handleSupabaseError(error);
-        return (data || []).map(mapHealthRecord);
+        return ((data as HealthRecordRow[] | null) || []).map(mapHealthRecord);
     },
 
     async createHealthRecord(input: CreateHealthRecordInput): Promise<HealthRecord> {
@@ -162,22 +213,22 @@ export const healthService = {
         const { data, error } = await supabase
             .from('health_records')
             .insert(dbInput)
-            .select('*')
+            .select(HEALTH_RECORD_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
-        return mapHealthRecord(data);
+        return mapHealthRecord(data as HealthRecordRow);
     },
 
     async listVaccines(animalId: string): Promise<VaccineRecord[]> {
         const { data, error } = await supabase
             .from('vaccines')
-            .select('*')
+            .select(VACCINE_SELECT)
             .eq('animal_id', animalId)
             .order('data_aplicacao', { ascending: false });
 
         if (error) handleSupabaseError(error);
-        return (data || []).map(mapVaccine);
+        return ((data as VaccineRow[] | null) || []).map(mapVaccine);
     },
 
     async createVaccine(input: CreateVaccineInput): Promise<VaccineRecord> {
@@ -201,22 +252,22 @@ export const healthService = {
         const { data, error } = await supabase
             .from('vaccines')
             .insert(dbInput)
-            .select('*')
+            .select(VACCINE_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
-        return mapVaccine(data);
+        return mapVaccine(data as VaccineRow);
     },
 
     async listExams(animalId: string): Promise<ExamRecord[]> {
         const { data, error } = await supabase
             .from('exams')
-            .select('*')
+            .select(EXAM_SELECT)
             .eq('animal_id', animalId)
             .order('data_exame', { ascending: false });
 
         if (error) handleSupabaseError(error);
-        return (data || []).map(mapExam);
+        return ((data as ExamRow[] | null) || []).map(mapExam);
     },
 
     async createExam(input: CreateExamInput): Promise<ExamRecord> {
@@ -243,11 +294,11 @@ export const healthService = {
         const { data, error } = await supabase
             .from('exams')
             .insert(dbInput)
-            .select('*')
+            .select(EXAM_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
-        return mapExam(data);
+        return mapExam(data as ExamRow);
     },
 
     /**
@@ -272,33 +323,33 @@ export const healthService = {
         ] = await Promise.all([
             supabase
                 .from('animals')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId)
                 .eq('status', 'Ativo'),
             supabase
                 .from('vaccines')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId)
                 .lt('data_proxima_dose', today),
             supabase
                 .from('vaccines')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId)
                 .gte('data_proxima_dose', today),
             supabase
                 .from('vaccines')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId)
                 .is('data_proxima_dose', null),
             supabase
                 .from('system_alerts')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId)
                 .eq('module', 'saude')
                 .is('resolved_at', null),
             supabase
                 .from('health_records')
-                .select('*', { count: 'exact', head: true })
+                .select('id', { count: 'exact', head: true })
                 .eq('haras_id', harasId),
         ]);
 

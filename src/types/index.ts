@@ -155,7 +155,7 @@ export interface Profile {
 export interface Haras {
     id: string;
     name: string;
-    owner_id: string;
+    owner_id: string | null;
     cnpj: string | null;
     address: string | null;
     city: string | null;
@@ -751,8 +751,11 @@ export interface AnimalFilters {
     sex?: AnimalSex;
     category?: AnimalCategory;
     status?: AnimalStatus;
+    activity_status?: 'ativo' | 'inativo';
     search?: string;
     environment?: AnimalEnvironment;
+    birth_date_from?: string;
+    birth_date_to?: string;
 }
 
 export interface AnimalLinkQueueItem {

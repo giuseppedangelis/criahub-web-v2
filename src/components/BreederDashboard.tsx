@@ -63,7 +63,7 @@ const BASE_MENU_ITEMS = [
 
 export function BreederDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userEmail, userName, profile, logout } = useUser();
+  const { user, userRole, userEmail, userName, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
   const { canAccessModule, isReady: isAccessReady } = useAccessControl();
@@ -83,21 +83,24 @@ export function BreederDashboard() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const loadNotifications = useCallback(async () => {
+    if (!user?.id) return;
     setIsLoadingNotifications(true);
     try {
-      const response = await notificationsService.list({ page: 1, limit: 50 });
+      const response = await notificationsService.list({ page: 1, limit: 50 }, false, user.id);
       setNotifications(response.data);
+      setHasLoadedNotifications(true);
     } catch (error: any) {
       console.error('Erro ao carregar notificações:', error);
       toast.error(error.message || 'Erro ao carregar notificações.');
     } finally {
       setIsLoadingNotifications(false);
     }
-  }, []);
+  }, [user?.id]);
 
   // Fecha a sidebar quando mudar de mobile para desktop
   useEffect(() => {
@@ -107,8 +110,25 @@ export function BreederDashboard() {
   }, [isMobile]);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    if (!user?.id) {
+      setNotifications([]);
+      setHasLoadedNotifications(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || hasLoadedNotifications || isLoadingNotifications) return;
+    if (!showNotifications && !showNotificationsPanel && !showNotificationsCenter) return;
+    void loadNotifications();
+  }, [
+    hasLoadedNotifications,
+    isLoadingNotifications,
+    loadNotifications,
+    showNotifications,
+    showNotificationsCenter,
+    showNotificationsPanel,
+    user?.id,
+  ]);
 
   // Fecha dropdowns quando clicar fora
   useEffect(() => {
@@ -129,8 +149,9 @@ export function BreederDashboard() {
   );
 
   const handleMarkAllAsRead = async () => {
+    if (!user?.id) return;
     try {
-      await notificationsService.markAllAsRead();
+      await notificationsService.markAllAsRead(user.id);
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
     } catch (error: any) {
       console.error('Erro ao marcar notificações:', error);

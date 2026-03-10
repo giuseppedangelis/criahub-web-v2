@@ -57,7 +57,7 @@ const BASE_MENU_ITEMS = [
 
 export function AdvisorDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userName, userEmail, profile, logout } = useUser();
+  const { user, userRole, userName, userEmail, profile, logout } = useUser();
   const { isMobile } = useResponsive();
   const { data: currentHaras } = useCurrentHaras();
   const { canAccessModule, isReady: isAccessReady } = useAccessControl();
@@ -70,25 +70,29 @@ export function AdvisorDashboard() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
 
   const unreadNotifications = notifications.filter(n => !n.read).length;
 
   const loadNotifications = useCallback(async () => {
+    if (!user?.id) return;
     setIsLoadingNotifications(true);
     try {
-      const response = await notificationsService.list({ page: 1, limit: 50 });
+      const response = await notificationsService.list({ page: 1, limit: 50 }, false, user.id);
       setNotifications(response.data);
+      setHasLoadedNotifications(true);
     } catch (error: any) {
       console.error('Erro ao carregar notificações:', error);
       toast.error(error.message || 'Erro ao carregar notificações.');
     } finally {
       setIsLoadingNotifications(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const handleMarkAllAsRead = async () => {
+    if (!user?.id) return;
     try {
-      await notificationsService.markAllAsRead();
+      await notificationsService.markAllAsRead(user.id);
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
     } catch (error: any) {
       console.error('Erro ao marcar notificações:', error);
@@ -152,8 +156,24 @@ export function AdvisorDashboard() {
   }, [isMobile]);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    if (!user?.id) {
+      setNotifications([]);
+      setHasLoadedNotifications(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || hasLoadedNotifications || isLoadingNotifications) return;
+    if (!showNotifications && !showNotificationsPanel) return;
+    void loadNotifications();
+  }, [
+    hasLoadedNotifications,
+    isLoadingNotifications,
+    loadNotifications,
+    showNotifications,
+    showNotificationsPanel,
+    user?.id,
+  ]);
 
   const menuItems = useMemo(
     () => BASE_MENU_ITEMS.filter((item) => canAccessModule(item.id as AccessModule)),

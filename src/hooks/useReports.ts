@@ -4,7 +4,7 @@
 // HOOKS - REPORTS
 // ============================================
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { reportsService } from '@/services/reports'
 import type { CreateReportInput, PaginationParams, ReportFilters } from '@/types'
 
@@ -26,6 +26,9 @@ export function useReports(
     queryKey: reportKeys.list(filters, pagination),
     queryFn: () => reportsService.list(filters, pagination),
     enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -34,6 +37,8 @@ export function useRecentReports(harasId: string, limit: number = 4) {
     queryKey: reportKeys.recent(harasId, limit),
     queryFn: () => reportsService.getRecent(harasId, limit),
     enabled: !!harasId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -42,6 +47,8 @@ export function useReportsSummary(harasId: string) {
     queryKey: reportKeys.summary(harasId),
     queryFn: () => reportsService.getSummary(harasId),
     enabled: !!harasId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 

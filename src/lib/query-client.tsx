@@ -1,19 +1,17 @@
 'use client'
 
 import { QueryClient, QueryClientProvider as TanStackQueryClientProvider } from '@tanstack/react-query'
-import { ReactNode, useState } from 'react'
+import { ReactNode } from 'react'
 
 function makeQueryClient() {
     return new QueryClient({
         defaultOptions: {
             queries: {
-                // Com SSR, geralmente queremos um staleTime > 0
-                // para evitar refetching imediato no cliente
-                staleTime: 60 * 1000, // 1 minuto
-                gcTime: 5 * 60 * 1000, // 5 minutos (garbage collection)
+                staleTime: 5 * 60 * 1000,
+                gcTime: 10 * 60 * 1000,
                 retry: 1,
-                refetchOnWindowFocus: true,
-                refetchOnReconnect: true,
+                refetchOnWindowFocus: false,
+                refetchOnReconnect: false,
             },
             mutations: {
                 retry: 1,

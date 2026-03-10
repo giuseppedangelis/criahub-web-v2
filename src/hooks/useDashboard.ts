@@ -1,10 +1,21 @@
+'use client'
+
 // ============================================
 // USE DASHBOARD HOOK
-// Hook para buscar dados do dashboard do criador
+// Hook para buscar snapshot otimizado do dashboard do criador
 // ============================================
 
-import { useState, useEffect, useCallback } from 'react';
-import { dashboardService, DashboardStats, CategoryDistribution, PelagemDistribution, GrowthData, UpcomingEvent, RecentActivity, AgeDistribution } from '@/services/dashboard';
+import { useQuery } from '@tanstack/react-query';
+import {
+    dashboardService,
+    type DashboardStats,
+    type CategoryDistribution,
+    type PelagemDistribution,
+    type GrowthData,
+    type UpcomingEvent,
+    type RecentActivity,
+    type AgeDistribution,
+} from '@/services/dashboard';
 import { useUser } from '@/contexts/UserContext';
 
 interface UseDashboardReturn {
@@ -29,107 +40,38 @@ interface DashboardOptions {
 
 export function useDashboard(harasId?: string, options: DashboardOptions = {}): UseDashboardReturn {
     const { stableHarasId, isSessionReady } = useUser();
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
-    const [pelagemDistribution, setPelagemDistribution] = useState<PelagemDistribution[]>([]);
-    const [growthData, setGrowthData] = useState<GrowthData[]>([]);
-    const [ageDistribution, setAgeDistribution] = useState<AgeDistribution[]>([]);
-    const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
-    const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-    const [currentHarasId, setCurrentHarasId] = useState<string | null>(harasId || null);
-    const [hasNoHaras, setHasNoHaras] = useState(false);
 
-    // Buscar haras_id do usuário logado se não foi fornecido
-    useEffect(() => {
-        if (harasId) {
-            setCurrentHarasId(harasId);
-            setHasNoHaras(false);
-            return;
-        }
-
-        if (stableHarasId) {
-            setCurrentHarasId(stableHarasId);
-            setHasNoHaras(false);
-            return;
-        }
-
-        if (!isSessionReady) {
-            return;
-        }
-
-        if (isSessionReady) {
-            setIsLoading(false);
-            setHasNoHaras(true);
-        }
-    }, [harasId, stableHarasId, isSessionReady]);
-
+    const currentHarasId = harasId || stableHarasId || null;
     const months = Math.max(1, options.months ?? 6);
-    const eventsLimit = options.eventsLimit ?? 5;
-    const activitiesLimit = options.activitiesLimit ?? 5;
+    const eventsLimit = Math.max(1, options.eventsLimit ?? 5);
+    const activitiesLimit = Math.max(1, options.activitiesLimit ?? 5);
+    const hasNoHaras = isSessionReady && !currentHarasId;
 
-    const fetchData = useCallback(async () => {
-        if (!currentHarasId) {
-            setIsLoading(false);
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const [
-                statsData,
-                categoryData,
-                pelagemData,
-                growthDataResult,
-                ageData,
-                eventsData,
-                activitiesData
-            ] = await Promise.all([
-                dashboardService.getStats(currentHarasId),
-                dashboardService.getCategoryDistribution(currentHarasId),
-                dashboardService.getPelagemDistribution(currentHarasId),
-                dashboardService.getGrowthData(currentHarasId, months),
-                dashboardService.getAgeDistribution(currentHarasId),
-                dashboardService.getUpcomingEvents(currentHarasId, eventsLimit),
-                dashboardService.getRecentActivities(currentHarasId, activitiesLimit)
-            ]);
-
-            setStats(statsData);
-            setCategoryDistribution(categoryData);
-            setPelagemDistribution(pelagemData);
-            setGrowthData(growthDataResult);
-            setAgeDistribution(ageData);
-            setUpcomingEvents(eventsData);
-            setRecentActivities(activitiesData);
-        } catch (err) {
-            console.error('Error fetching dashboard data:', err);
-            setError(err instanceof Error ? err : new Error('Erro ao carregar dados'));
-        } finally {
-            setIsLoading(false);
-        }
-    }, [currentHarasId, months, eventsLimit, activitiesLimit]);
-
-    useEffect(() => {
-        if (currentHarasId) {
-            fetchData();
-        }
-    }, [fetchData, currentHarasId]);
+    const query = useQuery({
+        queryKey: ['dashboard', currentHarasId, months, eventsLimit, activitiesLimit],
+        queryFn: () => dashboardService.getSnapshot(currentHarasId!, {
+            months,
+            eventsLimit,
+            activitiesLimit,
+        }),
+        enabled: !!currentHarasId && isSessionReady,
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+    });
 
     return {
-        stats,
-        categoryDistribution,
-        pelagemDistribution,
-        growthData,
-        ageDistribution,
-        upcomingEvents,
-        recentActivities,
-        isLoading,
-        error,
+        stats: query.data?.stats || null,
+        categoryDistribution: query.data?.categoryDistribution || [],
+        pelagemDistribution: query.data?.pelagemDistribution || [],
+        growthData: query.data?.growthData || [],
+        ageDistribution: query.data?.ageDistribution || [],
+        upcomingEvents: query.data?.upcomingEvents || [],
+        recentActivities: query.data?.recentActivities || [],
+        isLoading: !isSessionReady || query.isLoading,
+        error: query.error instanceof Error ? query.error : null,
         hasNoHaras,
-        refetch: fetchData
+        refetch: async () => {
+            await query.refetch();
+        },
     };
 }
-
