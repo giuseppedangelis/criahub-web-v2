@@ -7,6 +7,7 @@ import { useCreateReport } from '@/hooks/useReports';
 import { useAnimals } from '@/hooks/useAnimals';
 import { useHaras, useDashboardStats } from '@/hooks/useHaras';
 import { useReproductionStats } from '@/hooks/useReproduction';
+import { getAnimalStatusLabel, getDisplayCategoryLabel, isPlantelActiveStatus } from '@/lib/animal-classification';
 import type { ReportFormat, ReportType } from '@/types';
 import { uploadReportFile } from '@/services/reportFiles';
 
@@ -57,13 +58,13 @@ export function HerdReportModal({ isOpen, onClose, reportType = 'plantel' }: Her
   const totalAnimals = animalsResponse?.total ?? animals.length;
   const maleCount = animals.filter((animal) => animal.sex === 'Macho').length;
   const femaleCount = animals.filter((animal) => animal.sex === 'Fêmea').length;
-  const activeCount = animals.filter((animal) => animal.status === 'ativo').length;
+  const activeCount = animals.filter((animal) => isPlantelActiveStatus(animal.status)).length;
 
   const animalSampleRows = animals.slice(0, 12).map((animal) => [
     animal.name,
     animal.sex || '-',
-    animal.category || '-',
-    animal.status || '-',
+    getDisplayCategoryLabel(animal.category),
+    getAnimalStatusLabel(animal.status),
     animal.birth_date ? new Date(animal.birth_date).toLocaleDateString('pt-BR') : '-',
   ]);
 

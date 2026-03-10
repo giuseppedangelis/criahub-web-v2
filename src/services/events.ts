@@ -14,6 +14,8 @@ import type {
   PaginatedResponse,
 } from '@/types'
 
+export const HOSPEDAGEM_REMINDER_ORIGIN = 'hospedagem_retorno'
+
 const EVENT_TYPES: AgendaEventType[] = [
   'Serviço',
   'Evento',
@@ -87,6 +89,10 @@ function mapEventRow(row: any): AgendaEvent {
   }
 }
 
+function buildHospedagemReminderStartDate(returnDate: string): string {
+  return `${returnDate}T08:00:00`
+}
+
 export const eventsService = {
   /**
    * Lista eventos com filtros e paginação
@@ -126,6 +132,12 @@ export const eventsService = {
     }
     if (filters.animal_id) {
       query = query.eq('animal_id', filters.animal_id)
+    }
+    if (filters.origin) {
+      query = query.eq('origem', filters.origin)
+    }
+    if (filters.origin_id) {
+      query = query.eq('origem_id', filters.origin_id)
     }
 
     query = query.order('data_inicio', { ascending: true })
@@ -212,5 +224,62 @@ export const eventsService = {
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('events').delete().eq('id', id)
     if (error) handleSupabaseError(error)
+  },
+
+  async findHospedagemReturnReminder(harasId: string, animalId: string): Promise<AgendaEvent | null> {
+    const { data, error } = await supabase
+      .from('events')
+      .select(
+        `
+        *,
+        animal:animals(id, nome, registro)
+      `
+      )
+      .eq('haras_id', harasId)
+      .eq('origem', HOSPEDAGEM_REMINDER_ORIGIN)
+      .eq('origem_id', animalId)
+      .order('created_at', { ascending: false })
+      .maybeSingle()
+
+    if (error) handleSupabaseError(error)
+
+    return data ? mapEventRow(data) : null
+  },
+
+  async syncHospedagemReturnReminder(input: {
+    harasId: string
+    animalId: string
+    animalName: string
+    returnDate: string
+    location?: string | null
+    observations?: string | null
+  }): Promise<AgendaEvent> {
+    const existingEvent = await this.findHospedagemReturnReminder(input.harasId, input.animalId)
+    const payload: CreateAgendaEventInput = {
+      haras_id: input.harasId,
+      animal_id: input.animalId,
+      title: `Retorno de hospedagem - ${input.animalName}`,
+      type: 'Serviço',
+      start_date: buildHospedagemReminderStartDate(input.returnDate),
+      description: 'Lembrete automático para retorno de animal hospedado externamente.',
+      location: input.location || undefined,
+      status: 'Pendente',
+      auto_generated: true,
+      origin: HOSPEDAGEM_REMINDER_ORIGIN,
+      origin_id: input.animalId,
+      observations: input.observations || undefined,
+    }
+
+    if (existingEvent) {
+      return this.update(existingEvent.id, payload)
+    }
+
+    return this.create(payload)
+  },
+
+  async deleteHospedagemReturnReminder(harasId: string, animalId: string): Promise<void> {
+    const existingEvent = await this.findHospedagemReturnReminder(harasId, animalId)
+    if (!existingEvent) return
+    await this.delete(existingEvent.id)
   },
 }

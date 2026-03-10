@@ -34,11 +34,11 @@ export function MobileApp() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 max-w-md mx-auto">
+    <div className="h-screen flex flex-col bg-background max-w-md mx-auto">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-4">
-        <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
-        <p className="text-gray-500">Administrador</p>
+      <header className="bg-card border-b border-border px-4 py-4">
+        <BrandLogo orientation="horizontal" className="h-8 w-auto" />
+        <p className="text-muted-foreground">Administrador</p>
       </header>
 
       {/* Content */}
@@ -47,7 +47,7 @@ export function MobileApp() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 max-w-md mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border max-w-md mx-auto">
         <div className="flex justify-around items-center">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -57,8 +57,10 @@ export function MobileApp() {
               <button
                 key={item.id}
                 onClick={() => setCurrentPage(item.id)}
-                className={`flex flex-col items-center py-3 px-4 flex-1 transition-colors ${
-                  isActive ? 'text-gray-900' : 'text-gray-500'
+                className={`flex flex-1 flex-col items-center px-4 py-3 transition-colors ${
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
                 <Icon className="w-6 h-6 mb-1" />

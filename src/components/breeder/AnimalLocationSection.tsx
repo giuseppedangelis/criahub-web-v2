@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LocationChangeModal, LocationChangeData } from './LocationChangeModal';
 import { useAnimalLocationHistory, useCreateAnimalLocationChange } from '@/hooks/useAnimalLocations';
+import { useHarasSettings } from '@/hooks/useHarasSettings';
+import { getServiceTypeLabel, normalizeHarasLocationSettings, parseAnimalLocation } from '@/lib/animal-location';
 import type { AnimalLocationType, AnimalServiceType } from '@/types';
 
 interface Partner {
@@ -29,8 +31,6 @@ interface AnimalLocationSectionProps {
   serviceType?: AnimalServiceType;
   partners?: Partner[];
   locationHistory?: LocationHistory[];
-  availableBaias?: Array<{ id: string; name: string; status: string; animal?: string }>;
-  availablePastos?: Array<{ id: string; name: string; status: string; capacity?: number; current?: number }>;
 }
 
 export function AnimalLocationSection({
@@ -45,6 +45,16 @@ export function AnimalLocationSection({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const { data: remoteHistory, isLoading } = useAnimalLocationHistory(animalId);
   const { mutateAsync: createLocationChange, isPending: isSaving } = useCreateAnimalLocationChange();
+  const { data: harasSettings } = useHarasSettings(harasId || '');
+
+  const locationSettings = useMemo(
+    () => normalizeHarasLocationSettings(harasSettings?.location_settings),
+    [harasSettings?.location_settings]
+  );
+  const parsedCurrentLocation = useMemo(
+    () => parseAnimalLocation(currentLocation, serviceType),
+    [currentLocation, serviceType]
+  );
 
   const historyEntries: LocationHistory[] = useMemo(() => {
     if (remoteHistory && remoteHistory.length > 0) {
@@ -75,6 +85,7 @@ export function AnimalLocationSection({
         location_type: data.locationType,
         location_name: data.locationName,
         service_type: data.locationType === 'Servico' ? data.serviceType : undefined,
+        return_date: data.locationType === 'Servico' ? data.returnDate || null : null,
         reason: data.reason,
         notes: data.notes,
         changed_at: changedAt,
@@ -138,7 +149,7 @@ export function AnimalLocationSection({
               {locationType === 'Servico' && serviceType && (
                 <div className="mt-2">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
-                    Tipo: {serviceType}
+                    Tipo: {getServiceTypeLabel(serviceType)}
                   </span>
                 </div>
               )}
@@ -280,6 +291,9 @@ export function AnimalLocationSection({
       {showLocationModal && (
         <LocationChangeModal
           currentLocation={currentLocation}
+          currentLocationType={locationType || parsedCurrentLocation.locationType}
+          currentServiceType={serviceType || parsedCurrentLocation.serviceType || undefined}
+          locationSettings={locationSettings}
           onClose={() => setShowLocationModal(false)}
           onSave={handleSaveLocationChange}
           isSaving={isSaving}

@@ -5,19 +5,23 @@ import { useTheme } from '../../contexts/ThemeContext';
 
 export function Topbar() {
   const { theme, toggleTheme } = useTheme();
+  const controlClass =
+    theme === 'dark'
+      ? 'text-gray-400 hover:text-white hover:bg-[#333333]'
+      : 'rounded-xl text-foreground hover:text-foreground hover:bg-accent';
 
   return (
     <header className={`border-b px-12 py-6 flex items-center justify-between transition-colors ${
       theme === 'dark' 
         ? 'bg-[#1a1a1a] border-[#333333]' 
-        : 'bg-white border-gray-200'
+        : 'bg-card border-border'
     }`}>
       {/* Saudação */}
       <div className="flex flex-col">
-        <h1 className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+        <h1 className={theme === 'dark' ? 'text-white' : 'text-foreground'}>
           Olá, Rick!
         </h1>
-        <p className={`mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+        <p className={`mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'}`}>
           Bem-vindo de volta ao seu haras
         </p>
       </div>
@@ -29,10 +33,7 @@ export function Topbar() {
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          className={theme === 'dark' 
-            ? 'text-gray-400 hover:text-white hover:bg-[#333333]'
-            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }
+          className={controlClass}
         >
           {theme === 'dark' ? (
             <Sun className="w-5 h-5" />
@@ -45,11 +46,7 @@ export function Topbar() {
         <Button
           variant="ghost"
           size="icon"
-          className={`relative ${
-            theme === 'dark'
-              ? 'text-gray-400 hover:text-white hover:bg-[#333333]'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
+          className={`relative ${controlClass}`}
         >
           <Bell className="w-5 h-5" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -60,7 +57,7 @@ export function Topbar() {
           <AvatarFallback className={
             theme === 'dark' 
               ? 'bg-[#333333] text-white' 
-              : 'bg-gray-200 text-gray-900'
+              : 'bg-primary text-primary-foreground'
           }>
             RH
           </AvatarFallback>

@@ -9,11 +9,11 @@
 
 /* Light mode - lighter backgrounds */
 .criahub-container:not(.dark) > div[data-name="CriaHub"] {
-  background-color: #f5f5f5 !important;
+  background-color: #f4f0e8 !important;
 }
 
 .criahub-container:not(.dark) [data-name="Sidebar"] {
-  background-color: #e8e8e8 !important;
+  background-color: #ece5d9 !important;
 }
 
 .criahub-container:not(.dark) [data-name="Sidebar"] p[class*="text-white"] {
@@ -26,12 +26,12 @@
 
 .criahub-container:not(.dark) [data-name*="Container"][class*="bg-[#0d0d0d]"],
 .criahub-container:not(.dark) [data-name*="Container"][class*="bg-[#1a1a1a]"] {
-  background-color: #ffffff !important;
+  background-color: #faf7f2 !important;
 }
 
 .criahub-container:not(.dark) [data-name="Topbar"] {
-  background-color: #ffffff !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background-color: #faf7f2 !important;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.12) !important;
 }
 
 .criahub-container:not(.dark) [data-name="Topbar"] p[class*="text-white"] {
@@ -39,7 +39,7 @@
 }
 
 .criahub-container:not(.dark) [data-name*="Card"] {
-  background-color: #ffffff !important;
+  background-color: #faf7f2 !important;
 }
 
 .criahub-container:not(.dark) [data-name*="Card"] p[class*="text-white"] {
@@ -47,16 +47,16 @@
 }
 
 .criahub-container:not(.dark) [data-name*="Card"] p[class*="text-[#99a1af]"] {
-  color: #6a7282 !important;
+  color: #6d665d !important;
 }
 
 /* Border adjustments for light mode */
 .criahub-container:not(.dark) [class*="border-[rgba(255,255,255"] {
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(17, 17, 17, 0.12) !important;
 }
 
 .criahub-container:not(.dark) [class*="border-[#1a1a1a]"] {
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(17, 17, 17, 0.12) !important;
 }
 
 /* Make container elements clickable */
@@ -78,7 +78,7 @@
 }
 
 .criahub-container:not(.dark) [data-name="Sidebar"] [data-name^="Container"][class*="rounded-[10px]"]:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(17, 17, 17, 0.06);
 }
 
 /* Active state for selected menu item */
@@ -87,7 +87,7 @@
 }
 
 .criahub-container:not(.dark) [data-name="Container11"] {
-  background-color: rgba(0, 0, 0, 0.08) !important;
+  background-color: rgba(17, 17, 17, 0.1) !important;
 }
 
 /* SVG icon colors in light mode */
@@ -96,7 +96,7 @@
 }
 
 .criahub-container:not(.dark) svg path[stroke="#99A1AF"] {
-  stroke: #6a7282 !important;
+  stroke: #6d665d !important;
 }
 
 /* Ensure buttons work */

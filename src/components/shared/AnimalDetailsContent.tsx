@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { GenealogyTree } from '../breeder/GenealogyTree';
 import { useAnimalGenealogy } from '@/hooks/useAnimals';
+import { getAnimalStatusLabel, getDisplayCategoryLabel } from '@/lib/animal-classification';
 import { buildGenealogyView } from '@/lib/genealogy';
+import { getServiceTypeLabel, normalizeServiceType } from '@/lib/animal-location';
 
 interface Animal {
   id: number;
@@ -54,6 +56,9 @@ function formatBirthDate(isoDate: string | undefined): string {
 export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalDetailsContentProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { data: genealogyData, isLoading: isLoadingGenealogy } = useAnimalGenealogy(String(animal.id));
+  const displayCategory = getDisplayCategoryLabel(animal.category);
+  const displayStatus = getAnimalStatusLabel(animal.status);
+  const displayServiceType = getServiceTypeLabel(normalizeServiceType(animal.servicoTipo) || animal.servicoTipo);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -181,7 +186,7 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
                 )}
                 <div>
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Categoria</p>
-                  <p className="text-foreground dark:text-white">{animal.category}</p>
+                  <p className="text-foreground dark:text-white">{displayCategory}</p>
                 </div>
                 {animal.harasOrigem && (
                   <div>
@@ -196,7 +201,7 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
                 <div>
                   <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Status</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-sm ${animal.statusColor}`}>
-                    {animal.status}
+                    {displayStatus}
                   </span>
                 </div>
               </div>
@@ -225,7 +230,7 @@ export function AnimalDetailsContent({ animal, activeTab, onTabChange }: AnimalD
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground dark:text-[#99a1af]">Tipo de Serviço</p>
-                        <p className="text-foreground dark:text-white">{animal.servicoTipo}</p>
+                        <p className="text-foreground dark:text-white">{displayServiceType}</p>
                       </div>
                     </div>
                   )}

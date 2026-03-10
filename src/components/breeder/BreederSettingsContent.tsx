@@ -12,9 +12,13 @@ import {
   useUpdateTeamMemberStatus,
   useRemoveTeamMember,
 } from '@/hooks/useHarasSettings';
+import type { HarasBackupSettings } from '@/services/harasSettings';
 import { AddCollaboratorForm } from './AddCollaboratorForm';
 import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
+import { DEFAULT_HARAS_LOCATION_SETTINGS, normalizeHarasLocationSettings } from '@/lib/animal-location';
+import { isCreatorRole } from '@/lib/roles';
 import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
+import type { HarasLocationSettings } from '@/types';
 
 type SettingsTab = 'profile' | 'team' | 'plans' | 'security' | 'general';
 
@@ -92,10 +96,11 @@ export function BreederSettingsContent() {
     allowSearch: true,
   });
 
-  const [backupSettings, setBackupSettings] = useState({
+  const [backupSettings, setBackupSettings] = useState<HarasBackupSettings>({
     autoBackup: true,
     frequency: 'daily',
   });
+  const [locationSettings, setLocationSettings] = useState<HarasLocationSettings>(DEFAULT_HARAS_LOCATION_SETTINGS);
 
   // Estados dos Modais
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -132,6 +137,34 @@ export function BreederSettingsContent() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]/g, '');
+
+  const canManageLocations = isCreatorRole(profile?.role);
+
+  const locationSections: Array<{
+    key: keyof HarasLocationSettings;
+    title: string;
+    description: string;
+    placeholder: string;
+  }> = [
+    {
+      key: 'baias',
+      title: 'Baias',
+      description: 'Locais de manejo individual disponíveis para seleção nos cadastros.',
+      placeholder: 'Ex: Baia 04',
+    },
+    {
+      key: 'pastos',
+      title: 'Pastos',
+      description: 'Áreas coletivas que podem ser escolhidas no plantel.',
+      placeholder: 'Ex: Pasto Leste',
+    },
+    {
+      key: 'servicos',
+      title: 'Serviços / Hospedagens',
+      description: 'Destinos externos usados em serviço e hospedagem.',
+      placeholder: 'Ex: Centro Hípico Serra',
+    },
+  ];
 
   const formatPhone = (value: string): string => {
     const numbers = value.replace(/\D/g, '').slice(0, 11);
@@ -285,6 +318,7 @@ export function BreederSettingsContent() {
     setNotificationSettings(harasSettings.notification_settings);
     setPrivacySettings(harasSettings.privacy_settings);
     setBackupSettings(harasSettings.backup_settings);
+    setLocationSettings(normalizeHarasLocationSettings(harasSettings.location_settings));
     setSettingsHydrated(true);
   }, [harasSettings, settingsHydrated]);
 
@@ -558,6 +592,31 @@ export function BreederSettingsContent() {
     toast.success('Backup manual iniciado! Você será notificado quando concluído.');
   };
 
+  const updateLocationListItem = (
+    key: keyof HarasLocationSettings,
+    index: number,
+    value: string
+  ) => {
+    setLocationSettings((prev) => ({
+      ...prev,
+      [key]: prev[key].map((item, itemIndex) => (itemIndex === index ? value : item)),
+    }));
+  };
+
+  const addLocationListItem = (key: keyof HarasLocationSettings) => {
+    setLocationSettings((prev) => ({
+      ...prev,
+      [key]: [...prev[key], ''],
+    }));
+  };
+
+  const removeLocationListItem = (key: keyof HarasLocationSettings, index: number) => {
+    setLocationSettings((prev) => ({
+      ...prev,
+      [key]: prev[key].filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
   const handleSaveGeneralSettings = async () => {
     if (!harasId) {
       toast.error('Haras não encontrado.');
@@ -572,8 +631,10 @@ export function BreederSettingsContent() {
           notification_settings: notificationSettings,
           privacy_settings: privacySettings,
           backup_settings: backupSettings,
+          location_settings: locationSettings,
         },
       });
+      setLocationSettings((prev) => normalizeHarasLocationSettings(prev));
       toast.success('Configurações atualizadas com sucesso!');
     } catch (err: any) {
       console.error('Erro ao salvar configurações:', err);
@@ -586,7 +647,8 @@ export function BreederSettingsContent() {
   const handleRestoreDefaults = () => {
     const defaultNotification = { agenda: true, reproduction: true, system: true };
     const defaultPrivacy = { publicPlantel: true, shareAnalytics: true, allowSearch: true };
-    const defaultBackup = { autoBackup: true, frequency: 'daily' };
+    const defaultBackup: HarasBackupSettings = { autoBackup: true, frequency: 'daily' };
+    const defaultLocations = DEFAULT_HARAS_LOCATION_SETTINGS;
 
     setConfirmAction({
       title: 'Restaurar Configurações Padrão',
@@ -595,6 +657,7 @@ export function BreederSettingsContent() {
         setNotificationSettings(defaultNotification);
         setPrivacySettings(defaultPrivacy);
         setBackupSettings(defaultBackup);
+        setLocationSettings(defaultLocations);
         if (harasId) {
           try {
             await updateHarasSettings.mutateAsync({
@@ -603,6 +666,7 @@ export function BreederSettingsContent() {
                 notification_settings: defaultNotification,
                 privacy_settings: defaultPrivacy,
                 backup_settings: defaultBackup,
+                location_settings: defaultLocations,
               },
             });
           } catch (err: any) {
@@ -1445,6 +1509,66 @@ export function BreederSettingsContent() {
                   </div>
                 </div>
               </div>
+
+              {canManageLocations && (
+                <div className="bg-background dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl p-6">
+                  <div className="mb-6">
+                    <h3 className="text-lg text-foreground dark:text-white mb-2">
+                      Localizações do Plantel
+                    </h3>
+                    <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                      Cadastre as localizações que ficarão disponíveis nos dropdowns de cadastro, edição e mudança de local.
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {locationSections.map((section) => (
+                      <div
+                        key={section.key}
+                        className="rounded-xl border border-border dark:border-[#3a3a3a] p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div>
+                            <h4 className="text-foreground dark:text-white">{section.title}</h4>
+                            <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                              {section.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addLocationListItem(section.key)}
+                            className="px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-white/10 dark:text-white hover:opacity-90 transition-opacity"
+                          >
+                            Adicionar
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {locationSettings[section.key].map((item, index) => (
+                            <div key={`${section.key}-${index}`} className="flex gap-3">
+                              <input
+                                type="text"
+                                value={item}
+                                onChange={(e) => updateLocationListItem(section.key, index, e.target.value)}
+                                placeholder={section.placeholder}
+                                className="flex-1 h-11 px-4 bg-card dark:bg-[#1a1a1a] border border-border dark:border-[#3a3a3a] rounded-xl text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#6b6b6b] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeLocationListItem(section.key, index)}
+                                className="h-11 w-11 rounded-xl border border-border dark:border-[#3a3a3a] flex items-center justify-center text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                aria-label={`Remover ${section.title}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

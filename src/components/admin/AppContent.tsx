@@ -53,7 +53,7 @@ export function AppContent() {
   return (
     <div className="relative">
       {viewMode === 'desktop' ? (
-        <div className={`flex h-screen transition-colors ${theme === 'dark' ? 'bg-[#0d0d0d]' : 'bg-gray-50'
+        <div className={`flex h-screen transition-colors ${theme === 'dark' ? 'bg-[#0d0d0d]' : 'bg-background'
           }`}>
           <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -64,7 +64,7 @@ export function AppContent() {
           </div>
         </div>
       ) : (
-        <div className="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+        <div className="bg-background min-h-screen flex items-center justify-center p-4">
           <MobileApp />
         </div>
       )}

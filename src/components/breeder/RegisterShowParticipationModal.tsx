@@ -1,5 +1,6 @@
 import { X, Search, Plus, Check, Calendar, MapPin, Users, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
+import { getDisplayCategoryLabel } from '@/lib/animal-classification';
 
 interface Animal {
   id: string;
@@ -195,7 +196,7 @@ export function RegisterShowParticipationModal({ onClose, onRegister }: Register
                         Reg: {animal.registry}
                       </p>
                       <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                        {animal.category}
+                        {getDisplayCategoryLabel(animal.category)}
                       </p>
                     </button>
                   ))}
@@ -327,7 +328,7 @@ export function RegisterShowParticipationModal({ onClose, onRegister }: Register
                       {selectedAnimalsData.map((animal) => (
                         <div key={animal.id} className="flex items-center justify-between text-sm">
                           <span className="text-foreground dark:text-white">{animal.name}</span>
-                          <span className="text-muted-foreground dark:text-[#99a1af]">{animal.category}</span>
+                          <span className="text-muted-foreground dark:text-[#99a1af]">{getDisplayCategoryLabel(animal.category)}</span>
                         </div>
                       ))}
                     </div>

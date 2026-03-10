@@ -1,5 +1,6 @@
 import { X, Trophy } from 'lucide-react';
 import { useState } from 'react';
+import { getDisplayCategoryLabel } from '@/lib/animal-classification';
 
 interface AnimalResult {
   id: string;
@@ -69,7 +70,7 @@ export function UpdateResultModal({ animal, onClose, onSave }: UpdateResultModal
             </label>
             <input
               type="text"
-              value={animal.category}
+              value={getDisplayCategoryLabel(animal.category)}
               disabled
               className="w-full px-4 py-3 bg-muted dark:bg-[#3a3a3a] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-muted-foreground dark:text-[#99a1af] cursor-not-allowed"
             />

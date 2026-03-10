@@ -1,7 +1,19 @@
 import { ArrowLeft, Upload, X, Camera, FileText, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { toast } from 'sonner';
+import { useHarasSettings } from '@/hooks/useHarasSettings';
+import { useUser } from '@/contexts/UserContext';
+import { getAnimalStatusLabel, getDisplayCategoryLabel, isPlantelActiveStatus } from '@/lib/animal-classification';
+import {
+  getLocationOptionsForType,
+  getServiceTypeLabel,
+  normalizeHarasLocationSettings,
+  normalizeServiceType,
+  parseAnimalLocation,
+  withCurrentLocationOption,
+} from '@/lib/animal-location';
+import type { AnimalLocationType, AnimalServiceType } from '@/types';
 
 interface Animal {
   id: number;
@@ -44,11 +56,23 @@ interface DocumentItem {
 }
 
 export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAnimalProps) {
+  const { stableHarasId } = useUser();
+  const { data: harasSettings } = useHarasSettings(stableHarasId || '');
+  const locationSettings = useMemo(
+    () => normalizeHarasLocationSettings(harasSettings?.location_settings),
+    [harasSettings?.location_settings]
+  );
+  const parsedLocation = parseAnimalLocation(animal.localizacao, animal.servicoTipo);
+  const serviceTypeOptions: AnimalServiceType[] = ['Reproducao', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
+  const initialLocationOptions = withCurrentLocationOption(
+    getLocationOptionsForType(locationSettings, parsedLocation.locationType),
+    parsedLocation.locationName
+  );
   const [formData, setFormData] = useState({
     nome: animal.name,
     registro: animal.registry,
     chip: animal.chip || '',
-    categoria: animal.category,
+    categoria: getDisplayCategoryLabel(animal.category),
     sexo: animal.sex || 'Macho',
     dataNascimento: animal.birthDate || '2020-01-15',
     pelagem: 'Alazã',
@@ -56,10 +80,19 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
     pai: '',
     mae: '',
     haras: animal.haras,
-    status: animal.status,
-    localizacao: animal.localizacao || 'Baia',
-    servicoTipo: animal.servicoTipo || 'Reprodução',
+    status: getAnimalStatusLabel(animal.status),
+    localizacaoTipo: parsedLocation.locationType as AnimalLocationType,
+    localizacao: initialLocationOptions.find((option) => option === parsedLocation.locationName) || initialLocationOptions[0] || '',
+    servicoTipo: (parsedLocation.serviceType || 'Reproducao') as AnimalServiceType,
+    dataRetornoHospedagem: '',
   });
+  const locationOptions = withCurrentLocationOption(
+    getLocationOptionsForType(locationSettings, formData.localizacaoTipo),
+    parsedLocation.locationType === formData.localizacaoTipo ? parsedLocation.locationName : ''
+  );
+  const selectedLocation = locationOptions.includes(formData.localizacao)
+    ? formData.localizacao
+    : locationOptions[0] || '';
 
   // Estado para mídia existente e nova
   const [existingMedia, setExistingMedia] = useState<MediaItem[]>(
@@ -132,7 +165,9 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
     onBack();
   };
 
-  const mostrarSubOpcoesServico = formData.localizacao === 'Serviço';
+  const mostrarSubOpcoesServico = formData.localizacaoTipo === 'Servico';
+  const mostrarRetornoHospedagem = normalizeServiceType(formData.servicoTipo) === 'Hospedagem';
+  const mostrarLocalizacao = isPlantelActiveStatus(formData.status);
 
   return (
     <div className="space-y-6">
@@ -218,10 +253,11 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
                   value={formData.categoria}
                   onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
                 >
-                  <option value="Reprodutor">Reprodutor</option>
-                  <option value="Reprodutora">Reprodutora</option>
+                  <option value="Garanhão">Garanhão</option>
+                  <option value="Égua">Égua</option>
                   <option value="Potro">Potro</option>
                   <option value="Potra">Potra</option>
+                  <option value="Castrado">Castrado</option>
                 </NativeSelect>
               </div>
 
@@ -330,17 +366,18 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   <option value="Ativo">Ativo</option>
+                  <option value="Em serviço">Em serviço</option>
+                  <option value="Provisório">Provisório</option>
                   <option value="Vendido">Vendido</option>
-                  <option value="Falecido">Falecido</option>
                   <option value="Transferido">Transferido</option>
-                  <option value="Inativo">Inativo</option>
+                  <option value="Falecido">Falecido</option>
                 </NativeSelect>
               </div>
             </div>
           </div>
 
-          {/* Localização - Apenas se Status = Ativo */}
-          {formData.status === 'Ativo' && (
+          {/* Localização - Apenas para status ativos do plantel */}
+          {mostrarLocalizacao && (
             <div>
               <h3 className="text-lg text-foreground dark:text-white mb-4">Localização Atual</h3>
               <div className="space-y-6">
@@ -348,12 +385,32 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
                   <div>
                     <label className="block text-sm text-foreground dark:text-white mb-2">Onde está o animal? *</label>
                     <NativeSelect
-                      value={formData.localizacao}
-                      onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
+                      value={formData.localizacaoTipo}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          localizacaoTipo: e.target.value as AnimalLocationType,
+                          localizacao: getLocationOptionsForType(locationSettings, e.target.value as AnimalLocationType)[0] || '',
+                        })
+                      }
                     >
                       <option value="Baia">Baia</option>
                       <option value="Pasto">Pasto</option>
-                      <option value="Serviço">Serviço</option>
+                      <option value="Servico">Serviço</option>
+                    </NativeSelect>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Localização *</label>
+                    <NativeSelect
+                      value={selectedLocation}
+                      onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
+                    >
+                      {locationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </NativeSelect>
                   </div>
 
@@ -362,13 +419,26 @@ export function AdvisorEditarAnimal({ animal, onBack, onSave }: AdvisorEditarAni
                       <label className="block text-sm text-foreground dark:text-white mb-2">Tipo de Serviço *</label>
                       <NativeSelect
                         value={formData.servicoTipo}
-                        onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value as AnimalServiceType })}
                       >
-                        <option value="Reprodução">Reprodução</option>
-                        <option value="Trabalho">Trabalho</option>
-                        <option value="Repouso">Repouso</option>
-                        <option value="Outro">Outro</option>
+                        {serviceTypeOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {getServiceTypeLabel(option)}
+                          </option>
+                        ))}
                       </NativeSelect>
+                    </div>
+                  )}
+
+                  {mostrarRetornoHospedagem && (
+                    <div>
+                      <label className="block text-sm text-foreground dark:text-white mb-2">Data prevista de retorno</label>
+                      <input
+                        type="date"
+                        value={formData.dataRetornoHospedagem}
+                        onChange={(e) => setFormData({ ...formData, dataRetornoHospedagem: e.target.value })}
+                        className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+                      />
                     </div>
                   )}
                 </div>

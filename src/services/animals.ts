@@ -6,6 +6,7 @@
 import { supabase, applyPagination, formatPaginatedResponse, handleSupabaseError } from './base';
 import * as XLSX from 'xlsx';
 import { decode } from 'html-entities';
+import { getPlantelStatusActivity, normalizeAnimalStatus } from '@/lib/animal-classification';
 import type {
     Animal,
     AnimalSex,
@@ -88,17 +89,30 @@ function parseStatusManejo(value: string | null | undefined): { motivo?: string;
 // Mapeamento do status do banco para o frontend
 const STATUS_MAPPING: Record<string, string> = {
     'Ativo': 'ativo',
+    'ativo': 'ativo',
     'Provisorio': 'provisorio',
     'Provisório': 'provisorio',
+    'provisorio': 'provisorio',
     'Vendido': 'vendido',
+    'vendido': 'vendido',
     'Falecido': 'morto',
-    'Transferido': 'emprestado'
+    'morto': 'morto',
+    'Transferido': 'emprestado',
+    'transferido': 'emprestado',
+    'emprestado': 'emprestado',
+    'Em serviço': 'em_servico',
+    'Em servico': 'em_servico',
+    'em_servico': 'em_servico'
 };
 
-const REVERSE_STATUS_MAPPING: Record<string, string> = Object.entries(STATUS_MAPPING).reduce((acc, [key, value]) => {
-    acc[value] = key;
-    return acc;
-}, {} as Record<string, string>);
+const REVERSE_STATUS_MAPPING: Record<string, string> = {
+    'ativo': 'Ativo',
+    'provisorio': 'Provisório',
+    'vendido': 'Vendido',
+    'morto': 'Falecido',
+    'emprestado': 'Transferido',
+    'em_servico': 'Em serviço'
+};
 
 const GENEALOGY_SELECT_FIELDS = `
     id, abccmm_rowid, nome, registro, foto_url, images, pai_id, mae_id, father_name, mother_name, dados_genealogicos
@@ -631,8 +645,16 @@ export const animalsService = {
         }
         if (filters.status) {
             // Mapear status do filtro para status do banco
-            const dbStatus = REVERSE_STATUS_MAPPING[filters.status] || filters.status;
-            query = query.eq('status', dbStatus);
+            const normalizedStatus = normalizeAnimalStatus(filters.status);
+            const dbStatus = normalizedStatus ? REVERSE_STATUS_MAPPING[normalizedStatus] : filters.status;
+            const possibleStatusValues = Array.from(
+                new Set([dbStatus, normalizedStatus, filters.status].filter(Boolean))
+            );
+            if (possibleStatusValues.length === 1) {
+                query = query.eq('status', possibleStatusValues[0] as string);
+            } else {
+                query = query.in('status', possibleStatusValues as string[]);
+            }
         }
         if (filters.search) {
             query = query.or(`nome.ilike.%${filters.search}%,registro.ilike.%${filters.search}%`);
@@ -660,7 +682,7 @@ export const animalsService = {
             weight: item.weight,
             height: item.height,
             origin_haras: item.haras_origem,
-            status: STATUS_MAPPING[item.status] || item.status?.toLowerCase(),
+            status: STATUS_MAPPING[item.status] || normalizeAnimalStatus(item.status) || item.status?.toLowerCase(),
             father_id: item.pai_id,
             mother_id: item.mae_id,
             location: item.localizacao,
@@ -804,7 +826,7 @@ export const animalsService = {
             birth_date: data.data_nascimento,
             coat_color: data.pelagem,
             gait: data.andamento,
-            status: STATUS_MAPPING[data.status] || data.status?.toLowerCase(),
+            status: STATUS_MAPPING[data.status] || normalizeAnimalStatus(data.status) || data.status?.toLowerCase(),
             father_id: data.pai_id,
             mother_id: data.mae_id,
             location: data.localizacao,
@@ -831,7 +853,7 @@ export const animalsService = {
             mother: motherData,
 
             // Status no plantel (mapear do status)
-            statusAtividade: data.status === 'Ativo' ? 'Ativo' : 'Inativo',
+            statusAtividade: getPlantelStatusActivity(data.status),
 
             // Dados calculados
             filhos: offspringCount || 0,

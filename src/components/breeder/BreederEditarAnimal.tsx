@@ -1,10 +1,24 @@
 import { ArrowLeft, Upload, X, Camera, FileText, Plus, Video, Loader2, Lock } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
 import { useUpdateAnimal } from '@/hooks/useAnimals';
+import { useHarasSettings } from '@/hooks/useHarasSettings';
 import { useUser } from '@/contexts/UserContext';
 import { createClient } from '@/lib/supabase/client';
+import { isAdultByAgeOrCategory, isManualCastradoCategory, normalizeAnimalStatus, resolveManagedCategory } from '@/lib/animal-classification';
+import {
+  buildAnimalLocationLabel,
+  getLocationOptionsForType,
+  getServiceTypeLabel,
+  isHospedagemLocation,
+  normalizeHarasLocationSettings,
+  normalizeServiceType,
+  parseAnimalLocation,
+  unwrapLocationOptionLabel,
+  withCurrentLocationOption,
+} from '@/lib/animal-location';
+import { eventsService } from '@/services/events';
 
 interface Animal {
   id: string;
@@ -74,30 +88,7 @@ interface DocumentItem {
 
 export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAnimalProps) {
   const DEFAULT_PLACEHOLDER = '';
-  const SERVICE_TYPE_OPTIONS = ['Reprodução', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
-
-  const getAgeInMonths = (birthDate?: string) => {
-    if (!birthDate) return null;
-    const birth = new Date(birthDate);
-    if (Number.isNaN(birth.getTime())) return null;
-    const today = new Date();
-    return (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
-  };
-
-  const resolveCategoryByAge = (sex?: string, birthDate?: string): string => {
-    if (!sex || !birthDate) return '';
-    const ageInMonths = getAgeInMonths(birthDate);
-    if (ageInMonths === null) return '';
-    if (ageInMonths < 24) return sex === 'Fêmea' ? 'potra' : 'potro';
-    return sex === 'Fêmea' ? 'egua' : 'garanhao';
-  };
-
-  const isAdultByAgeOrCategory = (item: { birth_date?: string | null; category?: string | null }) => {
-    const ageInMonths = getAgeInMonths(item.birth_date || undefined);
-    if (ageInMonths !== null) return ageInMonths >= 24;
-    const key = (item.category || '').toLowerCase();
-    return key.includes('garanh') || key.includes('egua');
-  };
+  const SERVICE_TYPE_OPTIONS = ['Reproducao', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'] as const;
 
   const updateAnimalMutation = useUpdateAnimal();
   const { stableHarasId } = useUser();
@@ -108,33 +99,88 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   const [fatherSearch, setFatherSearch] = useState('');
   const [motherSearch, setMotherSearch] = useState('');
   const isOfficialDataLocked = Boolean(animal.abccmm_rowid);
+  const effectiveHarasId = animal.haras_id || stableHarasId || '';
+  const { data: harasSettings } = useHarasSettings(effectiveHarasId);
+  const locationSettings = useMemo(
+    () => normalizeHarasLocationSettings(harasSettings?.location_settings),
+    [harasSettings?.location_settings]
+  );
+  const [returnReminderDate, setReturnReminderDate] = useState('');
+  const normalizeCategoryValue = (value?: string | null) => {
+    switch (value) {
+      case 'Égua':
+        return 'egua';
+      case 'Garanhão':
+        return 'garanhao';
+      case 'Potro':
+        return 'potro';
+      case 'Potra':
+      case 'Potranca':
+        return 'potra';
+      case 'Castrado':
+        return 'castrado';
+      default:
+        return value || '';
+    }
+  };
 
-  const buildFormData = (source: Animal | null | undefined) => ({
-    nome: source?.name || '',
-    registro: source?.registry || source?.registry_number || '',
-    chip: source?.chip || source?.chip_number || '',
-    categoria: source?.category || '',
-    sexo: source?.sex || 'Macho',
-    dataNascimento: source?.birthDate || source?.birth_date || '',
-    pelagem: source?.coat_color || source?.pelagem || '',
-    andamento: source?.gait || 'Marchado',
-    pai_id: source?.father_id || (source as any)?.pai_id || (source?.father_name ? 'external' : ''),
-    pai: source?.father_name || source?.pai || '',
-    mae_id: source?.mother_id || (source as any)?.mae_id || (source?.mother_name ? 'external' : ''),
-    mae: source?.mother_name || source?.mae || '',
-    haras: source?.haras || '',
-    status: source?.status || 'ativo',
-    statusManejo: (source as any)?.status_manejo || (source as any)?.management_status || '',
-    localizacao: source?.localizacao || source?.location || 'Baia',
-    servicoTipo: source?.servicoTipo || source?.service_type || (source as any)?.tipo_servico || 'Reprodução',
-    origemHaras: source?.origin_haras || source?.harasOrigem || '',
-    observacoes: source?.observations || '',
-    peso: source?.weight || '',
-    altura: source?.height || '',
-  });
+  const buildFormData = (source: Animal | null | undefined) => {
+    const parsedLocation = parseAnimalLocation(
+      source?.localizacao || source?.location,
+      source?.servicoTipo || source?.service_type || (source as any)?.tipo_servico
+    );
+
+    return {
+      nome: source?.name || '',
+      registro: source?.registry || source?.registry_number || '',
+      chip: source?.chip || source?.chip_number || '',
+      categoria: normalizeCategoryValue(source?.category),
+      sexo: source?.sex || 'Macho',
+      dataNascimento: source?.birthDate || source?.birth_date || '',
+      pelagem: source?.coat_color || source?.pelagem || '',
+      andamento: source?.gait || 'Marchado',
+      pai_id: source?.father_id || (source as any)?.pai_id || (source?.father_name ? 'external' : ''),
+      pai: source?.father_name || source?.pai || '',
+      mae_id: source?.mother_id || (source as any)?.mae_id || (source?.mother_name ? 'external' : ''),
+      mae: source?.mother_name || source?.mae || '',
+      haras: source?.haras || '',
+      status: normalizeAnimalStatus(source?.status) || 'ativo',
+      statusManejo: (source as any)?.status_manejo || (source as any)?.management_status || '',
+      localizacaoTipo: parsedLocation.locationType,
+      localizacao: parsedLocation.locationName || '',
+      servicoTipo: parsedLocation.serviceType || '',
+      origemHaras: source?.origin_haras || source?.harasOrigem || '',
+      observacoes: source?.observations || '',
+      peso: source?.weight || '',
+      altura: source?.height || '',
+    };
+  };
 
   // Initialize form data with actual animal data from the database
   const [formData, setFormData] = useState(() => buildFormData(animal));
+  const originalParsedLocation = useMemo(
+    () => parseAnimalLocation(
+      (hydratedAnimal || animal)?.localizacao || (hydratedAnimal || animal)?.location,
+      (hydratedAnimal || animal)?.servicoTipo || (hydratedAnimal || animal)?.service_type
+    ),
+    [animal, hydratedAnimal]
+  );
+  const locationOptions = useMemo(() => {
+    const baseOptions = getLocationOptionsForType(locationSettings, formData.localizacaoTipo);
+    const currentLocationName =
+      originalParsedLocation.locationType === formData.localizacaoTipo
+        ? originalParsedLocation.locationName
+        : '';
+    return withCurrentLocationOption(baseOptions, currentLocationName);
+  }, [formData.localizacaoTipo, locationSettings, originalParsedLocation.locationName, originalParsedLocation.locationType]);
+  const normalizedServiceType = normalizeServiceType(formData.servicoTipo);
+  const isServiceLocation = formData.localizacaoTipo === 'Servico';
+  const isHospedagemSelection =
+    isServiceLocation
+    && (
+      normalizedServiceType === 'Hospedagem'
+      || isHospedagemLocation(formData.localizacao, formData.servicoTipo)
+    );
 
   useEffect(() => {
     let isMounted = true;
@@ -163,11 +209,59 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   }, [animal, hydratedAnimal]);
 
   useEffect(() => {
-    const autoCategory = resolveCategoryByAge(formData.sexo, formData.dataNascimento);
+    if (locationOptions.length === 0) return;
+
+    const currentLocation = unwrapLocationOptionLabel(formData.localizacao || '');
+    const matchingOption = locationOptions.find(
+      (option) => unwrapLocationOptionLabel(option) === currentLocation
+    );
+
+    if (matchingOption) {
+      if (formData.localizacao !== matchingOption) {
+        setFormData((prev) => ({
+          ...prev,
+          localizacao: matchingOption,
+        }));
+      }
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      localizacao: locationOptions[0],
+    }));
+  }, [formData.localizacao, locationOptions]);
+
+  useEffect(() => {
+    const autoCategory = resolveManagedCategory(formData.sexo, formData.dataNascimento, formData.categoria);
     if (autoCategory && formData.categoria !== autoCategory) {
+      if (isManualCastradoCategory(formData.categoria)) return;
       setFormData((prev) => ({ ...prev, categoria: autoCategory }));
     }
   }, [formData.sexo, formData.dataNascimento]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadReturnReminder() {
+      if (!effectiveHarasId) {
+        if (isMounted) setReturnReminderDate('');
+        return;
+      }
+
+      const reminderEvent = await eventsService.findHospedagemReturnReminder(effectiveHarasId, String(animal.id));
+      if (!isMounted) return;
+      setReturnReminderDate(reminderEvent?.start_date?.split('T')[0] || '');
+    }
+
+    loadReturnReminder().catch((error) => {
+      console.error('Erro ao carregar lembrete de retorno da hospedagem:', error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [animal.id, effectiveHarasId]);
 
   // Carregar garanhões e éguas do mesmo haras para seleção de genealogia
   useEffect(() => {
@@ -426,6 +520,16 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
 
   const handleSave = async () => {
     try {
+      if (isServiceLocation && !normalizedServiceType) {
+        toast.error('Selecione o tipo de serviço.');
+        return;
+      }
+
+      if (isHospedagemSelection && !returnReminderDate) {
+        toast.error('Informe a data prevista de retorno da hospedagem.');
+        return;
+      }
+
       setIsLoading(true);
       const supabase = createClient();
 
@@ -494,6 +598,21 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
         ? allMediaUrls[existingImageUrls.length + selectedNewCoverIndex]
         : undefined;
       const mainImageUrl = selectedExistingCover?.url || selectedNewCoverUrl || allMediaUrls[0] || undefined;
+      const locationName = unwrapLocationOptionLabel(formData.localizacao || '');
+      const resolvedLocation = buildAnimalLocationLabel(
+        formData.localizacaoTipo,
+        locationName,
+        isServiceLocation ? formData.servicoTipo : undefined
+      );
+      const resolvedServiceType = isServiceLocation && normalizedServiceType
+        ? getServiceTypeLabel(normalizedServiceType)
+        : undefined;
+      let nextStatus = mapStatusToDb(formData.status) as 'ativo' | 'vendido' | 'morto' | 'emprestado' | 'em_servico';
+      if (isHospedagemSelection) {
+        nextStatus = 'em_servico';
+      } else if (nextStatus === 'em_servico') {
+        nextStatus = 'ativo';
+      }
 
       const updateData = {
         id: animal.id,
@@ -501,18 +620,18 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
         registry_number: formData.registro,
         chip_number: formData.chip,
         sex: formData.sexo as 'Macho' | 'Fêmea',
-        category: mapCategoryToDb(formData.categoria),
+        category: mapCategoryToDb(resolveManagedCategory(formData.sexo, formData.dataNascimento, formData.categoria) || formData.categoria),
         birth_date: formData.dataNascimento,
         coat_color: formData.pelagem,
         gait: formData.andamento,
-        status: mapStatusToDb(formData.status) as 'ativo' | 'vendido' | 'morto' | 'emprestado' | 'em_servico',
+        status: nextStatus,
         management_status: formData.statusManejo || undefined,
         father_id: formData.pai_id && formData.pai_id !== 'external' ? formData.pai_id : undefined,
         mother_id: formData.mae_id && formData.mae_id !== 'external' ? formData.mae_id : undefined,
         father_name: formData.pai || undefined,
         mother_name: formData.mae || undefined,
-        location: formData.localizacao,
-        service_type: formData.servicoTipo,
+        location: resolvedLocation,
+        service_type: resolvedServiceType,
         origin_haras: formData.origemHaras,
         weight: formData.peso ? Number(formData.peso) : undefined,
         height: formData.altura ? Number(formData.altura) : undefined,
@@ -535,6 +654,21 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
       // Call the mutation to update the animal
       const result = await updateAnimalMutation.mutateAsync(updateData);
       console.log('Resultado da atualização:', result);
+
+      if (effectiveHarasId) {
+        if (isHospedagemSelection && returnReminderDate) {
+          await eventsService.syncHospedagemReturnReminder({
+            harasId: effectiveHarasId,
+            animalId: String(animal.id),
+            animalName: formData.nome,
+            returnDate: returnReminderDate,
+            location: resolvedLocation,
+            observations: formData.observacoes || null,
+          });
+        } else {
+          await eventsService.deleteHospedagemReturnReminder(effectiveHarasId, String(animal.id));
+        }
+      }
 
       // Show success message with details
       const successMsg = uploadedMediaCount > 0 || uploadedDocCount > 0
@@ -570,12 +704,14 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   const mapStatusToDb = (status: string): string => {
     const mapping: Record<string, string> = {
       'Ativo': 'ativo',
+      'Em serviço': 'em_servico',
+      'Provisório': 'provisorio',
       'Vendido': 'vendido',
       'Falecido': 'morto',
       'Transferido': 'emprestado',
       'Inativo': 'morto',
     };
-    return mapping[status] || status.toLowerCase();
+    return mapping[status] || normalizeAnimalStatus(status) || status.toLowerCase();
   };
 
   const lockedFieldClasses = isOfficialDataLocked
@@ -940,10 +1076,12 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                 <label className="block text-sm text-foreground dark:text-white mb-2">Status do Animal</label>
                 <NativeSelect
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as typeof formData.status })}
                   className="w-full"
                 >
                   <option value="ativo">Ativo</option>
+                  <option value="em_servico">Em serviço</option>
+                  <option value="provisorio">Provisório</option>
                   <option value="vendido">Vendido</option>
                   <option value="morto">Falecido</option>
                   <option value="emprestado">Transferido</option>
@@ -954,7 +1092,7 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
           </div>
 
           {/* Localização - Apenas se Status = Ativo */}
-          {formData.status?.toLowerCase() === 'ativo' && (
+          {normalizeAnimalStatus(formData.status) !== 'vendido' && normalizeAnimalStatus(formData.status) !== 'morto' && (
             <div>
               <h3 className="text-lg text-foreground dark:text-white mb-4">Localização Atual</h3>
               <div className="space-y-6">
@@ -962,13 +1100,34 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                   <div>
                     <label className="block text-sm text-foreground dark:text-white mb-2">Onde está o animal? *</label>
                     <NativeSelect
-                      value={formData.localizacao}
-                      onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
+                      value={formData.localizacaoTipo}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          localizacaoTipo: e.target.value as 'Baia' | 'Pasto' | 'Servico',
+                          servicoTipo: e.target.value === 'Servico' ? formData.servicoTipo : '',
+                        })
+                      }
                       className="w-full"
                     >
                       <option value="Baia">Baia</option>
                       <option value="Pasto">Pasto</option>
-                      <option value="Serviço">Serviço</option>
+                      <option value="Servico">Serviço</option>
+                    </NativeSelect>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-foreground dark:text-white mb-2">Localização *</label>
+                    <NativeSelect
+                      value={formData.localizacao}
+                      onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
+                      className="w-full"
+                    >
+                      {locationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </NativeSelect>
                   </div>
 
@@ -994,19 +1153,33 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
                     </datalist>
                   </div>
 
+                  {isServiceLocation && (
                   <div>
                     <label className="block text-sm text-foreground dark:text-white mb-2">Tipo de Serviço</label>
                     <NativeSelect
                       value={formData.servicoTipo}
-                      onChange={(e) => setFormData({ ...formData, servicoTipo: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, servicoTipo: (e.target.value || '') as typeof formData.servicoTipo })}
                       className="w-full"
                     >
                       <option value="">Selecione</option>
                       {SERVICE_TYPE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>{getServiceTypeLabel(option)}</option>
                       ))}
                     </NativeSelect>
                   </div>
+                  )}
+
+                  {isHospedagemSelection && (
+                    <div>
+                      <label className="block text-sm text-foreground dark:text-white mb-2">Data prevista de retorno *</label>
+                      <input
+                        type="date"
+                        value={returnReminderDate}
+                        onChange={(e) => setReturnReminderDate(e.target.value)}
+                        className="w-full h-10 px-4 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Informação da última alteração */}

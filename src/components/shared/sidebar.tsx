@@ -85,7 +85,7 @@ export function Sidebar({ role }: SidebarProps) {
     return (
         <aside
             className={cn(
-                'fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300',
+                'fixed left-0 top-0 z-40 h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300',
                 isCollapsed ? 'w-[70px]' : 'w-[260px]'
             )}
         >
@@ -96,13 +96,13 @@ export function Sidebar({ role }: SidebarProps) {
                         {isCollapsed ? (
                             <BrandLogo orientation="icon" className="h-9 w-9" />
                         ) : (
-                            <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
+                            <BrandLogo orientation="horizontal" className="h-8 w-auto" />
                         )}
                     </Link>
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="w-8 h-8"
+                        className="h-8 w-8 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                         onClick={() => setIsCollapsed(!isCollapsed)}
                     >
                         {isCollapsed ? (
@@ -125,10 +125,10 @@ export function Sidebar({ role }: SidebarProps) {
                                     key={item.href}
                                     href={item.href}
                                     className={cn(
-                                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                                        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                                         isActive
-                                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm dark:bg-white/10 dark:text-white'
+                                            : 'text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                                     )}
                                 >
                                     <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -144,7 +144,7 @@ export function Sidebar({ role }: SidebarProps) {
                     <Button
                         variant="ghost"
                         className={cn(
-                            'w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10',
+                            'w-full justify-start gap-3 rounded-xl text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-destructive',
                             isCollapsed && 'justify-center'
                         )}
                         onClick={handleSignOut}

@@ -18,6 +18,8 @@ import { useAnimalVideos, useCreateAnimalVideo, useUpdateAnimalVideo, useDeleteA
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { buildGenealogyView } from '@/lib/genealogy';
+import { getAnimalStatusLabel, getDisplayCategoryLabel, isPlantelActiveStatus, normalizeAnimalStatus } from '@/lib/animal-classification';
+import { getServiceTypeLabel, parseAnimalLocation } from '@/lib/animal-location';
 import { useAnimalLocationHistory } from '@/hooks/useAnimalLocations';
 import { useAnimalReproductiveEvents } from '@/hooks/useReproduction';
 
@@ -471,8 +473,9 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
   };
 
   const currentAnimalId = String(fullAnimal.id || animal.id);
-  const resolvedLocationType = normalizeLocationType(fullAnimal.localizacao);
-  const resolvedServiceType = normalizeServiceType(fullAnimal.servicoTipo);
+  const parsedCurrentLocation = parseAnimalLocation(fullAnimal.localizacao, fullAnimal.servicoTipo);
+  const resolvedLocationType = parsedCurrentLocation.locationType;
+  const resolvedServiceType = parsedCurrentLocation.serviceType || undefined;
   const isHistoricalNodeId = (id?: string) => Boolean(id && id.startsWith('historical:'));
   const extractHistoricalRowId = (id?: string) => {
     if (!id || !isHistoricalNodeId(id)) return null;
@@ -1291,10 +1294,10 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                     {/* Coluna 1: Informações gerais */}
                     <div className="space-y-4">
                       {fullAnimal.sex && <InfoRow label="Sexo" value={fullAnimal.sex} />}
-                      <InfoRow label="Categoria" value={fullAnimal.category} />
+                      <InfoRow label="Categoria" value={getDisplayCategoryLabel(fullAnimal.category)} />
                       <InfoRow label="Idade" value={calculateAge(fullAnimal.birthDate)} />
                       {fullAnimal.birthDate && <InfoRow label="Nascimento" value={formatBirthDate(fullAnimal.birthDate)} />}
-                      <InfoRow label="Status Reprodutivo" value={fullAnimal.status} />
+                      <InfoRow label="Status Reprodutivo" value={getAnimalStatusLabel(fullAnimal.status)} />
                       {/* Novo: Status no Plantel */}
                       <InfoRow
                         label="Status no Plantel"
@@ -1911,13 +1914,13 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
                             Nascimento: {child.birthDate ? formatBirthDate(child.birthDate) : 'Não informado'}
                           </span>
                           <span className={`px-2 py-0.5 rounded text-xs ${
-                            child.status === 'ativo'
+                            isPlantelActiveStatus(child.status)
                               ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                              : child.status === 'vendido'
+                              : normalizeAnimalStatus(child.status) === 'vendido'
                                 ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                                 : 'bg-red-500/20 text-red-600 dark:text-red-400'
                           }`}>
-                            {child.status}
+                            {getAnimalStatusLabel(child.status)}
                           </span>
                         </div>
                       </div>
@@ -2017,18 +2020,6 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
               currentLocation={fullAnimal.localizacao}
               locationType={resolvedLocationType}
               serviceType={resolvedServiceType}
-              availableBaias={[
-                { id: '1', name: 'Baia 01 - Setor A', status: 'ocupada', animal: 'Thor' },
-                { id: '2', name: 'Baia 02 - Setor A', status: 'disponível' },
-                { id: '3', name: 'Baia 03 - Setor A', status: 'manutencao' },
-                { id: '4', name: 'Baia 04 - Setor B', status: 'disponível' },
-                { id: '5', name: 'Baia 05 - Setor B', status: 'ocupada', animal: 'Safira' },
-              ]}
-              availablePastos={[
-                { id: '1', name: 'Pasto 01 - Norte', status: 'disponível', capacity: 20, current: 12 },
-                { id: '2', name: 'Pasto 02 - Norte', status: 'cheio', capacity: 15, current: 15 },
-                { id: '3', name: 'Pasto 03 - Sul', status: 'disponível', capacity: 25, current: 8 },
-              ]}
             />
           )}
 
@@ -3068,7 +3059,7 @@ function LocationBadge({ localizacao, servicoTipo }: { localizacao?: string; ser
       </span>
       {servicoTipo && (
         <span className="px-2 py-1 rounded text-xs bg-primary/10 dark:bg-white/10 text-primary dark:text-white">
-          {servicoTipo}
+          {getServiceTypeLabel(normalizeServiceType(servicoTipo) || servicoTipo)}
         </span>
       )}
     </div>

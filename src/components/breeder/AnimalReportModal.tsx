@@ -6,6 +6,7 @@ import { useUser } from '@/contexts/UserContext';
 import { useAnimals } from '@/hooks/useAnimals';
 import { useHaras } from '@/hooks/useHaras';
 import { useCreateReport } from '@/hooks/useReports';
+import { getAnimalStatusLabel, getDisplayCategoryLabel, isPlantelActiveStatus } from '@/lib/animal-classification';
 import type { ReportFormat, ReportType } from '@/types';
 import { uploadReportFile } from '@/services/reportFiles';
 
@@ -48,6 +49,9 @@ export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: An
     () => animals.find((animal) => animal.id === selectedAnimal),
     [animals, selectedAnimal]
   );
+  const selectedCategoryLabel = getDisplayCategoryLabel(selectedAnimalData?.category);
+  const selectedStatusLabel = getAnimalStatusLabel(selectedAnimalData?.status);
+  const selectedStatusTone = isPlantelActiveStatus(selectedAnimalData?.status) ? 'success' : 'warning';
 
   const formatDate = (value?: string | null) => {
     if (!value) return '-';
@@ -111,16 +115,16 @@ export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: An
         heroImageUrl: includeImages ? selectedAnimalData?.main_image_url || undefined : undefined,
         tags: [
           reportType === 'premiacoes' ? 'Premiações' : 'Animal',
-          selectedAnimalData?.status || '',
-          selectedAnimalData?.category || '',
+          selectedStatusLabel,
+          selectedCategoryLabel,
         ].filter(Boolean),
         summary: [
           { label: 'Animal', value: selectedAnimalData?.name || '-' },
           { label: 'Registro', value: selectedAnimalData?.registry_number || '-' },
           { label: 'Sexo', value: selectedAnimalData?.sex || '-' },
-          { label: 'Categoria', value: selectedAnimalData?.category || '-' },
+          { label: 'Categoria', value: selectedCategoryLabel },
           { label: 'Nascimento', value: formatDate(selectedAnimalData?.birth_date) },
-          { label: 'Status', value: selectedAnimalData?.status || '-', tone: selectedAnimalData?.status === 'ativo' ? 'success' : 'warning' },
+          { label: 'Status', value: selectedStatusLabel, tone: selectedStatusTone },
         ],
         sections: [
           {
@@ -132,11 +136,11 @@ export function AnimalReportModal({ isOpen, onClose, reportType = 'animal' }: An
                 ['Nome', selectedAnimalData?.name || '-'],
                 ['Registro', selectedAnimalData?.registry_number || '-'],
                 ['Sexo', selectedAnimalData?.sex || '-'],
-                ['Categoria', selectedAnimalData?.category || '-'],
+                ['Categoria', selectedCategoryLabel],
                 ['Nascimento', formatDate(selectedAnimalData?.birth_date)],
                 ['Pelagem', selectedAnimalData?.coat_color || '-'],
                 ['Localização', selectedAnimalData?.location || '-'],
-                ['Status', selectedAnimalData?.status || '-'],
+                ['Status', selectedStatusLabel],
               ],
             },
           },

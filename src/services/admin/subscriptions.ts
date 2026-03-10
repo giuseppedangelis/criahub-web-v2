@@ -3,6 +3,7 @@
 // Serviço para gerenciamento de assinaturas pelo Admin
 // ============================================
 
+import { isPlantelActiveStatus } from '@/lib/animal-classification';
 import { supabase } from '../base';
 
 // Interface para dados reais do banco
@@ -408,7 +409,7 @@ export async function getHarasDetails(harasId: string): Promise<any> {
       stats: {
         total_animals: animals.length,
         total_members: members.length + 1, // +1 para o dono
-        active_animals: animals.filter(a => a.status === 'ativo').length,
+        active_animals: animals.filter(a => isPlantelActiveStatus(a.status)).length,
         monthly_transactions: transactions.filter(t => {
           const transDate = new Date(t.data_transacao);
           const now = new Date();

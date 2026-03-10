@@ -186,6 +186,7 @@ export const dashboardService = {
         const colors: Record<string, string> = {
             'Potro': '#10b981',
             'Potranca': '#f59e0b',
+            'Potra': '#f59e0b',
             'Garanhão': '#3b82f6',
             'Égua': '#8b5cf6',
             'Castrado': '#6b7280',
@@ -194,7 +195,8 @@ export const dashboardService = {
 
         const labels: Record<string, string> = {
             'Potro': 'Potro',
-            'Potranca': 'Potranca',
+            'Potranca': 'Potra',
+            'Potra': 'Potra',
             'Garanhão': 'Garanhão',
             'Égua': 'Égua',
             'Castrado': 'Castrado',
@@ -221,7 +223,7 @@ export const dashboardService = {
         if (error) handleSupabaseError(error);
 
         const counts: Record<string, number> = {};
-        data?.forEach((item: { pelagem: string }) => {
+        data?.forEach((item: { pelagem: string | null }) => {
             const pelagem = item.pelagem || 'Outros';
             counts[pelagem] = (counts[pelagem] || 0) + 1;
         });
@@ -335,12 +337,12 @@ export const dashboardService = {
             .order('created_at', { ascending: false })
             .limit(3);
 
-        recentAnimals?.forEach((animal: { id: string; nome: string; created_at: string }) => {
+        recentAnimals?.forEach((animal: { id: string; nome: string; created_at: string | null }) => {
             activities.push({
                 id: animal.id,
                 title: 'Animal cadastrado',
                 description: animal.nome || 'Sem nome',
-                time: formatTimeAgo(animal.created_at),
+                time: formatTimeAgo(animal.created_at || new Date().toISOString()),
                 type: 'animal'
             });
         });
@@ -358,7 +360,7 @@ export const dashboardService = {
                 id: trans.id,
                 title: trans.tipo === 'Receita' ? 'Receita registrada' : 'Despesa registrada',
                 description: `${trans.descricao} - R$ ${Number(trans.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                time: formatTimeAgo(trans.created_at),
+                time: formatTimeAgo(trans.created_at || new Date().toISOString()),
                 type: 'receita'
             });
         });
@@ -390,7 +392,7 @@ export const dashboardService = {
         ];
 
         const now = new Date();
-        data?.forEach((item: { data_nascimento: string }) => {
+        data?.forEach((item: { data_nascimento: string | null }) => {
             if (!item.data_nascimento) return;
             const birthDate = new Date(item.data_nascimento);
             const age = Math.floor((now.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));

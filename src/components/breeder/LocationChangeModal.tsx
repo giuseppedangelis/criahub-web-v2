@@ -1,9 +1,21 @@
 import { X } from 'lucide-react';
-import { useState } from 'react';
-import type { AnimalLocationType, AnimalServiceType } from '@/types';
+import { useMemo, useState } from 'react';
+import { NativeSelect } from '../ui/native-select';
+import {
+  getLocationOptionsForType,
+  getServiceTypeLabel,
+  normalizeServiceType,
+  parseAnimalLocation,
+  unwrapLocationOptionLabel,
+  withCurrentLocationOption,
+} from '@/lib/animal-location';
+import type { AnimalLocationType, AnimalServiceType, HarasLocationSettings } from '@/types';
 
 interface LocationChangeModalProps {
   currentLocation?: string;
+  currentLocationType?: AnimalLocationType;
+  currentServiceType?: AnimalServiceType;
+  locationSettings: HarasLocationSettings;
   onClose: () => void;
   onSave: (data: LocationChangeData) => Promise<void> | void;
   isSaving?: boolean;
@@ -16,24 +28,61 @@ export interface LocationChangeData {
   reason?: string;
   date: string;
   time: string;
+  returnDate?: string;
   notes?: string;
 }
 
 const LOCATION_TYPES: AnimalLocationType[] = ['Baia', 'Pasto', 'Servico'];
 const SERVICE_TYPES: AnimalServiceType[] = ['Reproducao', 'Trabalho', 'Repouso', 'Hospedagem', 'Compra', 'Nascimento', 'Outro'];
 
-export function LocationChangeModal({ currentLocation, onClose, onSave, isSaving }: LocationChangeModalProps) {
+export function LocationChangeModal({
+  currentLocation,
+  currentLocationType,
+  currentServiceType,
+  locationSettings,
+  onClose,
+  onSave,
+  isSaving,
+}: LocationChangeModalProps) {
+  const parsedCurrentLocation = useMemo(
+    () => parseAnimalLocation(currentLocation, currentServiceType),
+    [currentLocation, currentServiceType]
+  );
   const [formData, setFormData] = useState<LocationChangeData>({
-    locationType: 'Baia',
-    locationName: '',
+    locationType: currentLocationType || parsedCurrentLocation.locationType || 'Baia',
+    locationName: parsedCurrentLocation.locationName || '',
+    serviceType: parsedCurrentLocation.serviceType || undefined,
     date: new Date().toISOString().split('T')[0],
     time: new Date().toTimeString().slice(0, 5),
   });
 
+  const locationOptions = useMemo(() => {
+    const baseOptions = getLocationOptionsForType(locationSettings, formData.locationType)
+    const currentOption =
+      parsedCurrentLocation.locationType === formData.locationType
+        ? parsedCurrentLocation.locationName
+        : ''
+    return withCurrentLocationOption(baseOptions, currentOption)
+  }, [locationSettings, formData.locationType, parsedCurrentLocation.locationName, parsedCurrentLocation.locationType])
+
+  const isHospedagem = normalizeServiceType(formData.serviceType) === 'Hospedagem'
+  const selectedLocationName = useMemo(() => {
+    const currentValue = unwrapLocationOptionLabel(formData.locationName || '')
+    const matchingOption = locationOptions.find(
+      (option) => unwrapLocationOptionLabel(option) === currentValue
+    )
+    return matchingOption || locationOptions[0] || ''
+  }, [formData.locationName, locationOptions])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.locationType === 'Servico' && !formData.serviceType) return;
+    if (isHospedagem && !formData.returnDate) return;
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        locationName: unwrapLocationOptionLabel(selectedLocationName),
+      });
       onClose();
     } catch {
       // Erro tratado pelo chamador
@@ -72,7 +121,15 @@ export function LocationChangeModal({ currentLocation, onClose, onSave, isSaving
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setFormData({ ...formData, locationType: type, serviceType: undefined })}
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      locationType: type,
+                      locationName: getLocationOptionsForType(locationSettings, type)[0] || '',
+                      serviceType: type === 'Servico' ? prev.serviceType : undefined,
+                      returnDate: type === 'Servico' ? prev.returnDate : undefined,
+                    }))
+                  }
                   className={`p-3 rounded-lg border-2 transition-all ${
                     formData.locationType === type
                       ? 'border-primary dark:border-white bg-primary/10 dark:bg-white/10 text-foreground dark:text-white'
@@ -93,20 +150,17 @@ export function LocationChangeModal({ currentLocation, onClose, onSave, isSaving
                   ? 'Nome do Pasto'
                   : 'Nome do Servico'} *
             </label>
-            <input
-              type="text"
+            <NativeSelect
               required
-              value={formData.locationName}
+              value={selectedLocationName}
               onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
-              placeholder={
-                formData.locationType === 'Baia'
-                  ? 'Ex: Baia 12'
-                  : formData.locationType === 'Pasto'
-                    ? 'Ex: Pasto Norte'
-                    : 'Ex: Fazenda Vizinha'
-              }
-              className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-gray-300 dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white placeholder:text-muted-foreground dark:placeholder:text-[#99a1af] focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
-            />
+            >
+              {locationOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
 
           {formData.locationType === 'Servico' && (
@@ -114,22 +168,42 @@ export function LocationChangeModal({ currentLocation, onClose, onSave, isSaving
               <label className="block text-sm text-foreground dark:text-white mb-2">
                 Tipo de Servico *
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <NativeSelect
+                required
+                value={formData.serviceType || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    serviceType: (e.target.value || undefined) as AnimalServiceType | undefined,
+                    returnDate:
+                      normalizeServiceType(e.target.value) === 'Hospedagem'
+                        ? formData.returnDate
+                        : undefined,
+                  })
+                }
+              >
+                <option value="">Selecione o tipo</option>
                 {SERVICE_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, serviceType: type })}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      formData.serviceType === type
-                        ? 'border-primary dark:border-white bg-primary/10 dark:bg-white/10 text-foreground dark:text-white'
-                        : 'border-gray-200 dark:border-[rgba(255,255,255,0.1)] text-muted-foreground dark:text-[#99a1af] hover:border-gray-300 dark:hover:border-[rgba(255,255,255,0.2)]'
-                    }`}
-                  >
-                    {type}
-                  </button>
+                  <option key={type} value={type}>
+                    {getServiceTypeLabel(type)}
+                  </option>
                 ))}
-              </div>
+              </NativeSelect>
+            </div>
+          )}
+
+          {isHospedagem && (
+            <div>
+              <label className="block text-sm text-foreground dark:text-white mb-2">
+                Data prevista de retorno *
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.returnDate || ''}
+                onChange={(e) => setFormData({ ...formData, returnDate: e.target.value })}
+                className="w-full px-4 py-3 bg-white dark:bg-[#0d0d0d] border border-gray-300 dark:border-[rgba(255,255,255,0.1)] rounded-lg text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-white/20"
+              />
             </div>
           )}
 

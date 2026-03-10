@@ -172,6 +172,12 @@ export interface Haras {
     updated_at: string;
 }
 
+export interface HarasLocationSettings {
+    baias: string[];
+    pastos: string[];
+    servicos: string[];
+}
+
 export interface HarasMember {
     id: string;
     haras_id: string;
@@ -607,6 +613,7 @@ export interface CreateAnimalLocationChangeInput {
     location_type: AnimalLocationType;
     location_name: string;
     service_type?: AnimalServiceType | null;
+    return_date?: string | null;
     reason?: string;
     notes?: string;
     changed_at?: string;
@@ -832,6 +839,8 @@ export interface AgendaEventFilters {
     start_date?: string;
     end_date?: string;
     animal_id?: string;
+    origin?: string;
+    origin_id?: string;
 }
 
 export interface ReportFilters {

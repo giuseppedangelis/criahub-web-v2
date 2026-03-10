@@ -4,6 +4,14 @@
 // ============================================
 
 import { supabase, handleSupabaseError, getCurrentHarasId } from './base';
+import { eventsService } from './events';
+import {
+    buildAnimalLocationLabel,
+    getServiceTypeLabel,
+    isHospedagemLocation,
+    normalizeServiceType,
+} from '@/lib/animal-location';
+import { normalizeAnimalStatus } from '@/lib/animal-classification';
 import type {
     AnimalLocationHistory,
     CreateAnimalLocationChangeInput,
@@ -82,11 +90,7 @@ function buildLocationLabel(
     serviceType?: AnimalServiceType | null
 ): string {
     const cleanName = normalizeLocationName(type, name);
-    if (type === 'Servico') {
-        const safeService = serviceType || 'Outro';
-        return `Servico - ${safeService} - ${cleanName}`;
-    }
-    return cleanName;
+    return buildAnimalLocationLabel(type, cleanName, serviceType || undefined);
 }
 
 async function resolveHarasId(animalId: string, explicitHarasId?: string): Promise<string | null> {
@@ -149,7 +153,7 @@ export const animalLocationsService = {
 
         const { data: animalData, error: animalError } = await supabase
             .from('animals')
-            .select('localizacao')
+            .select('nome, localizacao, tipo_servico, status')
             .eq('id', input.animal_id)
             .single();
 
@@ -158,14 +162,40 @@ export const animalLocationsService = {
         const newLocation = buildLocationLabel(input.location_type, input.location_name, input.service_type);
         const changedAt = input.changed_at || new Date().toISOString();
         const changedBy = input.changed_by || await getCurrentUserId();
+        const serviceTypeLabel =
+            input.location_type === 'Servico'
+                ? getServiceTypeLabel(normalizeServiceType(input.service_type) || input.service_type || 'Outro')
+                : null;
+        const willBeHospedagem = input.location_type === 'Servico' && isHospedagemLocation(newLocation, input.service_type);
+        const wasHospedagem = isHospedagemLocation(
+            (animalData as { localizacao?: string | null })?.localizacao,
+            (animalData as { tipo_servico?: string | null })?.tipo_servico
+        );
+        const currentStatus = normalizeAnimalStatus((animalData as { status?: string | null })?.status);
+        const nextStatus =
+            willBeHospedagem
+                ? 'em_servico'
+                : currentStatus === 'em_servico'
+                    ? 'ativo'
+                    : undefined;
+
+        if (willBeHospedagem && !input.return_date) {
+            throw new Error('Informe a data prevista de retorno para hospedagem.');
+        }
+
+        const updatePayload: Record<string, unknown> = {
+            localizacao: newLocation,
+            tipo_servico: input.location_type === 'Servico' ? serviceTypeLabel : null,
+            updated_at: new Date().toISOString()
+        };
+
+        if (nextStatus) {
+            updatePayload.status = nextStatus;
+        }
 
         const { error: updateError } = await supabase
             .from('animals')
-            .update({
-                localizacao: newLocation,
-                tipo_servico: input.location_type === 'Servico' ? toDbServiceType(input.service_type) : null,
-                updated_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('id', input.animal_id);
 
         if (updateError) handleSupabaseError(updateError);
@@ -189,6 +219,21 @@ export const animalLocationsService = {
             .single();
 
         if (error) handleSupabaseError(error);
+
+        const animalName = (animalData as { nome?: string | null })?.nome || 'Animal';
+
+        if (willBeHospedagem && input.return_date) {
+            await eventsService.syncHospedagemReturnReminder({
+                harasId,
+                animalId: input.animal_id,
+                animalName,
+                returnDate: input.return_date,
+                location: newLocation,
+                observations: input.notes || input.reason || null,
+            });
+        } else if (wasHospedagem) {
+            await eventsService.deleteHospedagemReturnReminder(harasId, input.animal_id);
+        }
 
         return mapRowToHistory(data);
     }

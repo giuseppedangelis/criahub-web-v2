@@ -2,6 +2,8 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Edit, MapPin, Heart, Calendar, Us
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { NativeSelect } from '../ui/native-select';
+import { getAnimalStatusLabel, getDisplayCategoryLabel } from '@/lib/animal-classification';
+import { getServiceTypeLabel, normalizeServiceType } from '@/lib/animal-location';
 import { toast } from 'sonner';
 
 interface Animal {
@@ -48,6 +50,9 @@ interface AdvisorAnimalDetailsProps {
 export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'overview' }: AdvisorAnimalDetailsProps) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const displayCategory = getDisplayCategoryLabel(animal.category);
+  const displayStatus = getAnimalStatusLabel(animal.status);
+  const displayServiceType = getServiceTypeLabel(normalizeServiceType(animal.servicoTipo) || animal.servicoTipo);
 
   // Verificar se o animal foi importado da ABCCMM
   const isImportedFromABCCMM = animal.importedFromABCCMM || false;
@@ -275,7 +280,7 @@ export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'ove
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm text-muted-foreground dark:text-[#99a1af]">Status Atual</span>
                       <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${animal.statusColor}`}>
-                        {animal.status}
+                        {displayStatus}
                       </span>
                     </div>
                     {(animal.localizacao || animal.servicoTipo) && (
@@ -294,7 +299,7 @@ export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'ove
                             <Calendar className="w-4 h-4 text-muted-foreground dark:text-[#99a1af]" />
                             <div className="flex-1">
                               <p className="text-xs text-muted-foreground dark:text-[#99a1af]">Serviço</p>
-                              <p className="text-sm text-foreground dark:text-white">{animal.servicoTipo}</p>
+                              <p className="text-sm text-foreground dark:text-white">{displayServiceType}</p>
                             </div>
                           </div>
                         )}
@@ -346,7 +351,7 @@ export function AdvisorAnimalDetails({ animal, onBack, onEdit, initialTab = 'ove
                       )}
                       <div>
                         <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Categoria</p>
-                        <p className="text-sm text-foreground dark:text-white font-medium">{animal.category}</p>
+                        <p className="text-sm text-foreground dark:text-white font-medium">{displayCategory}</p>
                       </div>
                       {animal.harasOrigem && (
                         <div>

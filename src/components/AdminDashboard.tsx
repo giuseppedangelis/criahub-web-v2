@@ -1,7 +1,7 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings, Moon, Sun, Bell, User, LogOut, HelpCircle, UserCog, UserCircle, Menu, X, TrendingUp, TrendingDown, Users, Repeat } from 'lucide-react';
+import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings, Bell, User, HelpCircle, TrendingUp, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
@@ -12,7 +12,7 @@ import { AdminCriticalAlertsContent } from './admin/AdminCriticalAlertsContent';
 import { AdminSettingsContent } from './admin/AdminSettingsContent';
 import { AdminHelpContent } from './admin/AdminHelpContent';
 import { NotificationsPanel } from './NotificationsPanel';
-import { BrandLogo } from './branding/BrandLogo';
+import { DashboardShell, dashboardTopbarControlClass } from './shared/DashboardShell';
 import { toast } from 'sonner';
 import type { Notification } from '@/types';
 import { notificationsService } from '@/services/notifications';
@@ -33,9 +33,6 @@ const formatNotificationTime = (dateValue?: string | null) => {
   if (diffDays === 1) return '1 dia atrás';
   return `${diffDays} dias atrás`;
 };
-
-// SVG Chart Path
-const revenueChartPath = "M4.91813e-08 57.7594C17.774 57.7594 17.774 11.9184 35.5481 11.9184C53.3221 11.9184 53.3221 22.3368 71.0962 22.3368C88.8703 22.3368 88.8703 49.4247 106.644 49.4247C124.418 49.4247 124.418 18.1695 142.193 18.1695C159.967 18.1695 159.967 53.5921 177.74 53.5921C195.514 53.5921 195.514 32.7552 213.289 32.7552C231.063 32.7552 231.063 24.4205 248.837 24.4205C266.611 24.4205 266.611 64.0105 284.385 64.0105C302.159 64.0105 302.159 78.5962 319.933 78.5962C337.707 78.5962 337.707 1.5 355.481 1.5C373.255 1.5 373.255 43.1736 391.03 43.1736C408.803 43.1736 408.803 68.1778 426.577 68.1778C444.351 68.1778 444.351 14.0021 462.126 14.0021";
 
 export function AdminDashboard() {
   const { theme, toggleTheme } = useTheme();
@@ -126,135 +123,33 @@ export function AdminDashboard() {
     }
   };
 
+  const currentTitle =
+    activeTab === 'profile'
+      ? 'Meu Perfil'
+      : activeTab === 'settings'
+        ? 'Configurações'
+        : menuItems.find((item) => item.id === activeTab)?.label || 'Dashboard';
+
   return (
-    <div className="flex h-screen bg-background dark:bg-[#0d0d0d]">
-      {/* Mobile Overlay */}
-      {isMobile && isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={`
-        ${isMobile ? 'fixed inset-y-0 left-0 z-50' : 'relative'}
-        w-64 bg-[#e8e8e8] dark:bg-[#1a1a1a] border-r border-border dark:border-[#1a1a1a] flex flex-col
-        transition-transform duration-300
-        ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
-      `}>
-        {/* Header */}
-        <div className="h-[101px] px-6 flex items-center justify-between border-b border-border dark:border-[#1a1a1a]">
-          <div>
-            <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto mb-2" />
-            <p className="text-muted-foreground dark:text-[#99a1af]">Administrador</p>
-          </div>
-          {isMobile && (
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg"
-            >
-              <X className="w-5 h-5 text-foreground dark:text-white" />
-            </button>
-          )}
-        </div>
-
-        {/* Menu Items */}
-        <nav className="flex-1 px-4 py-4 space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (isMobile) setIsSidebarOpen(false);
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all
-                  ${isActive
-                    ? 'bg-white/10 dark:bg-white/10'
-                    : 'hover:bg-black/5 dark:hover:bg-white/5'
-                  }
-                `}
-              >
-                <Icon className="w-5 h-5 text-foreground dark:text-white" />
-                <span className="text-foreground dark:text-white">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom Section - Theme Toggle (Mobile Only) */}
-        {isMobile && (
-          <div className="px-4 pb-4 border-t border-border dark:border-[#1a1a1a] pt-4">
-            <button
-              onClick={() => {
-                toggleTheme();
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-5 h-5 text-foreground dark:text-white" />
-                  <span className="text-foreground dark:text-white">Modo Claro</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-5 h-5 text-foreground dark:text-white" />
-                  <span className="text-foreground dark:text-white">Modo Escuro</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <header className="h-[101px] bg-card dark:bg-[#0d0d0d] border-b border-border dark:border-[#1a1a1a] px-4 md:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Mobile Menu Button */}
-            {isMobile && (
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
-              >
-                <Menu className="w-5 h-5 text-foreground dark:text-white" />
-              </button>
-            )}
-
-            <div>
-              <h2 className="text-xl md:text-2xl text-foreground dark:text-white mb-1">
-                {activeTab === 'profile' ? 'Meu Perfil' :
-                  activeTab === 'settings' ? 'Configurações' :
-                    menuItems.find(item => item.id === activeTab)?.label}
-              </h2>
-              <p className="text-muted-foreground dark:text-[#99a1af] hidden lg:block">
-                Painel Administrativo do CriaHub
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Theme Toggle - Desktop Only */}
-            {!isMobile && (
-              <button
-                onClick={toggleTheme}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-5 h-5 text-white" />
-                ) : (
-                  <Moon className="w-5 h-5 text-foreground" />
-                )}
-              </button>
-            )}
-
-            {/* Notifications */}
+    <>
+      <DashboardShell
+        isMobile={isMobile}
+        isSidebarOpen={isSidebarOpen}
+        menuItems={menuItems}
+        activeMenuId={activeTab}
+        onSelectMenu={(itemId) => {
+          setActiveTab(itemId);
+          if (isMobile) setIsSidebarOpen(false);
+        }}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+        onCloseSidebar={() => setIsSidebarOpen(false)}
+        title={currentTitle}
+        subtitle="Painel Administrativo do CriaHub"
+        sidebarSubtitle="Administrador"
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        topbarActions={
+          <>
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -262,9 +157,9 @@ export function AdminDashboard() {
                   setShowNotifications(!showNotifications);
                   setShowUserMenu(false);
                 }}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors relative"
+                className={`${dashboardTopbarControlClass} relative`}
               >
-                <Bell className="w-5 h-5 text-foreground dark:text-white" />
+                <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
                   <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
                     {unreadCount}
@@ -333,7 +228,6 @@ export function AdminDashboard() {
               )}
             </div>
 
-            {/* User Menu */}
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -341,12 +235,10 @@ export function AdminDashboard() {
                   setShowUserMenu(!showUserMenu);
                   setShowNotifications(false);
                 }}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
+                className={dashboardTopbarControlClass}
               >
-                <User className="w-5 h-5 text-foreground dark:text-white" />
+                <User className="w-5 h-5" />
               </button>
-
-              {/* User Dropdown */}
               {showUserMenu && (
                 <UserDropdown
                   userName={userName}
@@ -364,10 +256,9 @@ export function AdminDashboard() {
                 />
               )}
             </div>
-          </div>
-        </header>
-
-        {/* Content Area */}
+          </>
+        }
+      >
         <div className="flex-1 overflow-auto mobile-scroll-hidden bg-background dark:bg-[#0d0d0d] p-4 md:p-8">
           {activeTab === 'dashboard' && <DashboardContent onNavigate={setActiveTab} />}
           {activeTab === 'subscriptions' && <AdminSubscriptionsContent />}
@@ -377,9 +268,7 @@ export function AdminDashboard() {
           {activeTab === 'profile' && <ProfileView />}
           {activeTab === 'help' && <AdminHelpContent />}
         </div>
-      </main>
-
-
+      </DashboardShell>
 
       {/* Notifications Panel */}
       <NotificationsPanel
@@ -389,7 +278,7 @@ export function AdminDashboard() {
         onMarkAsRead={handleMarkAsRead}
         onDelete={handleDelete}
       />
-    </div>
+    </>
   );
 }
 

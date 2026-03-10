@@ -3,6 +3,7 @@
 // Dados do dashboard do assessor administrativo
 // ============================================
 
+import { isPlantelActiveStatus } from '@/lib/animal-classification'
 import { supabase } from './base'
 
 export interface AdvisorDashboardStats {
@@ -102,7 +103,7 @@ export const advisorDashboardService = {
 
     animals.forEach((animal: any) => {
       const status = normalizeValue(animal.status)
-      if (status === 'ativo') activeAnimals += 1
+      if (isPlantelActiveStatus(animal.status)) activeAnimals += 1
       if (status === 'vendido') soldAnimals += 1
       if (status === 'falecido' || status === 'morto') deceasedAnimals += 1
 

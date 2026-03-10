@@ -13,6 +13,7 @@ import { AdvancedFiltersModal } from './AdvancedFiltersModal';
 import { useAnimals, useDeleteAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
 import { animalsService } from '@/services/animals';
+import { getAnimalStatusLabel, getDisplayCategoryLabel, getPlantelStatusActivity, isManualCastradoCategory, resolveManagedCategory } from '@/lib/animal-classification';
 import { toast } from 'sonner';
 import type { AnimalEnvironment } from '@/types';
 
@@ -27,11 +28,14 @@ function formatBirthDate(isoDate: string): string {
 function getStatusColorClasses(status: string): string {
   const s = status?.toLowerCase() || '';
   if (s === 'ativo') return 'bg-green-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'em_servico' || s === 'em serviço') return 'bg-orange-500 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'provisorio' || s === 'provisório') return 'bg-cyan-500 dark:bg-gray-600 text-white dark:text-gray-200';
   if (s === 'gestante') return 'bg-pink-500 dark:bg-gray-600 text-white dark:text-gray-200';
   if (s === 'em cobertura') return 'bg-blue-500 dark:bg-gray-600 text-white dark:text-gray-200';
   if (s === 'em crescimento' || s === 'potro' || s === 'potra') return 'bg-yellow-500 dark:bg-gray-600 text-white dark:text-gray-200';
   if (s === 'vendido') return 'bg-red-500 dark:bg-gray-600 text-white dark:text-gray-200';
-  if (s === 'morto' || s === 'óbito') return 'bg-gray-800 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'morto' || s === 'óbito' || s === 'falecido') return 'bg-gray-800 dark:bg-gray-600 text-white dark:text-gray-200';
+  if (s === 'transferido') return 'bg-slate-500 dark:bg-gray-600 text-white dark:text-gray-200';
   return 'bg-gray-500 dark:bg-gray-600 text-white dark:text-gray-200';
 }
 
@@ -52,14 +56,16 @@ function calculateAge(birthDate?: string): string {
   return `${age} anos`;
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 function resolveDisplayCategory(birthDate: string | undefined, sex: 'Macho' | 'Fêmea' | undefined, fallback: string): string {
-  if (!birthDate || !sex) return fallback;
-  const birth = new Date(birthDate);
-  if (Number.isNaN(birth.getTime())) return fallback;
-  const today = new Date();
-  const ageInMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
-  if (ageInMonths < 24) return sex === 'Fêmea' ? 'potra' : 'potro';
-  return sex === 'Fêmea' ? 'egua' : 'garanhao';
+  if (isManualCastradoCategory(fallback)) return getDisplayCategoryLabel('castrado');
+  return getDisplayCategoryLabel(resolveManagedCategory(sex, birthDate, fallback) || fallback);
 }
 
 // Interface local para a UI (compatível com AnimalCard)
@@ -174,7 +180,6 @@ export function BreederPlantelContent() {
         : realImages;
 
       const status = animal.status || 'Ativo';
-      const isInactive = status.toLowerCase() === 'vendido' || status.toLowerCase() === 'morto' || status.toLowerCase() === 'óbito';
 
       return {
         id: animal.id, // Agora string, AnimalCard atualizado aceita string | number
@@ -190,12 +195,12 @@ export function BreederPlantelContent() {
         mother_id: animal.mother_id || (animal as any).mae_id || null,
         harasOrigem: animal.origin_haras || undefined,
         origin_haras: animal.origin_haras || (animal as any).haras_origem || undefined,
-         category: resolveDisplayCategory(animal.birth_date || undefined, animal.sex, animal.category),
+        category: resolveDisplayCategory(animal.birth_date || undefined, animal.sex, animal.category),
         age: calculateAge(animal.birth_date || undefined),
         haras: 'Meu Haras', // Poderíamos buscar o nome do haras se necessário
-        status: status,
+        status: getAnimalStatusLabel(status),
         statusColor: getStatusColorClasses(status),
-        statusAtividade: isInactive ? 'Inativo' : 'Ativo',
+        statusAtividade: getPlantelStatusActivity(status),
         localizacao: animal.location || (animal as any).localizacao || undefined,
         location: animal.location || (animal as any).localizacao || undefined,
         status_manejo: (animal as any).status_manejo || (animal as any).management_status || undefined,
@@ -245,7 +250,7 @@ export function BreederPlantelContent() {
 
       // Categoria
       const matchesCategoria = filterCategoria === 'todos' ||
-        animal.category.toLowerCase().includes(filterCategoria.toLowerCase());
+        normalizeText(animal.category).includes(normalizeText(filterCategoria));
 
       // Idade
       let matchesIdade = true;
@@ -373,12 +378,12 @@ export function BreederPlantelContent() {
                   mother_id: fetchedAnimal.mother_id || null,
                   harasOrigem: fetchedAnimal.origin_haras || undefined,
                   origin_haras: fetchedAnimal.origin_haras || undefined,
-                  category: fetchedAnimal.category,
+                  category: getDisplayCategoryLabel(resolveManagedCategory(fetchedAnimal.sex, fetchedAnimal.birth_date, fetchedAnimal.category) || fetchedAnimal.category),
                   age: calculateAge(fetchedAnimal.birth_date || undefined),
                   haras: 'Meu Haras',
-                  status: fetchedAnimal.status || 'Ativo',
+                  status: getAnimalStatusLabel(fetchedAnimal.status || 'Ativo'),
                   statusColor: getStatusColorClasses(fetchedAnimal.status || 'Ativo'),
-                  statusAtividade: (fetchedAnimal.status || '').toLowerCase() === 'ativo' ? 'Ativo' : 'Inativo',
+                  statusAtividade: getPlantelStatusActivity(fetchedAnimal.status),
                   localizacao: fetchedAnimal.location || undefined,
                   location: fetchedAnimal.location || undefined,
                   status_manejo: (fetchedAnimal as any).status_manejo || (fetchedAnimal as any).management_status || undefined,

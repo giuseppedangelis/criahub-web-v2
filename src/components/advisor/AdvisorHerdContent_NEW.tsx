@@ -1,6 +1,7 @@
 import { Search, Filter, Grid, List, Plus, Upload, Users, Eye, AlertTriangle, Info, FileUp, Edit, ChevronLeft, ChevronRight, GitBranch, Baby, Award, Video, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { getAnimalStatusLabel, getDisplayCategoryLabel } from '@/lib/animal-classification';
 import { NativeSelect } from '../ui/native-select';
 import { AdvisorCadastrarAnimal } from './AdvisorCadastrarAnimal';
 import { AdvisorAnimalDetails } from './AdvisorAnimalDetails';
@@ -308,7 +309,7 @@ export function AdvisorHerdContent() {
                     />
                     <div className="absolute top-3 right-3">
                       <span className={`px-3 py-1 rounded-full text-xs ${animal.statusColor}`}>
-                        {animal.status}
+                        {getAnimalStatusLabel(animal.status)}
                       </span>
                     </div>
                   </div>
@@ -316,7 +317,7 @@ export function AdvisorHerdContent() {
                     <h3 className="text-lg text-foreground dark:text-white mb-1">{animal.name}</h3>
                     <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3">{animal.registry}</p>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground dark:text-[#99a1af]">{animal.category}</span>
+                      <span className="text-muted-foreground dark:text-[#99a1af]">{getDisplayCategoryLabel(animal.category)}</span>
                       <span className="text-muted-foreground dark:text-[#99a1af]">{animal.age}</span>
                     </div>
                     {(animal.filhos !== undefined || animal.premiacoes !== undefined) && (
@@ -379,11 +380,11 @@ export function AdvisorHerdContent() {
                         </td>
                         <td className="px-6 py-4 text-muted-foreground dark:text-[#99a1af]">{animal.registry}</td>
                         <td className="px-6 py-4 text-foreground dark:text-white">{animal.sex || 'N/A'}</td>
-                        <td className="px-6 py-4 text-foreground dark:text-white">{animal.category}</td>
+                        <td className="px-6 py-4 text-foreground dark:text-white">{getDisplayCategoryLabel(animal.category)}</td>
                         <td className="px-6 py-4 text-foreground dark:text-white">{animal.age}</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs ${animal.statusColor}`}>
-                            {animal.status}
+                            {getAnimalStatusLabel(animal.status)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-foreground dark:text-white">{animal.haras}</td>

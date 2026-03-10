@@ -1,6 +1,5 @@
 import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings } from 'lucide-react';
 import { PageType } from '@/types';
-import { useTheme } from '../../contexts/ThemeContext';
 import { BrandLogo } from '../branding/BrandLogo';
 
 interface SidebarProps {
@@ -17,19 +16,11 @@ const menuItems = [
 ];
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
-  const { theme } = useTheme();
-
   return (
-    <aside className={`w-64 border-r flex flex-col transition-colors ${
-      theme === 'dark'
-        ? 'bg-[#1a1a1a] border-[#1a1a1a]'
-        : 'bg-white border-gray-200'
-    }`}>
-      <div className={`p-6 border-b ${
-        theme === 'dark' ? 'border-[#1a1a1a]' : 'border-gray-200'
-      }`}>
-        <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto" />
-        <p className={`mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+    <aside className="w-64 flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-colors dark:border-[#1a1a1a] dark:bg-[#1a1a1a] dark:text-white">
+      <div className="border-b border-sidebar-border p-6 dark:border-[#1a1a1a]">
+        <BrandLogo orientation="horizontal" className="h-8 w-auto" />
+        <p className="mt-1 text-sidebar-foreground/62 dark:text-gray-400">
           Administrador
         </p>
       </div>
@@ -44,14 +35,10 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               <li key={item.id}>
                 <button
                   onClick={() => onNavigate(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all duration-200 ${
                     isActive
-                      ? theme === 'dark'
-                        ? 'bg-white text-[#1a1a1a]'
-                        : 'bg-[#333333] text-white'
-                      : theme === 'dark'
-                        ? 'text-white hover:bg-[#333333]'
-                        : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm dark:bg-white/10 dark:text-white'
+                      : 'text-sidebar-foreground/72 hover:bg-sidebar-accent hover:text-sidebar-foreground dark:text-white/80 dark:hover:bg-white/5 dark:hover:text-white'
                   }`}
                 >
                   <Icon className="w-5 h-5" />

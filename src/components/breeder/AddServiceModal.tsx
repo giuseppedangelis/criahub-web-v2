@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X, ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
+import { useHarasSettings } from '@/hooks/useHarasSettings';
+import { normalizeHarasLocationSettings } from '@/lib/animal-location';
 import type { Animal, CreateAgendaEventInput } from '@/types';
 import { useVeterinarians } from '@/hooks/useVeterinarians';
 import { resolveAgendaType, serviceCategories } from './agendaUtils';
@@ -16,7 +18,11 @@ interface AddServiceModalProps {
 }
 
 export function AddServiceModal({ onClose, onBack, onCreate, harasId, animals, isSaving = false }: AddServiceModalProps) {
-  const serviceLocationOptions = ['Baia 01', 'Baia 02', 'Baia 03', 'Pasto Maternidade', 'Pasto Norte', 'Pasto Sul', 'Centro de Treinamento', 'Hospedagem Externa'];
+  const { data: harasSettings } = useHarasSettings(harasId);
+  const serviceLocationOptions = useMemo(() => {
+    const settings = normalizeHarasLocationSettings(harasSettings?.location_settings);
+    return Array.from(new Set([...settings.baias, ...settings.pastos, ...settings.servicos]));
+  }, [harasSettings?.location_settings]);
   const [formData, setFormData] = useState({
     title: '',
     category: '',

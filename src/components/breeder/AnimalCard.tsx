@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Edit, GitBranch, Baby, Award, Video, User, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { getAnimalStatusLabel, getDisplayCategoryLabel } from '@/lib/animal-classification';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {
@@ -49,6 +50,8 @@ export function AnimalCard({
   onDelete,
 }: AnimalCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const displayCategory = getDisplayCategoryLabel(animal.category);
+  const displayStatus = getAnimalStatusLabel(animal.status);
   const isCondominio =
     animal.proprietario?.toUpperCase().includes('CONDOMINIO') ||
     animal.proprietario?.toUpperCase().includes('CONDOMÍNIO');
@@ -217,7 +220,7 @@ export function AnimalCard({
           </p>
         )}
 
-        <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 mt-2">{animal.category} • {animal.age}</p>
+        <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-3 mt-2">{displayCategory} • {animal.age}</p>
 
         {animal.filhos !== undefined && animal.filhos > 0 && (
           <p className="text-xs text-primary dark:text-white mb-1 flex items-center gap-1">
@@ -232,7 +235,7 @@ export function AnimalCard({
         )}
 
         <span className={`inline-block px-3 py-1 ${animal.statusColor} text-white text-xs rounded-full`}>
-          {animal.status}
+          {displayStatus}
         </span>
       </div>
     </div>

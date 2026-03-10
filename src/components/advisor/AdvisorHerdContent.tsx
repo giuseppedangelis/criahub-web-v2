@@ -1,6 +1,7 @@
 import { Search, Filter, Eye, Upload, Download, Info } from 'lucide-react';
 import { useState } from 'react';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
+import { getAnimalStatusLabel, getDisplayCategoryLabel } from '@/lib/animal-classification';
 import { NativeSelect } from '../ui/native-select';
 import { AdvisorAnimalDetails } from './AdvisorAnimalDetails';
 import { AdvisorImportABCCMM } from './AdvisorImportABCCMM';
@@ -212,7 +213,7 @@ export function AdvisorHerdContent() {
                   animal.status === 'Vendido' ? 'bg-gray-500' :
                   'bg-red-500'
                 }`}>
-                  {animal.status}
+                  {getAnimalStatusLabel(animal.status)}
                 </span>
               </div>
             </div>
@@ -237,7 +238,7 @@ export function AdvisorHerdContent() {
                 </div>
                 <div>
                   <p className="text-muted-foreground dark:text-[#99a1af]">Categoria</p>
-                  <p className="text-foreground dark:text-white">{animal.category}</p>
+                  <p className="text-foreground dark:text-white">{getDisplayCategoryLabel(animal.category)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground dark:text-[#99a1af]">Pelagem</p>

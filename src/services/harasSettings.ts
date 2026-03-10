@@ -3,6 +3,8 @@
 // Gerencia configurações gerais do haras e equipe
 // ============================================
 
+import { normalizeHarasLocationSettings, DEFAULT_HARAS_LOCATION_SETTINGS } from '@/lib/animal-location'
+import type { HarasLocationSettings } from '@/types'
 import { supabase, handleSupabaseError } from './base'
 
 export interface HarasNotificationSettings {
@@ -27,6 +29,7 @@ export interface HarasSettings {
   notification_settings: HarasNotificationSettings
   privacy_settings: HarasPrivacySettings
   backup_settings: HarasBackupSettings
+  location_settings: HarasLocationSettings
   created_at?: string
   updated_at?: string
 }
@@ -44,6 +47,7 @@ const DEFAULT_SETTINGS: Omit<HarasSettings, 'haras_id'> = {
   notification_settings: { agenda: true, reproduction: true, system: true },
   privacy_settings: { publicPlantel: true, shareAnalytics: true, allowSearch: true },
   backup_settings: { autoBackup: true, frequency: 'daily' },
+  location_settings: DEFAULT_HARAS_LOCATION_SETTINGS,
 }
 
 function normalizeSettings(row: any, harasId: string): HarasSettings {
@@ -59,12 +63,14 @@ function normalizeSettings(row: any, harasId: string): HarasSettings {
     ...DEFAULT_SETTINGS.backup_settings,
     ...(row?.backup_settings ?? {}),
   }
+  const locationSettings = normalizeHarasLocationSettings(row?.location_settings)
 
   return {
     haras_id: row?.haras_id ?? harasId,
     notification_settings: notification,
     privacy_settings: privacy,
     backup_settings: backup,
+    location_settings: locationSettings,
     created_at: row?.created_at,
     updated_at: row?.updated_at,
   }
@@ -98,20 +104,25 @@ export const harasSettingsService = {
   },
 
   async upsertSettings(harasId: string, input: Partial<HarasSettings>): Promise<HarasSettings> {
+    const currentSettings = await this.getByHarasId(harasId)
     const payload = {
       haras_id: harasId,
       notification_settings: {
         ...DEFAULT_SETTINGS.notification_settings,
+        ...(currentSettings?.notification_settings ?? {}),
         ...(input.notification_settings ?? {}),
       },
       privacy_settings: {
         ...DEFAULT_SETTINGS.privacy_settings,
+        ...(currentSettings?.privacy_settings ?? {}),
         ...(input.privacy_settings ?? {}),
       },
       backup_settings: {
         ...DEFAULT_SETTINGS.backup_settings,
+        ...(currentSettings?.backup_settings ?? {}),
         ...(input.backup_settings ?? {}),
       },
+      location_settings: normalizeHarasLocationSettings(input.location_settings ?? currentSettings?.location_settings),
       updated_at: new Date().toISOString(),
     }
 

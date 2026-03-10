@@ -14,7 +14,7 @@ import { BrandLogo } from './branding/BrandLogo';
 
 export function EmployeeDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userRole, userName, userEmail, logout } = useUser();
+  const { userName, userEmail, logout } = useUser();
   const [activeTab, setActiveTab] = useState('home');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [employeeType, setEmployeeType] = useState<'peon' | 'vet'>('peon'); // or 'vet'
@@ -40,6 +40,8 @@ export function EmployeeDashboard() {
 
   const menuItems = isPeon ? peonMenuItems : vetMenuItems;
   const userTitle = isPeon ? 'Peão' : 'Veterinária';
+  const topbarControlClass =
+    'rounded-xl bg-muted p-2 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-[#0d0d0d] dark:text-white dark:hover:bg-[#2a2a2a]';
 
   const handleLogout = async () => {
     await logout();
@@ -50,14 +52,14 @@ export function EmployeeDashboard() {
       {/* Mobile Header */}
       <header className="bg-card dark:bg-[#1a1a1a] border-b border-border dark:border-[rgba(255,255,255,0.1)] px-4 py-4 flex items-center justify-between">
         <div>
-          <BrandLogo orientation="horizontal" tone="dark" className="h-7 w-auto" />
+          <BrandLogo orientation="horizontal" className="h-7 w-auto" />
           <p className="text-sm text-muted-foreground dark:text-[#99a1af]">{userTitle}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <button className="p-2 rounded-lg bg-muted dark:bg-[#0d0d0d] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors relative">
-            <Bell className="w-5 h-5 text-foreground dark:text-white" />
+          <button className={`${topbarControlClass} relative`}>
+            <Bell className="w-5 h-5" />
             {unreadNotifications > 0 && (
               <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
                 {unreadNotifications}
@@ -69,9 +71,9 @@ export function EmployeeDashboard() {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="p-2 rounded-lg bg-muted dark:bg-[#0d0d0d] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
+              className={topbarControlClass}
             >
-              <User className="w-5 h-5 text-foreground dark:text-white" />
+              <User className="w-5 h-5" />
             </button>
 
             {showUserMenu && (
@@ -172,12 +174,16 @@ export function EmployeeDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className="flex flex-col items-center gap-1 min-w-[60px]"
+                className={`min-w-[72px] rounded-2xl px-3 py-2 transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm dark:bg-white/10 dark:text-white'
+                    : 'text-muted-foreground hover:bg-muted dark:text-[#99a1af] dark:hover:bg-[#0d0d0d]'
+                }`}
               >
-                <Icon className={`w-6 h-6 ${isActive ? 'text-primary dark:text-white' : 'text-muted-foreground dark:text-[#99a1af]'}`} />
-                <span className={`text-xs ${isActive ? 'text-primary dark:text-white' : 'text-muted-foreground dark:text-[#99a1af]'}`}>
-                  {item.label}
-                </span>
+                <div className="flex flex-col items-center gap-1">
+                  <Icon className="w-6 h-6" />
+                  <span className="text-xs">{item.label}</span>
+                </div>
               </button>
             );
           })}

@@ -1,7 +1,7 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Moon, Sun, Bell, User, Menu, X, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Heart, DollarSign, CheckSquare, Calendar, FileText, Settings, Bell, User, HelpCircle } from 'lucide-react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 import { ProfileView } from './ProfileView';
@@ -18,7 +18,7 @@ import { AdvisorDocumentsContent } from './advisor/AdvisorDocumentsContent';
 import { UserDropdown } from './shared/UserDropdown';
 import { AdvisorPendingValidation } from './advisor/AdvisorPendingValidation';
 import { NotificationsPanel } from './NotificationsPanel';
-import { BrandLogo } from './branding/BrandLogo';
+import { DashboardShell, dashboardTopbarControlClass } from './shared/DashboardShell';
 import type { Notification } from '@/types';
 import { notificationsService } from '@/services/notifications';
 import { useCurrentHaras } from '@/hooks/useHaras';
@@ -160,142 +160,36 @@ export function AdvisorDashboard() {
     [canAccessModule]
   );
 
-  const userRole_display = 'Acessor Administrativo';
+  const currentTitle =
+    activeMenu === 'profile'
+      ? 'Meu Perfil'
+      : activeMenu === 'settings'
+        ? 'Configurações'
+        : menuItems.find((item) => item.id === activeMenu)?.label || 'Dashboard';
 
   return (
-    <div className="flex h-screen bg-background dark:bg-[#0d0d0d]">
-      {/* Mobile Overlay */}
-      {isMobile && isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={`
-        ${isMobile ? 'fixed inset-y-0 left-0 z-50' : 'relative'}
-        w-64 bg-[#e8e8e8] dark:bg-[#1a1a1a] border-r border-border dark:border-[#1a1a1a] flex flex-col
-        transition-transform duration-300
-        ${isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
-      `}>
-        {/* Header */}
-        <div className="h-[101px] px-6 flex items-center justify-between border-b border-border dark:border-[#1a1a1a]">
-          <div>
-            <BrandLogo orientation="horizontal" tone="dark" className="h-8 w-auto mb-2" />
-            <p className="text-muted-foreground dark:text-[#99a1af]">
-              {currentHaras?.name || 'Haras'}
-            </p>
-          </div>
-          {isMobile && (
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg"
-            >
-              <X className="w-5 h-5 text-foreground dark:text-white" />
-            </button>
-          )}
-        </div>
-
-        {/* Menu Items */}
-        <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeMenu === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleSelectMenu(item.id)}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all
-                  ${isActive
-                    ? 'bg-white/10 dark:bg-white/10'
-                    : 'hover:bg-black/5 dark:hover:bg-white/5'
-                  }
-                `}
-              >
-                <Icon className="w-5 h-5 text-foreground dark:text-white" />
-                <span className="text-foreground dark:text-white">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom Section - Theme Toggle (Mobile Only) */}
-        {isMobile && (
-          <div className="px-4 pb-4 border-t border-border dark:border-[#1a1a1a] pt-4">
-            <button
-              onClick={() => {
-                toggleTheme();
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-5 h-5 text-foreground dark:text-white" />
-                  <span className="text-foreground dark:text-white">Modo Claro</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-5 h-5 text-foreground dark:text-white" />
-                  <span className="text-foreground dark:text-white">Modo Escuro</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <header className="h-[101px] bg-card dark:bg-[#0d0d0d] border-b border-border dark:border-[#1a1a1a] px-4 md:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Mobile Menu Button */}
-            {isMobile && (
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
-              >
-                <Menu className="w-5 h-5 text-foreground dark:text-white" />
-              </button>
-            )}
-
-            <div>
-              <h2 className="text-xl md:text-2xl text-foreground dark:text-white mb-1">
-                {activeMenu === 'profile' ? 'Meu Perfil' :
-                  activeMenu === 'settings' ? 'Configurações' :
-                    menuItems.find(m => m.id === activeMenu)?.label}
-              </h2>
-              <p className="text-muted-foreground dark:text-[#99a1af]">
-                {currentHaras?.name || 'Haras'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Theme Toggle - Desktop Only */}
-            {!isMobile && (
-              <button
-                onClick={toggleTheme}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-5 h-5 text-white" />
-                ) : (
-                  <Moon className="w-5 h-5 text-foreground" />
-                )}
-              </button>
-            )}
-
-            {/* Notifications */}
+    <>
+      <DashboardShell
+        isMobile={isMobile}
+        isSidebarOpen={isSidebarOpen}
+        menuItems={menuItems}
+        activeMenuId={activeMenu}
+        onSelectMenu={handleSelectMenu}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+        onCloseSidebar={() => setIsSidebarOpen(false)}
+        title={currentTitle}
+        subtitle={currentHaras?.name || 'Haras'}
+        sidebarSubtitle={currentHaras?.name || 'Haras'}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        topbarActions={
+          <>
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors relative"
+                className={`${dashboardTopbarControlClass} relative`}
               >
-                <Bell className="w-5 h-5 text-foreground dark:text-white" />
+                <Bell className="w-5 h-5" />
                 {unreadNotifications > 0 && (
                   <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
                     {unreadNotifications}
@@ -374,17 +268,14 @@ export function AdvisorDashboard() {
               )}
             </div>
 
-            {/* User Menu - Desktop Only */}
             {!isMobile && (
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="p-3 rounded-lg bg-muted dark:bg-[#1a1a1a] hover:bg-accent dark:hover:bg-[#2a2a2a] transition-colors"
+                  className={dashboardTopbarControlClass}
                 >
-                  <User className="w-5 h-5 text-foreground dark:text-white" />
+                  <User className="w-5 h-5" />
                 </button>
-
-                {/* User Dropdown */}
                 {showUserMenu && (
                   <UserDropdown
                     userName={userName}
@@ -403,10 +294,9 @@ export function AdvisorDashboard() {
                 )}
               </div>
             )}
-          </div>
-        </header>
-
-        {/* Content */}
+          </>
+        }
+      >
         <main className="flex-1 overflow-auto mobile-scroll-hidden bg-background dark:bg-[#0d0d0d] p-4 md:p-8">
           {activeMenu === 'profile' && <ProfileView />}
           {activeMenu === 'settings' && <BreederSettingsContent />}
@@ -431,9 +321,7 @@ export function AdvisorDashboard() {
           {activeMenu === 'help' && <BreederHelpContent />}
           {activeMenu === 'pending-validation' && <AdvisorPendingValidation onBack={() => setActiveMenu('dashboard')} />}
         </main>
-      </div>
-
-
+      </DashboardShell>
 
       {/* Notifications Panel */}
       <NotificationsPanel
@@ -443,6 +331,6 @@ export function AdvisorDashboard() {
         onMarkAsRead={handleMarkAsRead}
         onDelete={handleDelete}
       />
-    </div>
+    </>
   );
 }
