@@ -1,18 +1,25 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
+import { normalizeRole } from '@/lib/roles';
 
-// Roles mantidos conforme o banco: admin, criador, assessor
-export type UserRole = 'admin' | 'criador' | 'assessor' | 'breeder' | 'advisor' | 'employee';
+// Roles mantidos conforme o banco: admin, criador, assessor e equipe
+export type UserRole =
+  | 'admin'
+  | 'criador'
+  | 'assessor'
+  | 'veterinario'
+  | 'peao'
+  | 'funcionario';
 
 interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
   avatar_url: string | null;
-  role: UserRole;
+  role: string | null;
   haras_id: string | null;
   phone: string | null;
 }
@@ -36,8 +43,33 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+function mapProfileRoleToUserRole(role?: string | null): UserRole | null {
+  const normalized = normalizeRole(role);
+  return normalized === 'unknown' ? null : normalized;
+}
+
+function isInvalidRefreshTokenError(error: unknown): boolean {
+  const message = getErrorMessage(error, '');
+  return (
+    message.includes('Invalid Refresh Token')
+    || message.includes('Refresh Token Not Found')
+  );
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stableHarasId, setStableHarasId] = useState<string | null>(null);
@@ -49,8 +81,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // Ref to track which user profile is currently being fetched to prevent duplicates
   const fetchingForUserId = useRef<string | null>(null);
   const lastUserIdRef = useRef<string | null>(null);
+  const profileRef = useRef<UserProfile | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const applyProfileState = useCallback((profileData: UserProfile | null) => {
+    profileRef.current = profileData;
+    setProfile(profileData);
+    setUserRole(mapProfileRoleToUserRole(profileData?.role) || null);
+    setStableHarasId(profileData?.haras_id || null);
+  }, []);
+
+  const fetchProfile = useCallback(async (userId: string) => {
     // If we are already fetching for this exact user, skip
     if (fetchingForUserId.current === userId) {
       return;
@@ -68,22 +108,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const cached = localStorage.getItem(cacheKey);
         if (cached) {
           cachedProfile = JSON.parse(cached);
-          setProfile(cachedProfile);
-
+          applyProfileState(cachedProfile);
           if (cachedProfile) {
-            let mappedRole = cachedProfile.role;
-            if (mappedRole === 'criador') mappedRole = 'breeder' as UserRole;
-            if (mappedRole === 'assessor') mappedRole = 'advisor' as UserRole;
-            setUserRole(mappedRole);
-            if (cachedProfile.haras_id) {
-              setStableHarasId(cachedProfile.haras_id);
-            }
             // Stop loading immediately if we found cache
             setIsLoading(false);
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Cache read error ignored
     }
 
@@ -100,7 +132,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      const result = await Promise.race([queryPromise, queryTimeout]) as any;
+      const result = await Promise.race([queryPromise, queryTimeout]) as Awaited<typeof queryPromise>;
       const { data, error: supabaseError } = result;
 
       if (supabaseError) {
@@ -114,51 +146,51 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       if (data) {
-        const profileData = data as UserProfile;
+        const profileData: UserProfile = {
+          id: data.id,
+          email: data.email,
+          full_name: data.full_name,
+          avatar_url: data.avatar_url,
+          role: data.role,
+          haras_id: data.haras_id,
+          phone: data.phone,
+        };
 
         // Update state and cache
-        setProfile(profileData);
+        applyProfileState(profileData);
         if (typeof window !== 'undefined') {
           localStorage.setItem(cacheKey, JSON.stringify(profileData));
         }
-        if (profileData.haras_id) {
-          setStableHarasId(profileData.haras_id);
-        }
-
-        // Map database roles to component roles
-        let mappedRole = profileData.role;
-        if (mappedRole === 'criador') mappedRole = 'breeder' as UserRole;
-        if (mappedRole === 'assessor') mappedRole = 'advisor' as UserRole;
-
-        setUserRole(mappedRole);
       } else {
         if (!cachedProfile) {
           setError('Perfil de usuário não encontrado no sistema.');
         }
       }
-    } catch (err: any) {
-      const isTimeout = err.message?.includes('Timeout');
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Erro inesperado ao carregar perfil.');
+      const isTimeout = errorMessage.includes('Timeout');
 
       // If we have cache, don't block the user with an error
       if (!cachedProfile) {
         // If it's a timeout, show a friendlier message
         const userMsg = isTimeout
           ? 'A conexão com o banco de dados está lenta. Tente recarregar.'
-          : (err.message || 'Erro inesperado ao carregar perfil.');
+          : errorMessage;
         setError(userMsg);
       }
     } finally {
       fetchingForUserId.current = null; // Release the lock
     }
-  };
+  }, [applyProfileState, supabase]);
 
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchProfile(user.id);
+  const refreshProfile = useCallback(async () => {
+    const currentUserId = lastUserIdRef.current ?? user?.id;
+    if (currentUserId) {
+      await fetchProfile(currentUserId);
     }
-  };
+  }, [fetchProfile, user?.id]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -169,22 +201,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
       return false;
     }
     return true;
-  };
+  }, [supabase]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-    } catch (err) {
+    } catch {
       // Error ignored
     } finally {
       setUser(null);
-      setProfile(null);
-      setStableHarasId(null);
-      setUserRole(null);
+      applyProfileState(null);
       setError(null);
       lastUserIdRef.current = null;
     }
-  };
+  }, [applyProfileState, supabase]);
 
   useEffect(() => {
     let mounted = true;
@@ -223,18 +253,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
               if (currentUser) return null;
               return currentUser;
             });
-            setProfile(null);
-            setStableHarasId(null);
-            setUserRole(null);
+            applyProfileState(null);
             lastUserIdRef.current = null;
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (mounted) {
+          if (isInvalidRefreshTokenError(error)) {
+            try {
+              await supabase.auth.signOut();
+            } catch {
+              // Error ignored
+            } finally {
+              setUser(null);
+              applyProfileState(null);
+              setError(null);
+              fetchingForUserId.current = null;
+              lastUserIdRef.current = null;
+            }
+            return;
+          }
+
           // Do not forcefully clear user here to avoid race with onAuthStateChange success
           // Only set error if we truly end up with no user
           setUser((currentUser) => {
-            if (!currentUser) setError(error.message || 'Erro ao verificar sessão.');
+            if (!currentUser) setError(getErrorMessage(error, 'Erro ao verificar sessão.'));
             return currentUser;
           });
         }
@@ -255,19 +298,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_OUT') {
           if (mounted) {
             setUser(null);
-            setProfile(null);
-            setStableHarasId(null);
-            setUserRole(null);
+            applyProfileState(null);
             setIsLoading(false);
             setIsSessionReady(true);
+            setError(null);
           }
           fetchingForUserId.current = null;
           lastUserIdRef.current = null;
         } else if (session?.user) {
           if (lastUserIdRef.current && lastUserIdRef.current !== session.user.id) {
-            setProfile(null);
-            setUserRole(null);
-            setStableHarasId(null);
+            applyProfileState(null);
           }
           lastUserIdRef.current = session.user.id;
 
@@ -280,7 +320,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           // Determine if we need to fetch profile:
           // 1. If we have no profile OR profile ID doesn't match current user
           // 2. AND we are not locked on fetching this ID
-          if ((!profile || profile.id !== session.user.id) && fetchingForUserId.current !== session.user.id) {
+          const currentProfile = profileRef.current;
+          if ((!currentProfile || currentProfile.id !== session.user.id) && fetchingForUserId.current !== session.user.id) {
             try {
               await fetchProfile(session.user.id);
             } finally {
@@ -310,7 +351,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []); // Dependências vazias intencionais
+  }, [applyProfileState, fetchProfile, supabase]);
 
   return (
     <UserContext.Provider value={{

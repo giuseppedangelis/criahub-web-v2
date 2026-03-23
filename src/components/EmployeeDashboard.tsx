@@ -1,7 +1,7 @@
 'use client'
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { Home, Heart, Users as HorseIcon, User, Calendar, Moon, Sun, Bell, LogOut, UserCircle, RefreshCw } from 'lucide-react';
+import { Home, Heart, Users as HorseIcon, User, Calendar, Moon, Sun, Bell, LogOut, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 import { ProfileView } from './ProfileView';
 import { PeonHomeContent } from './employee/PeonHomeContent';
@@ -11,18 +11,20 @@ import { VetHomeContent } from './employee/VetHomeContent';
 import { VetHerdContent } from './employee/VetHerdContent';
 import { VetCalendarContent } from './employee/VetCalendarContent';
 import { BrandLogo } from './branding/BrandLogo';
+import { normalizeRole } from '@/lib/roles';
 
 export function EmployeeDashboard() {
   const { theme, toggleTheme } = useTheme();
-  const { userName, userEmail, logout } = useUser();
+  const { userName, userEmail, logout, profile } = useUser();
   const [activeTab, setActiveTab] = useState('home');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [employeeType, setEmployeeType] = useState<'peon' | 'vet'>('peon'); // or 'vet'
   const [unreadNotifications] = useState(3);
 
-  // For demo purposes, we can toggle between Peão and Veterinária
-  const isPeon = employeeType === 'peon';
-  const isVet = employeeType === 'vet';
+  const employeeRole = normalizeRole(profile?.role);
+  const employeeWorkflow: 'operational' | 'veterinary' =
+    employeeRole === 'veterinario' ? 'veterinary' : 'operational';
+  const usesOperationalWorkflow = employeeWorkflow === 'operational';
+  const usesVeterinaryWorkflow = employeeWorkflow === 'veterinary';
 
   const peonMenuItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -38,8 +40,13 @@ export function EmployeeDashboard() {
     { id: 'profile', label: 'Perfil', icon: User },
   ];
 
-  const menuItems = isPeon ? peonMenuItems : vetMenuItems;
-  const userTitle = isPeon ? 'Peão' : 'Veterinária';
+  const menuItems = usesOperationalWorkflow ? peonMenuItems : vetMenuItems;
+  const userTitle =
+    employeeRole === 'funcionario'
+      ? 'Funcionário'
+      : usesOperationalWorkflow
+        ? 'Peão'
+        : 'Veterinário';
   const topbarControlClass =
     'rounded-xl bg-muted p-2 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-[#0d0d0d] dark:text-white dark:hover:bg-[#2a2a2a]';
 
@@ -119,17 +126,6 @@ export function EmployeeDashboard() {
                       </>
                     )}
                   </button>
-                  <button
-                    onClick={() => {
-                      setEmployeeType(employeeType === 'peon' ? 'vet' : 'peon');
-                      setActiveTab('home');
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-muted dark:hover:bg-[#0d0d0d] text-foreground dark:text-white flex items-center gap-3"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Alternar: {isPeon ? 'Ver como Veterinária' : 'Ver como Peão'}
-                  </button>
                   <div className="border-t border-border dark:border-[rgba(255,255,255,0.1)] my-2"></div>
                   <button
                     onClick={() => {
@@ -152,15 +148,15 @@ export function EmployeeDashboard() {
       <div className="flex-1 overflow-auto mobile-scroll-hidden pb-20">
         {activeTab === 'profile' && <ProfileView />}
 
-        {/* Peão Content */}
-        {isPeon && activeTab === 'home' && <PeonHomeContent />}
-        {isPeon && activeTab === 'pregnancies' && <PeonPregnanciesContent />}
-        {isPeon && activeTab === 'herd' && <PeonHerdContent />}
+        {/* Jornada operacional compartilhada por Peão e Funcionário */}
+        {usesOperationalWorkflow && activeTab === 'home' && <PeonHomeContent />}
+        {usesOperationalWorkflow && activeTab === 'pregnancies' && <PeonPregnanciesContent />}
+        {usesOperationalWorkflow && activeTab === 'herd' && <PeonHerdContent />}
 
         {/* Veterinária Content */}
-        {isVet && activeTab === 'home' && <VetHomeContent />}
-        {isVet && activeTab === 'herd' && <VetHerdContent />}
-        {isVet && activeTab === 'calendar' && <VetCalendarContent />}
+        {usesVeterinaryWorkflow && activeTab === 'home' && <VetHomeContent />}
+        {usesVeterinaryWorkflow && activeTab === 'herd' && <VetHerdContent />}
+        {usesVeterinaryWorkflow && activeTab === 'calendar' && <VetCalendarContent />}
       </div>
 
       {/* Bottom Navigation Bar */}

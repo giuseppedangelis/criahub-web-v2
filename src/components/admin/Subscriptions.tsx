@@ -1,4 +1,4 @@
-import { Search, MoreVertical, Download, Plus, Edit, Send, PlayCircle, StopCircle, XCircle } from 'lucide-react';
+import { Search, MoreVertical, Plus, Edit, Send, PlayCircle, StopCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -29,6 +29,15 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 
+interface Subscription {
+  id: string;
+  harasName: string;
+  owner: string;
+  plan: 'Básico' | 'Premium' | 'Enterprise';
+  dueDate: string;
+  status: 'Ativo' | 'Vencida' | 'Pendente' | 'Suspenso';
+}
+
 export function Subscriptions() {
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +60,7 @@ export function Subscriptions() {
     },
   });
 
-  const mockSubscriptions = [
+  const mockSubscriptions: Subscription[] = [
     { id: '1', harasName: 'Haras Aurora', owner: 'João Silva', plan: 'Premium', dueDate: '2025-10-15', status: 'Ativo' },
     { id: '2', harasName: 'Haras Vanguarda', owner: 'Maria Santos', plan: 'Enterprise', dueDate: '2025-09-20', status: 'Vencida' },
     { id: '3', harasName: 'Haras Esperança', owner: 'Pedro Costa', plan: 'Básico', dueDate: '2025-11-01', status: 'Ativo' },
@@ -59,9 +68,9 @@ export function Subscriptions() {
     { id: '5', harasName: 'Haras Estrela', owner: 'Carlos Mendes', plan: 'Premium', dueDate: '2025-10-30', status: 'Ativo' },
   ];
 
-  const [subscriptions, setSubscriptions] = useState(mockSubscriptions);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(mockSubscriptions);
 
-  const filteredSubscriptions = mockSubscriptions.filter(sub =>
+  const filteredSubscriptions = subscriptions.filter(sub =>
     sub.harasName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     sub.owner.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -261,7 +270,12 @@ export function Subscriptions() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="plan">Plano</Label>
-                  <Select value={newClient.plan} onValueChange={(value) => setNewClient({ ...newClient, plan: value })}>
+                  <Select
+                    value={newClient.plan}
+                    onValueChange={(value: Subscription['plan']) =>
+                      setNewClient({ ...newClient, plan: value })
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -292,7 +306,7 @@ export function Subscriptions() {
                     <Label className="capitalize">{key === 'plantel' ? 'Gestão do Plantel' : key === 'reproduction' ? 'Controle Reprodutivo' : key === 'financial' ? 'Gestão Financeira' : 'Gestão de Equipe'}</Label>
                     <Switch
                       checked={value}
-                      onCheckedChange={(checked) =>
+                      onCheckedChange={(checked: boolean) =>
                         setNewClient({
                           ...newClient,
                           permissions: { ...newClient.permissions, [key]: checked },

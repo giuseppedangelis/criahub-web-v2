@@ -77,10 +77,7 @@ export function AdvisorTasksContent({ showPendingValidation = true }: AdvisorTas
   const harasId = currentHaras?.id || '';
   const { profile, userRole } = useUser();
   const currentUserId = profile?.id || '';
-  const isAdvisor =
-    userRole === 'advisor' ||
-    userRole === 'assessor' ||
-    userRole === 'assessor';
+  const isAdvisor = userRole === 'assessor';
 
   const { data: animalsResponse } = useAnimals(
     { haras_id: harasId },

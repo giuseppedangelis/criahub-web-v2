@@ -1,7 +1,20 @@
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
-import { normalizeRoleForStorage } from '@/lib/roles'
+import type { UserRole } from '@/types'
+
+const CLIENT_OWNER_ROLE: UserRole = 'criador'
+const CLIENT_OWNER_PERMISSIONS = {
+    viewHerd: true,
+    registerActivities: true,
+    healthManagement: true,
+    reproduction: true,
+    financialManagement: true,
+    trainingManagement: true,
+    teamManagement: true,
+    documentManagement: true,
+    fullAdministrative: true,
+} as const
 
 // Definir tipos simples para evitar dependência circular ou complexa
 interface CreateClientData {
@@ -10,12 +23,12 @@ interface CreateClientData {
     email: string;
     phone: string;
     password: string;
-    role: string;
+    role: UserRole;
     plan: string;
     value: number;
     startDate: string;
     dueDay: number;
-    permissions: any;
+    permissions: Record<string, boolean>;
 }
 
 export async function createClientAction(data: CreateClientData) {
@@ -84,7 +97,7 @@ export async function createClientAction(data: CreateClientData) {
             throw new Error('Erro ao criar haras: ' + harasError.message)
         }
 
-        const normalizedRole = normalizeRoleForStorage(data.role) || data.role
+        const normalizedRole = CLIENT_OWNER_ROLE
 
         // 3. Atualizar/Criar Perfil
         // Tenta atualizar primeiro (caso exista trigger)
@@ -124,10 +137,52 @@ export async function createClientAction(data: CreateClientData) {
             return { success: true, warning: 'Cliente criado, mas houve erro ao vincular perfil: ' + upsertError.message }
         }
 
+        const { data: roleId, error: ensureRoleError } = await supabase.rpc('ensure_default_haras_role', {
+            p_haras_id: haras.id,
+            p_role: normalizedRole,
+            p_created_by: userId,
+        })
+
+        if (ensureRoleError) {
+            console.error('Erro ao garantir função padrão do haras:', ensureRoleError)
+            return { success: true, warning: 'Cliente criado, mas houve erro ao sincronizar a função padrão da equipe: ' + ensureRoleError.message }
+        }
+
+        const { data: teamPermissions, error: teamPermissionsError } = await supabase.rpc('default_team_permissions', {
+            p_role: normalizedRole,
+        })
+
+        if (teamPermissionsError) {
+            console.error('Erro ao carregar permissões padrão da equipe:', teamPermissionsError)
+        }
+
+        const { error: harasMemberError } = await supabase
+            .from('haras_members')
+            .upsert({
+                haras_id: haras.id,
+                user_id: userId,
+                role_id: roleId,
+                permissions: teamPermissions || CLIENT_OWNER_PERMISSIONS,
+                status: 'Ativo',
+                created_by: userId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            }, {
+                onConflict: 'haras_id,user_id',
+            })
+
+        if (harasMemberError) {
+            console.error('Erro ao sincronizar membro do haras:', harasMemberError)
+            return { success: true, warning: 'Cliente criado, mas houve erro ao sincronizar o vínculo na equipe: ' + harasMemberError.message }
+        }
+
         return { success: true }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('Create Client Action Error:', err)
-        return { success: false, error: err.message }
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : 'Erro inesperado ao cadastrar cliente.'
+        }
     }
 }

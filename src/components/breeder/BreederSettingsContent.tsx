@@ -16,7 +16,7 @@ import type { HarasBackupSettings } from '@/services/harasSettings';
 import { AddCollaboratorForm } from './AddCollaboratorForm';
 import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
 import { DEFAULT_HARAS_LOCATION_SETTINGS, normalizeHarasLocationSettings } from '@/lib/animal-location';
-import { isCreatorRole } from '@/lib/roles';
+import { getRoleLabel, isCreatorRole, normalizeRole } from '@/lib/roles';
 import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
 import type { HarasLocationSettings } from '@/types';
 
@@ -118,24 +118,6 @@ export function BreederSettingsContent() {
     { id: 'security' as SettingsTab, name: 'Segurança', icon: Shield },
     { id: 'general' as SettingsTab, name: 'Geral', icon: Wrench },
   ];
-
-  const ROLE_LABELS: Record<string, string> = {
-    criador: 'Criador/Dono de Haras',
-    breeder: 'Criador/Dono de Haras',
-    assessor: 'Assessor Administrativo',
-    advisor: 'Assessor Administrativo',
-    peao: 'Funcionário de Campo',
-    veterinario: 'Veterinário',
-    employee: 'Funcionário de Campo',
-    admin: 'Administrador',
-  };
-
-  const normalizeRole = (role?: string | null) =>
-    (role || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
 
   const canManageLocations = isCreatorRole(profile?.role);
 
@@ -255,7 +237,7 @@ export function BreederSettingsContent() {
         id: member.id,
         name: member.full_name || member.email || 'Colaborador',
         email: member.email || '',
-        role: ROLE_LABELS[normalizedRole] || member.role || 'Colaborador',
+        role: getRoleLabel(normalizedRole),
         status: member.status === 'Inativo' ? 'Inativo' : 'Ativo',
         avatar: member.avatar_url || undefined,
         systemRole: normalizedRole,
@@ -289,7 +271,7 @@ export function BreederSettingsContent() {
 
   useEffect(() => {
     if (!profile || profileHydrated) return;
-    const roleLabel = ROLE_LABELS[normalizeRole(profile.role)] || profile.role || '';
+    const roleLabel = getRoleLabel(profile.role);
     setProfileData((prev) => ({
       ...prev,
       name: profile.full_name || '',

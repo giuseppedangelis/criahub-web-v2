@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useUser } from '@/contexts/UserContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import type { UserRole } from '@/contexts/UserContext'
+import { normalizeRole } from '@/lib/roles'
 
 interface HeaderProps {
     title?: string
@@ -32,7 +32,7 @@ export function Header({ title, onMenuClick }: HeaderProps) {
         try {
             await logout()
             window.location.href = '/login'
-        } catch (error) {
+        } catch {
             setIsSigningOut(false)
         }
     }
@@ -47,18 +47,20 @@ export function Header({ title, onMenuClick }: HeaderProps) {
             .slice(0, 2)
     }
 
-    const getRoleLabel = (role: UserRole | undefined) => {
-        switch (role) {
+    const getRoleLabel = (role?: string | null) => {
+        switch (normalizeRole(role)) {
             case 'admin':
                 return 'Administrador'
-            case 'breeder':
-                return 'Criador'
-            case 'advisor':
-                return 'Assessor'
             case 'criador':
                 return 'Criador'
             case 'assessor':
                 return 'Assessor'
+            case 'veterinario':
+                return 'Veterinário'
+            case 'peao':
+                return 'Peão'
+            case 'funcionario':
+                return 'Funcionário'
             default:
                 return 'Usuário'
         }

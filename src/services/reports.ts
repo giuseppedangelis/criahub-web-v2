@@ -11,6 +11,7 @@ import type {
   Report,
   ReportFilters,
 } from '@/types'
+import type { Json } from '@/types/database.types'
 
 const REPORT_SELECT = `
   id,
@@ -131,7 +132,7 @@ export const reportsService = {
       tipo: input.type,
       formato: input.format,
       status: input.status ?? 'Gerado',
-      parametros: input.parameters ?? null,
+      parametros: (input.parameters ?? null) as Json | null,
       arquivo_url: input.file_url ?? null,
       tamanho_bytes: input.size_bytes ?? null,
       agendado_para: input.scheduled_for ?? null,
@@ -158,7 +159,7 @@ export const reportsService = {
     if (input.type !== undefined) payload.tipo = input.type
     if (input.format !== undefined) payload.formato = input.format
     if (input.status !== undefined) payload.status = input.status
-    if (input.parameters !== undefined) payload.parametros = input.parameters
+    if (input.parameters !== undefined) payload.parametros = (input.parameters ?? null) as Json | null
     if (input.file_url !== undefined) payload.arquivo_url = input.file_url
     if (input.size_bytes !== undefined) payload.tamanho_bytes = input.size_bytes
     if (input.scheduled_for !== undefined) payload.agendado_para = input.scheduled_for

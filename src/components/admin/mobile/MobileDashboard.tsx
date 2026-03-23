@@ -96,7 +96,6 @@ export function MobileDashboard() {
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
-                formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
               />
               <Line 
                 type="monotone" 

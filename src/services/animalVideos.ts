@@ -66,8 +66,18 @@ function inferSourceFromUrl(url: string): AnimalVideoSource {
     return 'link';
 }
 
-function normalizeSource(source?: AnimalVideoSource, url?: string): AnimalVideoSource {
-    if (source) return source;
+function normalizeSource(source?: AnimalVideoSource | string | null, url?: string): AnimalVideoSource {
+    if (source === 'upload' || source === 'youtube' || source === 'vimeo' || source === 'link') {
+        return source;
+    }
+
+    if (typeof source === 'string' && source.trim().length > 0) {
+        const normalizedSource = source.toLowerCase();
+        if (normalizedSource === 'upload' || normalizedSource === 'youtube' || normalizedSource === 'vimeo' || normalizedSource === 'link') {
+            return normalizedSource;
+        }
+    }
+
     if (url) return inferSourceFromUrl(url);
     return 'link';
 }

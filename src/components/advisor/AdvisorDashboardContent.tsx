@@ -320,7 +320,6 @@ export function AdvisorDashboardContent({
                   borderRadius: '8px',
                   color: '#fff'
                 }}
-                formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                 {financialData.map((entry, index) => (

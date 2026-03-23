@@ -5,6 +5,7 @@ import { useUser } from '../../contexts/UserContext';
 import { NativeSelect } from '../ui/native-select';
 import { createClient } from '@/lib/supabase/client';
 import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
+import { getRoleLabel } from '@/lib/roles';
 import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
 
 type SettingsTab = 'profile' | 'plans' | 'integrations' | 'security' | 'maintenance';
@@ -1101,15 +1102,7 @@ export function AdminSettingsContent() {
                   </label>
                   <input
                     type="text"
-                    value={
-                      profileData.role === 'admin'
-                        ? 'Administrador'
-                        : profileData.role === 'criador'
-                          ? 'Criador'
-                          : profileData.role === 'assessor' || profileData.role === 'advisor'
-                            ? 'Assessor'
-                            : profileData.role
-                    }
+                    value={getRoleLabel(profileData.role)}
                     disabled
                     className="w-full px-4 py-2 bg-muted dark:bg-[#0d0d0d] border border-border dark:border-[#3a3a3a] rounded-xl text-muted-foreground dark:text-[#99a1af] cursor-not-allowed"
                   />

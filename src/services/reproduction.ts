@@ -28,11 +28,17 @@ import type {
     CreateReproductionProtocolStepInput,
     CreateReproductionProtocolApplicationInput
 } from '@/types';
+import type { Json } from '@/types/database.types';
 
 type GestationRow = Record<string, any>;
+type ReproductiveEventRow = Record<string, any>;
+type CoveringRow = Record<string, any>;
+type OvuleRow = Record<string, any>;
+type EmbryoRow = Record<string, any>;
 type ReproductionProtocolRow = ReproductionProtocol & {
     steps?: ReproductionProtocolStep[] | null;
 };
+type JsonObject = Record<string, Json | undefined>;
 
 const REPRODUCTIVE_EVENT_SELECT = `
   id,
@@ -272,6 +278,113 @@ const mapGestationRow = (row: GestationRow): Gestation => ({
     foal: row.foal ?? null,
 });
 
+const toNullableRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+
+    return value as Record<string, unknown>;
+};
+
+const toJsonObject = (value: Json | null): JsonObject | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+
+    return value as JsonObject;
+};
+
+const toNumber = (value: unknown): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return 0;
+};
+
+const mapReproductiveEventRow = (row: ReproductiveEventRow): ReproductiveEvent => ({
+    id: row.id,
+    haras_id: row.haras_id,
+    animal_id: row.animal_id,
+    event_type: row.event_type as ReproductiveEvent['event_type'],
+    event_date: row.event_date,
+    stallion_id: row.stallion_id ?? null,
+    mare_id: row.mare_id ?? null,
+    veterinarian: row.veterinarian ?? null,
+    protocol: row.protocol ?? null,
+    observations: row.observations ?? null,
+    status: row.status ?? null,
+    semen_type: row.semen_type ?? null,
+    details: toNullableRecord(row.details),
+    auto_generated: row.auto_generated ?? null,
+    priority: row.priority ?? null,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? row.created_at ?? '',
+    animal: row.animal ?? null,
+    stallion: row.stallion ?? null,
+    mare: row.mare ?? null,
+});
+
+const mapCoveringRow = (row: CoveringRow): Covering => ({
+    id: row.id,
+    haras_id: row.haras_id,
+    mare_id: row.mare_id ?? row.egua_id,
+    stallion_id: row.stallion_id ?? row.garanhao_id,
+    event_date: row.event_date ?? row.data_cobertura,
+    type: row.type as Covering['type'],
+    semen_type: row.semen_type ?? row.tipo_semen ?? null,
+    veterinarian: row.veterinarian ?? row.veterinario ?? null,
+    observations: row.observations ?? row.observacoes ?? null,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? row.created_at ?? '',
+    mare: row.mare ?? null,
+    stallion: row.stallion ?? null,
+});
+
+const mapOvuleRow = (row: OvuleRow): Ovule => ({
+    id: row.id,
+    haras_id: row.haras_id,
+    donor_id: row.donor_id,
+    collection_date: row.collection_date,
+    quantity: row.quantity,
+    available: row.available,
+    quality: row.quality as Ovule['quality'],
+    method: row.method ?? null,
+    status: row.status ?? null,
+    veterinarian: row.veterinarian ?? null,
+    observations: row.observations ?? null,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? row.created_at ?? '',
+    donor: row.donor ?? null,
+});
+
+const mapEmbryoRow = (row: EmbryoRow): Embryo => ({
+    id: row.id,
+    haras_id: row.haras_id,
+    donor_id: row.donor_id,
+    stallion_id: row.stallion_id ?? null,
+    production_date: row.production_date,
+    quantity: row.quantity,
+    available: row.available,
+    grade: row.grade as Embryo['grade'],
+    storage_type: row.storage_type as Embryo['storage_type'],
+    method: row.method ?? null,
+    status: row.status ?? null,
+    veterinarian: row.veterinarian ?? null,
+    observations: row.observations ?? null,
+    created_at: row.created_at ?? '',
+    updated_at: row.updated_at ?? row.created_at ?? '',
+    donor: row.donor ?? null,
+    stallion: row.stallion ?? null,
+});
+
 const sortProtocolSteps = (steps?: ReproductionProtocolStep[] | null): ReproductionProtocolStep[] => {
     if (!steps || steps.length === 0) return [];
 
@@ -311,22 +424,40 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mapped = (data || []).map(mapReproductiveEventRow);
+        return formatPaginatedResponse(mapped, count || 0, pagination);
     },
 
     /**
      * Registra um novo evento reprodutivo
      */
     async createEvent(input: CreateReproductiveEventInput): Promise<ReproductiveEvent> {
+        const payload = {
+            haras_id: input.haras_id,
+            animal_id: input.animal_id,
+            event_type: input.event_type,
+            event_date: input.event_date,
+            stallion_id: input.stallion_id ?? null,
+            mare_id: input.mare_id ?? null,
+            veterinarian: input.veterinarian ?? null,
+            protocol: input.protocol ?? null,
+            observations: input.observations ?? null,
+            status: input.status ?? null,
+            semen_type: input.semen_type ?? null,
+            details: (input.details ?? null) as Json | null,
+            auto_generated: input.auto_generated ?? null,
+            priority: input.priority ?? null,
+        };
+
         const { data, error } = await supabase
             .from('reproductive_events')
-            .insert(input)
+            .insert(payload)
             .select(REPRODUCTIVE_EVENT_SELECT)
             .single();
 
         if (error) handleSupabaseError(error);
 
-        return data as ReproductiveEvent;
+        return mapReproductiveEventRow(data);
     },
 
     /**
@@ -341,7 +472,7 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return data as ReproductiveEvent[];
+        return (data || []).map(mapReproductiveEventRow);
     },
 
     // ============================================
@@ -367,7 +498,8 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mapped = (data || []).map(mapCoveringRow);
+        return formatPaginatedResponse(mapped, count || 0, pagination);
     },
 
     /**
@@ -391,7 +523,7 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return data as Covering;
+        return mapCoveringRow(data);
     },
 
     // ============================================
@@ -464,7 +596,7 @@ export const reproductionService = {
                 egua_id: input.mare_id,
                 garanhao_id: input.stallion_id || null,
                 covering_id: input.reproductive_event_id || null,
-                data_diagnostico: input.confirmation_date || null,
+                data_diagnostico: input.confirmation_date ?? input.start_date,
                 data_prevista_parto: input.expected_birth_date || expectedBirth.toISOString().split('T')[0],
                 status: mapAppGestationStatus(input.status || 'confirmada'),
                 tipo_diagnostico: input.diagnosis_type || null,
@@ -534,19 +666,23 @@ export const reproductionService = {
      * Obtém estatísticas de reprodução
      */
     async getStats(harasId: string, year?: number): Promise<ReproductionStats> {
-        const { data, error } = await supabase.rpc('get_reproduction_stats', {
-            p_haras_id: harasId,
-            p_year: year ?? null,
-        });
+        const { data, error } = await supabase.rpc(
+            'get_reproduction_stats',
+            year === undefined
+                ? { p_haras_id: harasId }
+                : { p_haras_id: harasId, p_year: year }
+        );
 
         if (error) handleSupabaseError(error);
 
+        const stats = toJsonObject(data);
+
         return {
-            totalGestations: data?.totalGestations ?? 0,
-            confirmedGestations: data?.confirmedGestations ?? 0,
-            births: data?.births ?? 0,
-            abortions: data?.abortions ?? 0,
-            successRate: Number(data?.successRate ?? 0),
+            totalGestations: toNumber(stats?.totalGestations),
+            confirmedGestations: toNumber(stats?.confirmedGestations),
+            births: toNumber(stats?.births),
+            abortions: toNumber(stats?.abortions),
+            successRate: toNumber(stats?.successRate),
         };
     },
 
@@ -570,7 +706,8 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mapped = (data || []).map(mapOvuleRow);
+        return formatPaginatedResponse(mapped, count || 0, pagination);
     },
 
     async createOvule(input: CreateOvuleInput): Promise<Ovule> {
@@ -593,7 +730,7 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return data as Ovule;
+        return mapOvuleRow(data);
     },
 
     // ============================================
@@ -616,7 +753,8 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return formatPaginatedResponse(data || [], count || 0, pagination);
+        const mapped = (data || []).map(mapEmbryoRow);
+        return formatPaginatedResponse(mapped, count || 0, pagination);
     },
 
     async createEmbryo(input: CreateEmbryoInput): Promise<Embryo> {
@@ -641,7 +779,7 @@ export const reproductionService = {
 
         if (error) handleSupabaseError(error);
 
-        return data as Embryo;
+        return mapEmbryoRow(data);
     },
 
     // ============================================

@@ -311,7 +311,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       title: 'Cobertura registrada',
       animal: `${cobertura.pai} x ${cobertura.mae}`,
       time: cobertura.data,
-      type: 'covering',
+      type: 'covering' as const,
     }));
 
     const gestationActivities = gestations.slice(0, 2).map((gestation) => ({
@@ -319,7 +319,7 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
       title: 'Gestação confirmada',
       animal: gestation.mare?.name || 'Gestação',
       time: formatDate(gestation.confirmation_date || gestation.expected_birth_date || ''),
-      type: 'birth',
+      type: 'birth' as const,
     }));
 
     return [...coverageActivities, ...gestationActivities].slice(0, 4);
@@ -462,14 +462,17 @@ export function BreederReproductionContent({ onNavigateToAgenda }: BreederReprod
           total_days: totalDays,
         },
       });
-      await replaceProtocolSteps(protocolId, data.steps.map((step, index) => ({
-        protocol_id: protocolId,
-        name: step.name,
-        day_offset: step.dayOffset,
-        description: step.description,
-        step_type: step.type,
-        sort_order: index,
-      })));
+      await replaceProtocolSteps({
+        protocolId,
+        steps: data.steps.map((step, index) => ({
+          protocol_id: protocolId,
+          name: step.name,
+          day_offset: step.dayOffset,
+          description: step.description,
+          step_type: step.type,
+          sort_order: index,
+        })),
+      });
       toast.success('Protocolo atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar protocolo:', error);
@@ -1384,7 +1387,17 @@ function DeadlineItem({ name, type, days, onClick }: { name: string; type: strin
   );
 }
 
-function ActivityItem({ title, animal, time, type }: { title: string; animal: string; time: string; type: string }) {
+function ActivityItem({
+  title,
+  animal,
+  time,
+  type,
+}: {
+  title: string;
+  animal: string;
+  time: string;
+  type: 'covering' | 'birth' | 'report' | 'update';
+}) {
   const icon = {
     covering: <Heart className="w-5 h-5 text-pink-500" />,
     birth: <Heart className="w-5 h-5 text-purple-500" />,

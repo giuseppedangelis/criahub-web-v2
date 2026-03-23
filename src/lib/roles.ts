@@ -1,30 +1,31 @@
-export type NormalizedRole =
+export type CanonicalRole =
   | 'admin'
   | 'criador'
-  | 'breeder'
   | 'assessor'
-  | 'advisor'
   | 'veterinario'
   | 'peao'
   | 'funcionario'
-  | 'employee'
+
+export type NormalizedRole =
+  | CanonicalRole
   | 'unknown'
 
 const ROLE_RANK: Record<NormalizedRole, number> = {
   admin: 4,
   criador: 3,
-  breeder: 3,
   assessor: 2,
-  advisor: 2,
   veterinario: 1,
   peao: 1,
   funcionario: 1,
-  employee: 1,
   unknown: 0,
 }
 
-export function normalizeRole(role?: string | null): NormalizedRole {
-  const normalized = (role || '')
+function normalizeRoleInput(role: unknown): string {
+  return typeof role === 'string' ? role : ''
+}
+
+export function normalizeRole(role?: unknown): NormalizedRole {
+  const normalized = normalizeRoleInput(role)
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -34,68 +35,78 @@ export function normalizeRole(role?: string | null): NormalizedRole {
     case 'admin':
       return 'admin'
     case 'criador':
-      return 'criador'
     case 'breeder':
-      return 'breeder'
+      return 'criador'
     case 'assessor':
-      return 'assessor'
+    case 'acessor':
     case 'advisor':
-      return 'advisor'
+      return 'assessor'
     case 'veterinario':
       return 'veterinario'
     case 'peao':
       return 'peao'
     case 'funcionario':
-      return 'funcionario'
     case 'employee':
-      return 'employee'
+      return 'funcionario'
     default:
       return 'unknown'
   }
 }
 
-export function isAdminRole(role?: string | null): boolean {
+export function getRoleLabel(role?: unknown): string {
+  switch (normalizeRole(role)) {
+    case 'admin':
+      return 'Administrador'
+    case 'criador':
+      return 'Criador/Dono de Haras'
+    case 'assessor':
+      return 'Assessor Administrativo'
+    case 'veterinario':
+      return 'Veterinário'
+    case 'peao':
+      return 'Peão'
+    case 'funcionario':
+      return 'Funcionário'
+    default:
+      return 'Usuário'
+  }
+}
+
+export function isAdminRole(role?: unknown): boolean {
   return normalizeRole(role) === 'admin'
 }
 
-export function isCreatorRole(role?: string | null): boolean {
-  const normalized = normalizeRole(role)
-  return normalized === 'criador' || normalized === 'breeder'
+export function isCreatorRole(role?: unknown): boolean {
+  return normalizeRole(role) === 'criador'
 }
 
-export function isAdvisorRole(role?: string | null): boolean {
-  const normalized = normalizeRole(role)
-  return normalized === 'assessor' || normalized === 'advisor'
+export function isAdvisorRole(role?: unknown): boolean {
+  return normalizeRole(role) === 'assessor'
 }
 
-export function isStaffRole(role?: string | null): boolean {
+export function isStaffRole(role?: unknown): boolean {
   const normalized = normalizeRole(role)
   return (
     normalized === 'veterinario'
     || normalized === 'peao'
     || normalized === 'funcionario'
-    || normalized === 'employee'
   )
 }
 
-export function getRoleRank(role?: string | null): number {
+export function getRoleRank(role?: unknown): number {
   return ROLE_RANK[normalizeRole(role)] ?? 0
 }
 
-export function normalizeRoleForStorage(role?: string | null): string | null {
-  if (!role) return null
+export function normalizeRoleForStorage(role?: unknown): string | null {
+  if (typeof role !== 'string' || !role.trim()) return null
   const normalized = normalizeRole(role)
   switch (normalized) {
-    case 'assessor':
-    case 'advisor':
-      return 'assessor'
     case 'admin':
     case 'criador':
-    case 'breeder':
+    case 'assessor':
     case 'veterinario':
     case 'peao':
     case 'funcionario':
-    case 'employee':
       return normalized
     default:
       return role

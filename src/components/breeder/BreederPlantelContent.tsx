@@ -9,13 +9,13 @@ import { BreederAnimalDetails } from './BreederAnimalDetails';
 import { BreederEditarAnimal } from './BreederEditarAnimal';
 import { AnimalCard } from './AnimalCard';
 import { AdvancedFiltersModal } from './AdvancedFiltersModal';
-import { useAnimals, useAnimalSummary, useDeleteAnimal } from '@/hooks/useAnimals';
+import { useAnimals, useAnimalEnvironmentCounts, useAnimalSummary, useDeleteAnimal } from '@/hooks/useAnimals';
 import { useUser } from '@/contexts/UserContext';
 import { animalsService } from '@/services/animals';
 import { getAnimalStatusLabel, getDisplayCategoryLabel, getPlantelStatusActivity, isManualCastradoCategory, resolveManagedCategory } from '@/lib/animal-classification';
 import { toast } from 'sonner';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import type { AnimalCategory, AnimalEnvironment } from '@/types';
+import type { AnimalCategory, AnimalEnvironment, AnimalFilters } from '@/types';
 
 // Função auxiliar para formatar data de nascimento
 function formatBirthDate(isoDate: string): string {
@@ -179,7 +179,7 @@ export function BreederPlantelContent() {
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 350);
   const birthDateRange = useMemo(() => getBirthDateRangeFromAgeFilter(filterIdade), [filterIdade]);
 
-  const animalFilters = useMemo(() => ({
+  const animalFilters = useMemo<AnimalFilters>(() => ({
     haras_id: harasId,
     environment: activeEnvironment,
     search: debouncedSearchTerm.trim() || undefined,
@@ -198,6 +198,10 @@ export function BreederPlantelContent() {
 
   const { data: animalSummary } = useAnimalSummary(
     { haras_id: harasId, environment: activeEnvironment },
+    !!harasId && isSessionReady && !isUserLoading
+  );
+  const { data: environmentCounts } = useAnimalEnvironmentCounts(
+    harasId,
     !!harasId && isSessionReady && !isUserLoading
   );
 
@@ -468,30 +472,32 @@ export function BreederPlantelContent() {
 
           <div className="bg-card dark:bg-[#1a1a1a] rounded-2xl p-4 border border-border dark:border-[rgba(255,255,255,0.1)]">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <button
-                onClick={() => setActiveEnvironment('oficial')}
-                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'oficial' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
-              >
-                Plantel Oficial
-              </button>
-              <button
-                onClick={() => setActiveEnvironment('avulsos')}
-                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'avulsos' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
-              >
-                Avulsos
-              </button>
-              <button
-                onClick={() => setActiveEnvironment('vinculacao')}
-                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'vinculacao' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
-              >
-                Vinculação
-              </button>
-              <button
-                onClick={() => setActiveEnvironment('condominio')}
-                className={`h-10 rounded-lg text-sm transition-colors ${activeEnvironment === 'condominio' ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
-              >
-                Condomínio
-              </button>
+              {([
+                { key: 'oficial', label: 'Plantel Oficial' },
+                { key: 'avulsos', label: 'Avulsos' },
+                { key: 'vinculacao', label: 'Vinculação' },
+                { key: 'condominio', label: 'Condomínio' },
+              ] as const).map((environment) => {
+                const isActive = activeEnvironment === environment.key;
+                const count = environmentCounts?.[environment.key] ?? 0;
+
+                return (
+                  <button
+                    key={environment.key}
+                    onClick={() => setActiveEnvironment(environment.key)}
+                    className={`h-12 rounded-lg px-3 text-sm transition-colors ${isActive ? 'bg-primary text-white dark:bg-white dark:text-black' : 'bg-muted dark:bg-[#0d0d0d] text-foreground dark:text-white'}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate">{environment.label}</span>
+                      <span
+                        className={`min-w-7 rounded-full px-2 py-0.5 text-xs font-semibold ${isActive ? 'bg-white/15 text-white dark:bg-black/10 dark:text-black' : 'bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white'}`}
+                      >
+                        {isHarasLoading ? '...' : count}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

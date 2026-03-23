@@ -31,6 +31,49 @@ export const DEFAULT_TEAM_PERMISSIONS: TeamPermissions = {
   fullAdministrative: false,
 }
 
+const TEAM_ROLE_SELECT = `
+  id,
+  haras_id,
+  name,
+  description,
+  user_type,
+  permissions,
+  can_edit,
+  can_view,
+  can_delete,
+  created_at,
+  updated_at
+`
+
+const TEAM_MEMBER_PROFILE_SELECT = `
+  id,
+  full_name,
+  email,
+  role,
+  status,
+  avatar_url,
+  phone,
+  created_at,
+  updated_at
+`
+
+const TEAM_MEMBER_SELECT = `
+  id,
+  haras_id,
+  user_id,
+  role_id,
+  permissions,
+  status,
+  created_at,
+  updated_at,
+  profile:profiles!haras_members_user_id_fkey (
+    ${TEAM_MEMBER_PROFILE_SELECT}
+  ),
+  role:haras_roles!haras_members_role_id_fkey (
+    ${TEAM_ROLE_SELECT}
+  )
+`
+
 export function normalizeTeamPermissions(input?: Partial<TeamPermissions> | null): TeamPermissions {
   if (!input) return { ...DEFAULT_TEAM_PERMISSIONS }
   return {
@@ -102,13 +145,32 @@ function mapRole(row: any): TeamRole | null {
   }
 }
 
+function extractRpcError(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null
+  const message = (data as { error?: unknown }).error
+  return typeof message === 'string' && message.length > 0 ? message : null
+}
+
+async function runTeamRpc(functionName: 'set_haras_member_status' | 'remove_haras_member', args: Record<string, unknown>) {
+  const { data, error } = await (supabase as any).rpc(functionName, args)
+
+  if (error) handleSupabaseError(error)
+
+  const rpcError = extractRpcError(data)
+  if (rpcError) {
+    throw new Error(rpcError)
+  }
+
+  return data
+}
+
 export const teamService = {
   async listRoles(harasId: string): Promise<TeamRole[]> {
     if (!harasId) return []
 
     const { data, error } = await (supabase as any)
       .from('haras_roles')
-      .select('*')
+      .select(TEAM_ROLE_SELECT)
       .eq('haras_id', harasId)
       .order('name', { ascending: true })
 
@@ -134,7 +196,7 @@ export const teamService = {
     const { data, error } = await (supabase as any)
       .from('haras_roles')
       .insert(payload)
-      .select('*')
+      .select(TEAM_ROLE_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -159,7 +221,7 @@ export const teamService = {
       .from('haras_roles')
       .update(payload)
       .eq('id', roleId)
-      .select('*')
+      .select(TEAM_ROLE_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -180,76 +242,41 @@ export const teamService = {
     if (!harasId) return []
 
     const { data, error } = await (supabase as any)
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        email,
-        role,
-        status,
-        avatar_url,
-        phone,
-        created_at,
-        updated_at,
-        haras_members:haras_members!haras_members_user_id_fkey (
-          id,
-          haras_id,
-          user_id,
-          role_id,
-          permissions,
-          status,
-          created_at,
-          updated_at,
-          role:haras_roles!haras_members_role_id_fkey (
-            id,
-            haras_id,
-            name,
-            description,
-            user_type,
-            permissions,
-            can_edit,
-            can_view,
-            can_delete,
-            created_at,
-            updated_at
-          )
-        )
-      `)
+      .from('haras_members')
+      .select(TEAM_MEMBER_SELECT)
       .eq('haras_id', harasId)
-      .order('full_name', { ascending: true })
 
     if (error) handleSupabaseError(error)
 
     const rows = (data || []) as any[]
-    return rows.map((profileRow) => {
-      const membership = Array.isArray(profileRow.haras_members) ? profileRow.haras_members[0] : null
-      const permissions = normalizeTeamPermissions(membership?.permissions)
-      const role = mapRole(membership?.role)
-      const status = (membership?.status || profileRow.status || 'Ativo') as 'Ativo' | 'Inativo'
-
-      return {
-        id: membership?.id || '',
-        haras_id: membership?.haras_id || harasId,
-        user_id: profileRow.id,
-        role_id: membership?.role_id || null,
-        permissions,
-        status,
-        created_at: membership?.created_at,
-        updated_at: membership?.updated_at,
+    return rows
+      .map((row) => ({
+        id: row.id,
+        haras_id: row.haras_id,
+        user_id: row.user_id,
+        role_id: row.role_id ?? null,
+        permissions: normalizeTeamPermissions(row.permissions || row.role?.permissions),
+        status: (row.status || row.profile?.status || 'Ativo') as 'Ativo' | 'Inativo',
+        created_at: row.created_at,
+        updated_at: row.updated_at,
         profile: {
-          id: profileRow.id,
-          full_name: profileRow.full_name ?? null,
-          email: profileRow.email ?? null,
-          role: profileRow.role ?? null,
-          status: profileRow.status ?? null,
-          avatar_url: profileRow.avatar_url ?? null,
-          phone: profileRow.phone ?? null,
-          created_at: profileRow.created_at ?? null,
-          updated_at: profileRow.updated_at ?? null,
+          id: row.profile?.id ?? row.user_id,
+          full_name: row.profile?.full_name ?? null,
+          email: row.profile?.email ?? null,
+          role: row.profile?.role ?? null,
+          status: row.profile?.status ?? null,
+          avatar_url: row.profile?.avatar_url ?? null,
+          phone: row.profile?.phone ?? null,
+          created_at: row.profile?.created_at ?? null,
+          updated_at: row.profile?.updated_at ?? null,
         },
-        role,
-      } as TeamMember
-    })
+        role: mapRole(row.role),
+      }) as TeamMember)
+      .sort((left, right) => {
+        const leftName = left.profile.full_name || left.profile.email || ''
+        const rightName = right.profile.full_name || right.profile.email || ''
+        return leftName.localeCompare(rightName, 'pt-BR')
+      })
   },
 
   async upsertMember(input: {
@@ -260,14 +287,17 @@ export const teamService = {
     status?: 'Ativo' | 'Inativo'
     createdBy?: string | null
   }): Promise<void> {
+    const now = new Date().toISOString()
+    const status = input.status ?? 'Ativo'
+
     const payload = {
       haras_id: input.harasId,
       user_id: input.userId,
       role_id: input.roleId ?? null,
       permissions: normalizeTeamPermissions(input.permissions),
-      status: input.status ?? 'Ativo',
+      status,
       created_by: input.createdBy ?? null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     }
 
     const { error } = await (supabase as any)
@@ -275,6 +305,17 @@ export const teamService = {
       .upsert(payload, { onConflict: 'haras_id,user_id' })
 
     if (error) handleSupabaseError(error)
+
+    const { error: profileError } = await (supabase as any)
+      .from('profiles')
+      .update({
+        haras_id: input.harasId,
+        status,
+        updated_at: now,
+      })
+      .eq('id', input.userId)
+
+    if (profileError) handleSupabaseError(profileError)
   },
 
   async updateMember(memberId: string, input: Partial<TeamMember>): Promise<void> {
@@ -313,22 +354,18 @@ export const teamService = {
     if (error) handleSupabaseError(error)
   },
 
+  async setMemberStatus(userId: string, harasId: string, status: 'Ativo' | 'Inativo'): Promise<void> {
+    await runTeamRpc('set_haras_member_status', {
+      p_user_id: userId,
+      p_haras_id: harasId,
+      p_status: status,
+    })
+  },
+
   async removeMember(userId: string, harasId: string): Promise<void> {
-    const now = new Date().toISOString()
-
-    const { error: profileError } = await (supabase as any)
-      .from('profiles')
-      .update({ haras_id: null, status: 'Inativo', updated_at: now })
-      .eq('id', userId)
-
-    if (profileError) handleSupabaseError(profileError)
-
-    const { error: memberError } = await (supabase as any)
-      .from('haras_members')
-      .delete()
-      .eq('user_id', userId)
-      .eq('haras_id', harasId)
-
-    if (memberError) handleSupabaseError(memberError)
+    await runTeamRpc('remove_haras_member', {
+      p_user_id: userId,
+      p_haras_id: harasId,
+    })
   },
 }

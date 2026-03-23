@@ -22,7 +22,7 @@ import {
   type TeamPermissionKey,
   type TeamPermissions,
 } from '@/services/team';
-import { isAdminRole, isAdvisorRole, isCreatorRole, normalizeRole } from '@/lib/roles';
+import { getRoleLabel, isAdminRole, isAdvisorRole, isCreatorRole, normalizeRole } from '@/lib/roles';
 
 const PERMISSION_LABELS: Record<TeamPermissionKey, string> = {
   viewHerd: 'Plantel',
@@ -53,15 +53,6 @@ const SYSTEM_ROLE_OPTIONS = [
   { value: 'peao', label: 'Peão' },
 ];
 
-const SYSTEM_ROLE_LABELS: Record<string, string> = {
-  criador: 'Criador/Dono de Haras',
-  assessor: 'Assessor Administrativo',
-  advisor: 'Assessor Administrativo',
-  veterinario: 'Veterinário',
-  peao: 'Peão',
-  funcionario: 'Funcionário',
-};
-
 const formatAllowedModules = (permissions: TeamPermissions) => {
   if (permissions.fullAdministrative) return 'Acesso total (Criador)';
   const selected = ASSIGNABLE_PERMISSION_KEYS
@@ -86,8 +77,7 @@ export function AdvisorTeamContent() {
 
   const currentRole = normalizeRole(profile?.role);
   const isAdmin = isAdminRole(currentRole);
-  const isOwner = Boolean(currentHaras?.owner_id && profile?.id === currentHaras.owner_id);
-  const isCreator = isOwner || (!currentHaras?.owner_id && isCreatorRole(currentRole)) || isAdmin;
+  const isCreator = isCreatorRole(currentRole) || isAdmin;
   const isAdvisor = isAdvisorRole(currentRole);
 
   const [activeTab, setActiveTab] = useState<'team' | 'roles'>('team');
@@ -160,28 +150,15 @@ export function AdvisorTeamContent() {
   }, [rolesData, memberCounts]);
 
   const team = useMemo(() => {
-    const explicitOwnerId = currentHaras?.owner_id;
-    const fallbackOwnerId = !explicitOwnerId
-      ? membersData.find((member) => {
-        const normalized = normalizeRole(member.profile.role);
-        return normalized === 'criador' || normalized === 'breeder';
-      })?.user_id
-      : null;
-    const ownerId = explicitOwnerId || fallbackOwnerId || null;
-    const hasExplicitOwner = Boolean(explicitOwnerId);
-
     return membersData
       .map((member) => {
         const normalizedSystemRole = normalizeRole(member.profile.role);
-        const isOwnerMember = Boolean(ownerId && member.user_id === ownerId);
-        const isCreatorSystemRole = normalizedSystemRole === 'criador' || normalizedSystemRole === 'breeder';
-        const displayRole = isOwnerMember
+        const isCreatorMember = normalizedSystemRole === 'criador';
+        const displayRole = isCreatorMember
           ? 'Criador (Admin total)'
-          : isCreatorSystemRole
-            ? (hasExplicitOwner ? 'Criador (sem acesso total)' : 'Criador')
-            : member.role?.name
-              || SYSTEM_ROLE_LABELS[member.profile.role || '']
-              || 'Colaborador';
+          : member.role?.name
+            || getRoleLabel(member.profile.role)
+            || 'Colaborador';
 
         return {
           id: member.user_id,
@@ -196,7 +173,7 @@ export function AdvisorTeamContent() {
           permissions: normalizeTeamPermissions(member.permissions || member.role?.permissions),
           systemRole: member.profile.role || 'funcionario',
           systemRoleKey: normalizedSystemRole,
-          isOwner: isOwnerMember,
+          isOwner: isCreatorMember,
           isSelf: member.user_id === user?.id,
         };
       })
@@ -204,7 +181,7 @@ export function AdvisorTeamContent() {
         if (a.isOwner === b.isOwner) return a.name.localeCompare(b.name);
         return a.isOwner ? -1 : 1;
       });
-  }, [membersData, currentHaras?.owner_id, user?.id]);
+  }, [membersData, user?.id]);
 
   const currentMember = useMemo(() => membersData.find((member) => member.user_id === user?.id), [membersData, user?.id]);
   const currentPermissions = normalizeTeamPermissions(currentMember?.permissions || currentMember?.role?.permissions);
@@ -300,7 +277,7 @@ export function AdvisorTeamContent() {
 
   const canManageSystemRole = (role?: string | null) => {
     const normalized = normalizeRole(role);
-    if (isCreator) return !['admin', 'criador', 'breeder'].includes(normalized);
+    if (isCreator) return !['admin', 'criador'].includes(normalized);
     if (isAdvisor) return normalized === 'peao' || normalized === 'veterinario';
     return false;
   };
@@ -437,26 +414,17 @@ export function AdvisorTeamContent() {
 
     setIsSubmitting(true);
     try {
-      const response = await collaboratorsService.createCollaborator({
+      await collaboratorsService.createCollaborator({
         full_name: formData.name,
         email: formData.email,
         password: formData.password,
         role: formData.systemRole as any,
         haras_id: harasId,
-      });
-
-      await upsertMember.mutateAsync({
-        harasId,
-        userId: response.user_id,
-        roleId: formData.roleId || null,
+        role_id: formData.roleId || null,
         permissions: delegatedPermissions,
         status: formData.status as 'Ativo' | 'Inativo',
-        createdBy: profile?.id,
-      });
-
-      await teamService.updateProfile(response.user_id, {
+        created_by: profile?.id,
         phone: formData.phone || null,
-        status: formData.status as 'Ativo' | 'Inativo',
       });
 
       toast.success('Usuário criado com sucesso!');
@@ -810,12 +778,12 @@ export function AdvisorTeamContent() {
 
       {activeTab === 'team' && ownerMember && (
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-          <strong>Administrador do haras:</strong> {ownerMember.name}. Apenas este usuário possui acesso total.
+          <strong>Criador principal do haras:</strong> {ownerMember.name}. Apenas este usuário possui acesso total.
         </div>
       )}
       {activeTab === 'team' && !ownerMember && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-          <strong>Atenção:</strong> o Criador principal ainda não está definido no haras. Até isso ser ajustado, o acesso total fica restrito ao administrador logado.
+          <strong>Atenção:</strong> nenhum perfil de criador foi encontrado na equipe deste haras. Revise o vínculo do criador principal para evitar falhas de permissão.
         </div>
       )}
 

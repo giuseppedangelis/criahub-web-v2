@@ -24,8 +24,6 @@ const TRANSACTION_SELECT = `
   descricao,
   data_transacao,
   animal_id,
-  reference_id,
-  created_by,
   created_at,
   updated_at,
   observacoes,
@@ -91,6 +89,15 @@ function normalizeType(value: string | null | undefined): TransactionType {
     return TYPE_MAP[key] || 'despesa';
 }
 
+function mapTransactionAnimal(row: any): Transaction['animal'] {
+    if (!row?.animal) return null;
+
+    return {
+        id: row.animal.id,
+        name: row.animal.nome ?? row.animal.name ?? '',
+    } as unknown as Transaction['animal'];
+}
+
 function mapTransactionRow(row: any): Transaction {
     return {
         id: row.id,
@@ -101,18 +108,13 @@ function mapTransactionRow(row: any): Transaction {
         description: row.descricao ?? '',
         date: row.data_transacao ?? '',
         animal_id: row.animal_id ?? null,
-        reference_id: row.reference_id ?? null,
-        created_by: row.created_by ?? null,
+        reference_id: null,
+        created_by: null,
         created_at: row.created_at ?? null,
         updated_at: row.updated_at ?? null,
         observations: row.observacoes ?? null,
         payment_method: row.forma_pagamento ?? null,
-        animal: row.animal
-            ? {
-                id: row.animal.id,
-                name: row.animal.nome ?? row.animal.name ?? '',
-            }
-            : null,
+        animal: mapTransactionAnimal(row),
         created_by_profile: null,
     };
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { Dashboard } from './Dashboard';
+import { AdminPlatformUsageContent } from './AdminPlatformUsageContent';
 import { Subscriptions } from './Subscriptions';
 import { PlatformUsage } from './PlatformUsage';
 import { CriticalAlerts } from './CriticalAlerts';
@@ -36,7 +36,7 @@ export function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <AdminPlatformUsageContent />;
       case 'subscriptions':
         return <Subscriptions />;
       case 'usage':
@@ -46,7 +46,7 @@ export function AppContent() {
       case 'settings':
         return <Settings />;
       default:
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <AdminPlatformUsageContent />;
     }
   };
 

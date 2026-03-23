@@ -10,7 +10,13 @@ export * from './useHaras'
 export * from './useEvents'
 export * from './useVeterinarians'
 export * from './useReports'
-export * from './useHarasSettings'
+export {
+  harasSettingsKeys,
+  useHarasSettings,
+  useUpdateHarasSettings,
+  useHarasTeamMembers,
+  useUpdateTeamMemberStatus,
+} from './useHarasSettings'
 export * from './useProfileSettings'
 export * from './useSessions'
 export * from './useAdvisorDashboard'

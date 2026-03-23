@@ -5,6 +5,8 @@
 
 import { supabase, handleSupabaseError } from './base';
 import { dashboardService } from './dashboard';
+import { normalizeTeamPermissions, teamService } from './team';
+import { normalizeRoleForStorage } from '@/lib/roles';
 import type { Haras, HarasMember, Profile, DashboardStats } from '@/types';
 
 const HARAS_SELECT = `
@@ -29,7 +31,8 @@ function mapHaras(row: any): Haras {
     return {
         id: row.id,
         name: row.nome ?? row.name ?? '',
-        owner_id: row.owner_id ?? null,
+        owner_id: null,
+        owner_name: row.proprietario ?? null,
         cnpj: row.cnpj ?? null,
         address: row.address ?? row.endereco ?? null,
         city: row.city ?? row.cidade ?? null,
@@ -44,6 +47,46 @@ function mapHaras(row: any): Haras {
         subscription_start_date: row.subscription_start_date ?? null,
         created_at: row.created_at,
         updated_at: row.updated_at
+    };
+}
+
+function mapMemberProfile(profile: {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    phone: string | null;
+    role: string | null;
+    status: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}): Profile {
+    return {
+        id: profile.id,
+        email: profile.email ?? '',
+        full_name: profile.full_name ?? null,
+        avatar_url: profile.avatar_url ?? null,
+        phone: profile.phone ?? null,
+        role: (profile.role as Profile['role']) ?? 'funcionario',
+        haras_id: null,
+        status: profile.status === 'Inativo' ? 'Inativo' : 'Ativo',
+        created_at: profile.created_at ?? '',
+        updated_at: profile.updated_at ?? '',
+    };
+}
+
+function mapTeamMemberToHarasMember(member: Awaited<ReturnType<typeof teamService.listMembers>>[number]): HarasMember & { profile: Profile } {
+    return {
+        id: member.id,
+        haras_id: member.haras_id,
+        user_id: member.user_id,
+        role: (member.profile.role as Profile['role']) ?? null,
+        role_id: member.role_id,
+        permissions: member.permissions,
+        status: member.status,
+        created_at: member.created_at ?? '',
+        updated_at: member.updated_at ?? null,
+        profile: mapMemberProfile(member.profile),
     };
 }
 
@@ -102,17 +145,8 @@ export const harasService = {
      * Lista membros do haras
      */
     async getMembers(harasId: string): Promise<(HarasMember & { profile: Profile })[]> {
-        const { data, error } = await supabase
-            .from('haras_members')
-            .select(`
-        *,
-        profile:profiles(*)
-      `)
-            .eq('haras_id', harasId);
-
-        if (error) handleSupabaseError(error);
-
-        return data as (HarasMember & { profile: Profile })[];
+        const members = await teamService.listMembers(harasId);
+        return members.map(mapTeamMemberToHarasMember);
     },
 
     /**
@@ -124,32 +158,43 @@ export const harasService = {
         role: HarasMember['role'],
         permissions: Record<string, boolean> = {}
     ): Promise<HarasMember> {
-        const { data, error } = await supabase
-            .from('haras_members')
-            .insert({
-                haras_id: harasId,
-                user_id: userId,
-                role,
-                permissions
-            })
-            .select()
-            .single();
+        const normalizedRole = normalizeRoleForStorage(role) ?? role;
+        const roles = await teamService.listRoles(harasId);
+        const matchedRole = roles.find((candidate) => normalizeRoleForStorage(candidate.name) === normalizedRole);
 
-        if (error) handleSupabaseError(error);
+        await teamService.upsertMember({
+            harasId,
+            userId,
+            roleId: matchedRole?.id ?? null,
+            permissions: normalizeTeamPermissions(permissions),
+            status: 'Ativo',
+        });
 
-        return data as HarasMember;
+        const members = await this.getMembers(harasId);
+        const member = members.find((currentMember) => currentMember.user_id === userId);
+
+        if (!member) {
+            throw new Error('Não foi possível localizar o membro após a vinculação ao haras.');
+        }
+
+        return member;
     },
 
     /**
      * Remove membro do haras
      */
     async removeMember(memberId: string): Promise<void> {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('haras_members')
-            .delete()
+            .select('haras_id, user_id')
             .eq('id', memberId);
 
         if (error) handleSupabaseError(error);
+
+        const member = data?.[0];
+        if (!member) return;
+
+        await teamService.removeMember(member.user_id, member.haras_id);
     },
 
     /**

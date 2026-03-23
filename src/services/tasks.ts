@@ -14,6 +14,7 @@ import type {
   TaskDocument,
   TaskPhoto,
 } from '@/types'
+import type { Json } from '@/types/database.types'
 
 const TASK_SELECT = `
   id,
@@ -135,21 +136,23 @@ export const tasksService = {
   },
 
   async create(input: CreateTaskInput): Promise<Task> {
+    const payload = {
+      haras_id: input.haras_id,
+      title: input.title,
+      due_date: input.due_date,
+      status: input.status ?? 'pendente',
+      priority: input.priority ?? 'media',
+      observations: input.observations ?? null,
+      animal_id: input.animal_id ?? null,
+      responsible_id: input.responsible_id ?? null,
+      documents: (input.documents ?? []) as unknown as Json,
+      photos: (input.photos ?? []) as unknown as Json,
+      created_by: input.created_by ?? null,
+    }
+
     const { data, error } = await supabase
       .from('tasks')
-      .insert({
-        haras_id: input.haras_id,
-        title: input.title,
-        due_date: input.due_date,
-        status: input.status ?? 'pendente',
-        priority: input.priority ?? 'media',
-        observations: input.observations ?? null,
-        animal_id: input.animal_id ?? null,
-        responsible_id: input.responsible_id ?? null,
-        documents: input.documents ?? [],
-        photos: input.photos ?? [],
-        created_by: input.created_by ?? null,
-      })
+      .insert(payload)
       .select(TASK_SELECT)
       .single()
 
@@ -170,8 +173,8 @@ export const tasksService = {
     if (input.observations !== undefined) payload.observations = input.observations
     if (input.animal_id !== undefined) payload.animal_id = input.animal_id
     if (input.responsible_id !== undefined) payload.responsible_id = input.responsible_id
-    if (input.documents !== undefined) payload.documents = input.documents
-    if (input.photos !== undefined) payload.photos = input.photos
+    if (input.documents !== undefined) payload.documents = input.documents as unknown as Json
+    if (input.photos !== undefined) payload.photos = input.photos as unknown as Json
 
     const { data, error } = await supabase
       .from('tasks')

@@ -10,6 +10,7 @@ import { animalsService } from '@/services/animals'
 import type {
     AnimalFilters,
     CreateAnimalInput,
+    SaveAnimalOwnershipSharesInput,
     UpdateAnimalInput,
     PaginationParams
 } from '@/types'
@@ -20,6 +21,7 @@ export const animalKeys = {
     lists: () => [...animalKeys.all, 'list'] as const,
     list: (filters: AnimalFilters, pagination: PaginationParams) =>
         [...animalKeys.lists(), filters, pagination] as const,
+    environmentCounts: (harasId: string) => [...animalKeys.all, 'environment-counts', harasId] as const,
     details: () => [...animalKeys.all, 'detail'] as const,
     detail: (id: string) => [...animalKeys.details(), id] as const,
     offspring: (id: string) => [...animalKeys.detail(id), 'offspring'] as const,
@@ -59,6 +61,16 @@ export function useAnimalSummary(
         queryKey: [...animalKeys.all, 'summary', filters],
         queryFn: () => animalsService.getSummary(filters),
         enabled: enabled && hasHarasFilter,
+        staleTime: 60_000,
+        refetchOnWindowFocus: false,
+    })
+}
+
+export function useAnimalEnvironmentCounts(harasId?: string, enabled: boolean = true) {
+    return useQuery({
+        queryKey: animalKeys.environmentCounts(harasId || ''),
+        queryFn: () => animalsService.getEnvironmentCounts(harasId || ''),
+        enabled: enabled && !!harasId,
         staleTime: 60_000,
         refetchOnWindowFocus: false,
     })
@@ -164,6 +176,18 @@ export function useUpdateAnimal() {
         mutationFn: (input: UpdateAnimalInput) => animalsService.update(input),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: animalKeys.detail(variables.id) })
+            queryClient.invalidateQueries({ queryKey: animalKeys.lists() })
+        },
+    })
+}
+
+export function useSaveAnimalOwnershipShares() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: SaveAnimalOwnershipSharesInput) => animalsService.saveOwnershipShares(input),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: animalKeys.detail(variables.animalId) })
             queryClient.invalidateQueries({ queryKey: animalKeys.lists() })
         },
     })

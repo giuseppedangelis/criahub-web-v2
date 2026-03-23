@@ -1,4 +1,4 @@
-import { X, Shield, Home, Users } from 'lucide-react';
+import { X, Shield, Home } from 'lucide-react';
 import { UserRole } from '../contexts/UserContext';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
@@ -24,14 +24,14 @@ export function SwitchUserModal({ isOpen, onClose, onSelectRole, currentRole }: 
       color: 'bg-purple-500',
     },
     {
-      role: 'breeder' as UserRole,
+      role: 'criador' as UserRole,
       title: 'Criador/Dono de Haras',
       description: 'Gestão completa do haras, plantel, reprodução e equipe',
       icon: Home,
       color: 'bg-blue-500',
     },
     {
-      role: 'advisor' as UserRole,
+      role: 'assessor' as UserRole,
       title: 'Assessor Administrativo',
       description: 'Gestão burocrática, documentação e alinhamento com ABCCMM',
       icon: Shield,

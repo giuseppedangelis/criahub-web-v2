@@ -241,6 +241,7 @@ export function ReportsTab({
       const metaVersion = (report.parameters as any)?.meta?.layoutVersion;
       const shouldRegenerate = !report.fileUrl || !metaVersion || metaVersion !== REPORT_LAYOUT_VERSION;
       const url = shouldRegenerate ? await ensureReportFile(report) : report.fileUrl;
+      if (!url) throw new Error('Relatório sem URL disponível.');
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Erro ao baixar relatório:', error);
@@ -253,6 +254,7 @@ export function ReportsTab({
       const metaVersion = (report.parameters as any)?.meta?.layoutVersion;
       const shouldRegenerate = !report.fileUrl || !metaVersion || metaVersion !== REPORT_LAYOUT_VERSION;
       const url = shouldRegenerate ? await ensureReportFile(report) : report.fileUrl;
+      if (!url) throw new Error('Relatório sem URL disponível.');
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Erro ao imprimir relatório:', error);

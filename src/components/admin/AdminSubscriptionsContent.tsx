@@ -1,10 +1,11 @@
-import { Search, Filter, Download, Send, Edit, MoreVertical, Eye, Plus, X, Check, Calendar } from 'lucide-react';
+import { Search, MoreVertical, Plus, X, Calendar } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NativeSelect } from '../ui/native-select';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { toast } from 'sonner';
 import { createClientAction } from '@/app/actions/admin';
 import { maskPhone, maskCurrency, parseCurrency } from '@/utils/masks';
+import type { UserRole } from '@/types';
 
 interface Subscription {
   id: string;
@@ -450,7 +451,18 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
   useEscapeKey(onClose);
 
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    harasName: string;
+    ownerName: string;
+    email: string;
+    phone: string;
+    password: string;
+    role: UserRole;
+    plan: string;
+    value: string;
+    startDate: string;
+    dueDay: number;
+  }>({
     harasName: '',
     ownerName: '',
     email: '',
@@ -604,17 +616,14 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <div>
                   <label className="block text-sm text-muted-foreground dark:text-[#99a1af] mb-2">
-                    Cargo / Função
+                    Perfil inicial
                   </label>
-                  <NativeSelect
-                    value={formData.role}
-                    onChange={(e) => handleChange('role', e.target.value)}
-                  >
-                    <option value="criador">Criador (Dono)</option>
-                    <option value="admin">Administrador</option>
-                    <option value="veterinario">Veterinário</option>
-                    <option value="gerente">Gerente</option>
-                  </NativeSelect>
+                  <div className="w-full px-4 py-3 rounded-xl bg-muted/60 dark:bg-[#0d0d0d] border border-border dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white">
+                    Criador (Dono do Haras)
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground dark:text-[#99a1af]">
+                    Novos clientes entram como dono do haras. Cargos operacionais e equipe são configurados depois no módulo de equipe.
+                  </p>
                 </div>
               </div>
             </div>

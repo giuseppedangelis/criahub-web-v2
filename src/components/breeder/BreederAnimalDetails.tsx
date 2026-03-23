@@ -246,6 +246,17 @@ type StatusHistoryEntry = {
   usuario: string;
 };
 
+interface OwnershipShare {
+  id: string;
+  animal_id: string;
+  haras_id: string;
+  owner_name: string;
+  percentage: number;
+  is_primary: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
 interface Animal {
   id: number;
   haras_id?: string;
@@ -285,6 +296,7 @@ interface Animal {
   gait?: string; // Tipo de andamento
   criador?: string | null;
   proprietario?: string | null;
+  ownership_shares?: OwnershipShare[];
 }
 
 function formatMotherDisplayName(value?: string | null): string {
@@ -2020,6 +2032,8 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
               currentLocation={fullAnimal.localizacao}
               locationType={resolvedLocationType}
               serviceType={resolvedServiceType}
+              ownershipShares={fullAnimal.ownership_shares}
+              defaultOwnerName={fullAnimal.proprietario || undefined}
             />
           )}
 

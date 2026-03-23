@@ -17,22 +17,29 @@ import {
     FileText,
     Calendar,
     ClipboardList,
-    Heart
+    Heart,
+    type LucideIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { BrandLogo } from '@/components/branding/BrandLogo'
-import { useAuth } from '@/contexts/auth-context'
-import type { Database } from '@/types/database.types'
+import { useUser } from '@/contexts/UserContext'
+import { normalizeRole } from '@/lib/roles'
 
-type UserRole = Database['public']['Tables']['profiles']['Row']['role']
+type SidebarMenuRole = 'admin' | 'criador' | 'assessor'
 
-interface SidebarProps {
-    role: UserRole
+interface SidebarMenuItem {
+    label: string
+    href: string
+    icon: LucideIcon
 }
 
-const assessorMenu = [
+interface SidebarProps {
+    role: string | null | undefined
+}
+
+const assessorMenu: SidebarMenuItem[] = [
     { label: 'Dashboard', href: '/assessor', icon: Home },
     { label: 'Plantel', href: '/assessor/plantel', icon: Users },
     { label: 'Pendências', href: '/assessor/pendencias', icon: AlertTriangle },
@@ -46,7 +53,7 @@ const assessorMenu = [
     { label: 'Ajuda', href: '/assessor/ajuda', icon: HelpCircle },
 ]
 
-const menuConfig = {
+const menuConfig: Record<SidebarMenuRole, SidebarMenuItem[]> = {
     admin: [
         { label: 'Dashboard', href: '/admin', icon: Home },
         { label: 'Assinaturas', href: '/admin/assinaturas', icon: CreditCard },
@@ -66,18 +73,24 @@ const menuConfig = {
         { label: 'Ajuda', href: '/criador/ajuda', icon: HelpCircle },
     ],
     assessor: assessorMenu,
-    advisor: assessorMenu,
 }
 
 export function Sidebar({ role }: SidebarProps) {
     const pathname = usePathname()
-    const { signOut } = useAuth()
+    const { logout } = useUser()
     const [isCollapsed, setIsCollapsed] = useState(false)
 
-    const menu = menuConfig[role] || menuConfig.criador
+    const normalizedRole = normalizeRole(role)
+    const menuKey: SidebarMenuRole =
+        normalizedRole === 'admin'
+            ? 'admin'
+            : normalizedRole === 'assessor'
+                ? 'assessor'
+                : 'criador'
+    const menu = menuConfig[menuKey]
 
     const handleSignOut = async () => {
-        await signOut()
+        await logout()
         window.location.href = '/login'
     }
 

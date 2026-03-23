@@ -6,6 +6,7 @@
 import { normalizeHarasLocationSettings, DEFAULT_HARAS_LOCATION_SETTINGS } from '@/lib/animal-location'
 import type { HarasLocationSettings } from '@/types'
 import { supabase, handleSupabaseError } from './base'
+import { teamService } from './team'
 
 export interface HarasNotificationSettings {
   agenda: boolean
@@ -36,11 +37,13 @@ export interface HarasSettings {
 
 export interface TeamMemberRecord {
   id: string
+  member_id?: string | null
   full_name: string | null
   email: string | null
   role: string | null
   status: string | null
   avatar_url: string | null
+  phone?: string | null
 }
 
 const DEFAULT_SETTINGS: Omit<HarasSettings, 'haras_id'> = {
@@ -49,6 +52,16 @@ const DEFAULT_SETTINGS: Omit<HarasSettings, 'haras_id'> = {
   backup_settings: { autoBackup: true, frequency: 'daily' },
   location_settings: DEFAULT_HARAS_LOCATION_SETTINGS,
 }
+
+const HARAS_SETTINGS_SELECT = `
+  haras_id,
+  notification_settings,
+  privacy_settings,
+  backup_settings,
+  location_settings,
+  created_at,
+  updated_at
+`
 
 function normalizeSettings(row: any, harasId: string): HarasSettings {
   const notification = {
@@ -82,7 +95,7 @@ export const harasSettingsService = {
 
     const { data, error } = await (supabase as any)
       .from('haras_settings')
-      .select('*')
+      .select(HARAS_SETTINGS_SELECT)
       .eq('haras_id', harasId)
       .single()
 
@@ -91,7 +104,7 @@ export const harasSettingsService = {
         const { data: created, error: insertError } = await (supabase as any)
           .from('haras_settings')
           .insert({ haras_id: harasId })
-          .select('*')
+          .select(HARAS_SETTINGS_SELECT)
           .single()
 
         if (insertError) handleSupabaseError(insertError)
@@ -129,7 +142,7 @@ export const harasSettingsService = {
     const { data, error } = await (supabase as any)
       .from('haras_settings')
       .upsert(payload, { onConflict: 'haras_id' })
-      .select('*')
+      .select(HARAS_SETTINGS_SELECT)
       .single()
 
     if (error) handleSupabaseError(error)
@@ -140,32 +153,25 @@ export const harasSettingsService = {
   async listTeamMembers(harasId: string): Promise<TeamMemberRecord[]> {
     if (!harasId) return []
 
-    const { data, error } = await (supabase as any)
-      .from('profiles')
-      .select('id, full_name, email, role, status, avatar_url')
-      .eq('haras_id', harasId)
-      .order('full_name', { ascending: true })
+    const members = await teamService.listMembers(harasId)
 
-    if (error) handleSupabaseError(error)
-
-    return (data || []) as TeamMemberRecord[]
+    return members.map((member) => ({
+      id: member.user_id,
+      member_id: member.id || null,
+      full_name: member.profile.full_name ?? null,
+      email: member.profile.email ?? null,
+      role: member.profile.role ?? null,
+      status: member.status ?? member.profile.status ?? 'Ativo',
+      avatar_url: member.profile.avatar_url ?? null,
+      phone: member.profile.phone ?? null,
+    }))
   },
 
-  async updateTeamMemberStatus(memberId: string, status: 'Ativo' | 'Inativo'): Promise<void> {
-    const { error } = await (supabase as any)
-      .from('profiles')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', memberId)
-
-    if (error) handleSupabaseError(error)
+  async updateTeamMemberStatus(memberId: string, harasId: string, status: 'Ativo' | 'Inativo'): Promise<void> {
+    await teamService.setMemberStatus(memberId, harasId, status)
   },
 
-  async removeTeamMember(memberId: string): Promise<void> {
-    const { error } = await (supabase as any)
-      .from('profiles')
-      .update({ haras_id: null, status: 'Inativo', updated_at: new Date().toISOString() })
-      .eq('id', memberId)
-
-    if (error) handleSupabaseError(error)
+  async removeTeamMember(memberId: string, harasId: string): Promise<void> {
+    await teamService.removeMember(memberId, harasId)
   },
 }

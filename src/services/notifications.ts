@@ -18,7 +18,7 @@ interface NotificationRow {
     prioridade?: string | null;
     link?: string | null;
     lida?: boolean | null;
-    created_at: string;
+    created_at: string | null;
 }
 
 function normalizeNotificationType(value: string): NotificationType {
@@ -51,7 +51,7 @@ function mapNotification(row: NotificationRow): Notification {
         message: row.mensagem,
         read: row.lida ?? false,
         data,
-        created_at: row.created_at,
+        created_at: row.created_at ?? '',
     };
 }
 
@@ -88,7 +88,7 @@ export const notificationsService = {
 
         if (error) handleSupabaseError(error);
 
-        const mapped = (data || []).map(mapNotification);
+        const mapped = ((data as NotificationRow[] | null) || []).map(mapNotification);
         return formatPaginatedResponse(mapped, includeTotal ? count || 0 : mapped.length, pagination);
     },
 
@@ -168,7 +168,7 @@ export const notificationsService = {
 
         if (error) handleSupabaseError(error);
 
-        return mapNotification(notification);
+        return mapNotification(notification as NotificationRow);
     },
 
     /**

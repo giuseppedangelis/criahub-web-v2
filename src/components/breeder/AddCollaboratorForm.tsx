@@ -3,7 +3,7 @@ import { Shield, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
 import { collaboratorsService } from '@/services/collaborators';
-import { DEFAULT_TEAM_PERMISSIONS, teamService } from '@/services/team';
+import { DEFAULT_TEAM_PERMISSIONS } from '@/services/team';
 import { useUser } from '@/contexts/UserContext';
 
 interface AddCollaboratorFormProps {
@@ -70,22 +70,15 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
 
     setIsLoading(true);
     try {
-      const response = await collaboratorsService.createCollaborator({
+      await collaboratorsService.createCollaborator({
         full_name: formData.fullName,
         email: formData.email,
         password: formData.password,
-        role: formData.role as 'assessor' | 'veterinario' | 'peao',
+        role: formData.role as 'assessor' | 'veterinario' | 'peao' | 'funcionario',
         haras_id: stableHarasId,
-        permissions
-      });
-
-      await teamService.upsertMember({
-        harasId: stableHarasId,
-        userId: response.user_id,
-        roleId: null,
         permissions: mapPermissionsToTeam(),
         status: 'Ativo',
-        createdBy: user.id,
+        created_by: user.id,
       });
 
       toast.success('Colaborador adicionado com sucesso!');
@@ -183,6 +176,7 @@ export function AddCollaboratorForm({ onClose, onSuccess }: AddCollaboratorFormP
                 <option value="assessor">Assessor</option>
                 <option value="veterinario">Veterinário</option>
                 <option value="peao">Peão</option>
+                <option value="funcionario">Colaborador</option>
               </NativeSelect>
             </div>
           </div>

@@ -42,8 +42,7 @@ export function useAccessControl() {
 
   const roleKey = normalizeRole(profile?.role)
   const isAdmin = isAdminRole(roleKey)
-  const isOwner = Boolean(currentHaras?.owner_id && profile?.id === currentHaras.owner_id)
-  const isCreator = isOwner || (!currentHaras?.owner_id && isCreatorRole(roleKey))
+  const isCreator = isCreatorRole(roleKey)
 
   const { data: members = [], isLoading } = useTeamMembers(harasId, !!harasId && isSessionReady)
 

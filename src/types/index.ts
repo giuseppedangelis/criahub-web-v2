@@ -7,7 +7,13 @@
 // ENUMS
 // ============================================
 
-export type UserRole = 'admin' | 'criador' | 'assessor';
+export type UserRole =
+    | 'admin'
+    | 'criador'
+    | 'assessor'
+    | 'veterinario'
+    | 'peao'
+    | 'funcionario';
 
 export type AnimalSex = 'Macho' | 'Fêmea';
 
@@ -148,6 +154,7 @@ export interface Profile {
     phone: string | null;
     role: UserRole;
     haras_id: string | null;
+    status?: 'Ativo' | 'Inativo';
     created_at: string;
     updated_at: string;
 }
@@ -156,6 +163,7 @@ export interface Haras {
     id: string;
     name: string;
     owner_id: string | null;
+    owner_name?: string | null;
     cnpj: string | null;
     address: string | null;
     city: string | null;
@@ -182,14 +190,20 @@ export interface HarasMember {
     id: string;
     haras_id: string;
     user_id: string;
-    role: 'owner' | 'manager' | 'employee';
+    role: UserRole | null;
+    role_id?: string | null;
     permissions: Record<string, boolean>;
+    status: 'Ativo' | 'Inativo';
+    created_by?: string | null;
     created_at: string;
+    updated_at?: string | null;
+    profile?: Profile | null;
 }
 
 export interface Animal {
     id: string;
     abccmm_rowid?: string | null;
+    ingestion_source?: string | null;
     haras_id: string;
     name: string;
     registry_number: string | null;
@@ -219,6 +233,33 @@ export interface Animal {
     father?: Animal | null;
     mother?: Animal | null;
     haras?: Haras | null;
+    ownership_shares?: AnimalOwnershipShare[];
+}
+
+export interface AnimalOwnershipShare {
+    id: string;
+    animal_id: string;
+    haras_id: string;
+    owner_name: string;
+    percentage: number;
+    is_primary: boolean;
+    start_date?: string | null;
+    end_date?: string | null;
+    notes?: string | null;
+    source?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface SaveAnimalOwnershipSharesInput {
+    animalId: string;
+    harasId: string;
+    shares: Array<{
+        id?: string;
+        owner_name: string;
+        percentage: number;
+        is_primary: boolean;
+    }>;
 }
 
 export interface AnimalVideo {

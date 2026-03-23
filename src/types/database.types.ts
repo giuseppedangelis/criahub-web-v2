@@ -41,6 +41,166 @@ export type Database = {
         }
         Relationships: []
       }
+      animal_link_queue: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          created_by: string | null
+          haras_id: string
+          id: string
+          match_type: string
+          official_abccmm_rowid: string | null
+          official_animal_id: string | null
+          official_registry: string | null
+          payload: Json
+          provisional_animal_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          haras_id: string
+          id?: string
+          match_type?: string
+          official_abccmm_rowid?: string | null
+          official_animal_id?: string | null
+          official_registry?: string | null
+          payload?: Json
+          provisional_animal_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          haras_id?: string
+          id?: string
+          match_type?: string
+          official_abccmm_rowid?: string | null
+          official_animal_id?: string | null
+          official_registry?: string | null
+          payload?: Json
+          provisional_animal_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "animal_link_queue_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_link_queue_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_link_queue_official_animal_id_fkey"
+            columns: ["official_animal_id"]
+            isOneToOne: false
+            referencedRelation: "animals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_link_queue_provisional_animal_id_fkey"
+            columns: ["provisional_animal_id"]
+            isOneToOne: false
+            referencedRelation: "animals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_link_queue_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      animal_ownership_shares: {
+        Row: {
+          animal_id: string
+          created_at: string
+          end_date: string | null
+          haras_id: string
+          id: string
+          is_primary: boolean
+          notes: string | null
+          owner_name: string
+          owner_profile_id: string | null
+          percentage: number
+          source: string | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          animal_id: string
+          created_at?: string
+          end_date?: string | null
+          haras_id: string
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          owner_name: string
+          owner_profile_id?: string | null
+          percentage: number
+          source?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          animal_id?: string
+          created_at?: string
+          end_date?: string | null
+          haras_id?: string
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          owner_name?: string
+          owner_profile_id?: string | null
+          percentage?: number
+          source?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "animal_ownership_shares_animal_id_fkey"
+            columns: ["animal_id"]
+            isOneToOne: false
+            referencedRelation: "animals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_ownership_shares_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "animal_ownership_shares_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       animal_location_history: {
         Row: {
           animal_id: string
@@ -176,10 +336,13 @@ export type Database = {
       }
       animals: {
         Row: {
+          abccmm_rowid: string | null
           andamento: string | null
           categoria: string
           chip: string | null
           created_at: string | null
+          criador: string | null
+          dados_genealogicos: Json | null
           data_nascimento: string | null
           documents: string[] | null
           father_name: string | null
@@ -188,6 +351,7 @@ export type Database = {
           haras_origem: string | null
           height: number | null
           id: string
+          ingestion_source: string
           images: string[] | null
           localizacao: string | null
           mae_id: string | null
@@ -199,6 +363,7 @@ export type Database = {
           para_venda: boolean | null
           pelagem: string | null
           piquete: string | null
+          proprietario: string | null
           registro: string | null
           sexo: string
           status: string | null
@@ -209,10 +374,13 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          abccmm_rowid?: string | null
           andamento?: string | null
           categoria: string
           chip?: string | null
           created_at?: string | null
+          criador?: string | null
+          dados_genealogicos?: Json | null
           data_nascimento?: string | null
           documents?: string[] | null
           father_name?: string | null
@@ -221,6 +389,7 @@ export type Database = {
           haras_origem?: string | null
           height?: number | null
           id?: string
+          ingestion_source?: string
           images?: string[] | null
           localizacao?: string | null
           mae_id?: string | null
@@ -232,6 +401,7 @@ export type Database = {
           para_venda?: boolean | null
           pelagem?: string | null
           piquete?: string | null
+          proprietario?: string | null
           registro?: string | null
           sexo: string
           status?: string | null
@@ -242,10 +412,13 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          abccmm_rowid?: string | null
           andamento?: string | null
           categoria?: string
           chip?: string | null
           created_at?: string | null
+          criador?: string | null
+          dados_genealogicos?: Json | null
           data_nascimento?: string | null
           documents?: string[] | null
           father_name?: string | null
@@ -254,6 +427,7 @@ export type Database = {
           haras_origem?: string | null
           height?: number | null
           id?: string
+          ingestion_source?: string
           images?: string[] | null
           localizacao?: string | null
           mae_id?: string | null
@@ -265,6 +439,7 @@ export type Database = {
           para_venda?: boolean | null
           pelagem?: string | null
           piquete?: string | null
+          proprietario?: string | null
           registro?: string | null
           sexo?: string
           status?: string | null
@@ -966,6 +1141,131 @@ export type Database = {
         }
         Relationships: []
       }
+      haras_members: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          haras_id: string
+          id: string
+          permissions: Json
+          role_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          haras_id: string
+          id?: string
+          permissions?: Json
+          role_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          haras_id?: string
+          id?: string
+          permissions?: Json
+          role_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "haras_members_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haras_members_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haras_members_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "haras_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haras_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      haras_roles: {
+        Row: {
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          haras_id: string
+          id: string
+          name: string
+          permissions: Json
+          updated_at: string
+          user_type: string
+        }
+        Insert: {
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          haras_id: string
+          id?: string
+          name: string
+          permissions?: Json
+          updated_at?: string
+          user_type?: string
+        }
+        Update: {
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          haras_id?: string
+          id?: string
+          name?: string
+          permissions?: Json
+          updated_at?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "haras_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "haras_roles_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       health_records: {
         Row: {
           animal_id: string
@@ -1400,6 +1700,7 @@ export type Database = {
           number: string | null
           phone: string | null
           role: string
+          status: string
           state: string | null
           street: string | null
           updated_at: string | null
@@ -1419,6 +1720,7 @@ export type Database = {
           number?: string | null
           phone?: string | null
           role: string
+          status?: string
           state?: string | null
           street?: string | null
           updated_at?: string | null
@@ -1438,6 +1740,7 @@ export type Database = {
           number?: string | null
           phone?: string | null
           role?: string
+          status?: string
           state?: string | null
           street?: string | null
           updated_at?: string | null
@@ -2204,6 +2507,178 @@ export type Database = {
           },
         ]
       }
+      task_executions: {
+        Row: {
+          attachments: Json
+          created_at: string
+          executed_at: string
+          executed_by: string
+          haras_id: string
+          id: string
+          metadata: Json
+          notes: string | null
+          outcome: string
+          task_id: string
+        }
+        Insert: {
+          attachments?: Json
+          created_at?: string
+          executed_at?: string
+          executed_by: string
+          haras_id: string
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          outcome: string
+          task_id: string
+        }
+        Update: {
+          attachments?: Json
+          created_at?: string
+          executed_at?: string
+          executed_by?: string
+          haras_id?: string
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          outcome?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_executions_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_executions_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_executions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          animal_id: string | null
+          auto_generated: boolean
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          documents: Json | null
+          due_date: string
+          haras_id: string
+          id: string
+          last_execution_id: string | null
+          observations: string | null
+          photos: Json | null
+          priority: string
+          responsible_id: string | null
+          source_id: string | null
+          source_table: string | null
+          started_at: string | null
+          status: string
+          task_number: number
+          task_type: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          animal_id?: string | null
+          auto_generated?: boolean
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          documents?: Json | null
+          due_date: string
+          haras_id: string
+          id?: string
+          last_execution_id?: string | null
+          observations?: string | null
+          photos?: Json | null
+          priority?: string
+          responsible_id?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          started_at?: string | null
+          status?: string
+          task_number?: number
+          task_type?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          animal_id?: string | null
+          auto_generated?: boolean
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          documents?: Json | null
+          due_date?: string
+          haras_id?: string
+          id?: string
+          last_execution_id?: string | null
+          observations?: string | null
+          photos?: Json | null
+          priority?: string
+          responsible_id?: string | null
+          source_id?: string | null
+          source_table?: string | null
+          started_at?: string | null
+          status?: string
+          task_number?: number
+          task_type?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_animal_id_fkey"
+            columns: ["animal_id"]
+            isOneToOne: false
+            referencedRelation: "animals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_haras_id_fkey"
+            columns: ["haras_id"]
+            isOneToOne: false
+            referencedRelation: "haras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_last_execution_id_fkey"
+            columns: ["last_execution_id"]
+            isOneToOne: false
+            referencedRelation: "task_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_responsible_id_fkey"
+            columns: ["responsible_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           animal_id: string | null
@@ -2383,13 +2858,106 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_collaborator: {
+      create_collaborator:
+        | {
+            Args: {
+              p_email: string
+              p_full_name: string
+              p_haras_id: string
+              p_password: string
+              p_role: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_created_by?: string
+              p_email: string
+              p_full_name: string
+              p_haras_id: string
+              p_password: string
+              p_permissions?: Json
+              p_phone?: string
+              p_role: string
+              p_role_id?: string
+              p_status?: string
+            }
+            Returns: Json
+          }
+      default_haras_role_name: {
+        Args: { p_role: string }
+        Returns: string
+      }
+      default_team_permissions: {
+        Args: { p_role: string }
+        Returns: Json
+      }
+      ensure_default_haras_role: {
         Args: {
-          p_email: string
-          p_full_name: string
+          p_created_by?: string
           p_haras_id: string
-          p_password: string
           p_role: string
+        }
+        Returns: string
+      }
+      get_dashboard_snapshot: {
+        Args: {
+          p_activities_limit?: number
+          p_events_limit?: number
+          p_haras_id: string
+          p_months?: number
+        }
+        Returns: Json
+      }
+      get_reproduction_stats: {
+        Args: {
+          p_haras_id: string
+          p_year?: number
+        }
+        Returns: Json
+      }
+      list_haras_assignable_members: {
+        Args: { p_haras_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          membership_status: string
+          role: string
+          user_id: string
+        }[]
+      }
+      normalize_app_role: {
+        Args: { p_role: string }
+        Returns: string
+      }
+      remove_haras_member: {
+        Args: {
+          p_haras_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      user_belongs_to_haras: {
+        Args: { p_haras_id: string }
+        Returns: boolean
+      }
+      user_can_manage_haras_admin: {
+        Args: { p_haras_id: string }
+        Returns: boolean
+      }
+      user_can_manage_haras_data: {
+        Args: { p_haras_id: string }
+        Returns: boolean
+      }
+      user_can_manage_haras_team: {
+        Args: { p_haras_id: string }
+        Returns: boolean
+      }
+      set_haras_member_status: {
+        Args: {
+          p_haras_id: string
+          p_status: string
+          p_user_id: string
         }
         Returns: Json
       }

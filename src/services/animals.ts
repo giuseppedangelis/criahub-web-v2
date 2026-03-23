@@ -4,15 +4,19 @@
 // ============================================
 
 import { supabase, applyPagination, formatPaginatedResponse, handleSupabaseError } from './base';
+import type { Database, Json } from '@/types/database.types';
 import * as XLSX from 'xlsx';
 import { decode } from 'html-entities';
 import { getPlantelStatusActivity, normalizeAnimalStatus } from '@/lib/animal-classification';
 import type {
     Animal,
+    AnimalEnvironment,
+    AnimalOwnershipShare,
     AnimalSex,
     AnimalGenealogy,
     AnimalFilters,
     CreateAnimalInput,
+    SaveAnimalOwnershipSharesInput,
     UpdateAnimalInput,
     PaginationParams,
     PaginatedResponse,
@@ -778,6 +782,31 @@ export const animalsService = {
         };
     },
 
+    async getEnvironmentCounts(harasId: string): Promise<Record<AnimalEnvironment, number>> {
+        if (!harasId) {
+            return {
+                oficial: 0,
+                avulsos: 0,
+                vinculacao: 0,
+                condominio: 0,
+            };
+        }
+
+        const [oficial, avulsos, vinculacao, condominio] = await Promise.all([
+            this.getSummary({ haras_id: harasId, environment: 'oficial' }),
+            this.getSummary({ haras_id: harasId, environment: 'avulsos' }),
+            this.getSummary({ haras_id: harasId, environment: 'vinculacao' }),
+            this.getSummary({ haras_id: harasId, environment: 'condominio' }),
+        ]);
+
+        return {
+            oficial: oficial.total,
+            avulsos: avulsos.total,
+            vinculacao: vinculacao.total,
+            condominio: condominio.total,
+        };
+    },
+
     /**
      * Busca um animal pelo ID com dados completos para a ficha do animal
      */
@@ -877,6 +906,34 @@ export const animalsService = {
             console.error('Erro ao buscar eventos reprodutivos:', reproError);
         }
 
+        const { data: ownershipSharesData, error: ownershipSharesError } = await supabase
+            .from('animal_ownership_shares')
+            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, created_at, updated_at')
+            .eq('animal_id', id)
+            .order('end_date', { ascending: false, nullsFirst: true })
+            .order('is_primary', { ascending: false })
+            .order('percentage', { ascending: false })
+            .order('owner_name', { ascending: true });
+
+        if (ownershipSharesError) {
+            console.error('Erro ao buscar cotas do animal:', ownershipSharesError);
+        }
+
+        const ownershipShares = ((ownershipSharesData as AnimalOwnershipShare[] | null) || []).map((share) => ({
+            ...share,
+            percentage: typeof share.percentage === 'number'
+                ? share.percentage
+                : Number.parseFloat(String(share.percentage ?? 0)) || 0,
+            is_primary: Boolean(share.is_primary),
+        }));
+        const activeOwnershipShares = ownershipShares.filter((share) => !share.end_date);
+        const primaryOwnership =
+            activeOwnershipShares.find((share) => share.is_primary)
+            || activeOwnershipShares[0]
+            || ownershipShares.find((share) => share.is_primary)
+            || ownershipShares[0]
+            || null;
+
         // Calcular dados reprodutivos
         const coverageCount = (reproEvents as any)?.filter((e: any) =>
             e.event_type === 'cobertura' || e.event_type === 'inseminacao'
@@ -947,11 +1004,162 @@ export const animalsService = {
             father_name: data.father_name,
             mother_name: data.mother_name,
             criador: data.criador,
-            proprietario: data.proprietario,
+            proprietario: primaryOwnership?.owner_name || data.proprietario,
+            ownership_shares: ownershipShares,
             observations: data.observacoes,
         };
 
         return mappedData as unknown as Animal;
+    },
+
+    async saveOwnershipShares(input: SaveAnimalOwnershipSharesInput): Promise<AnimalOwnershipShare[]> {
+        const { animalId, harasId, shares } = input;
+
+        if (!animalId || !harasId) {
+            throw new Error('Animal ou haras inválido para atualizar cotas.');
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const normalizedShares = shares
+            .map((share) => ({
+                id: share.id,
+                owner_name: normalizeSpaces(String(share.owner_name || '')).toUpperCase(),
+                percentage: Number.parseFloat(String(share.percentage).replace(',', '.')),
+                is_primary: Boolean(share.is_primary),
+            }))
+            .filter((share) => share.owner_name);
+
+        if (normalizedShares.length === 0) {
+            throw new Error('Informe ao menos um cotista ativo.');
+        }
+
+        const seenOwners = new Set<string>();
+        for (const share of normalizedShares) {
+            if (!Number.isFinite(share.percentage) || share.percentage <= 0) {
+                throw new Error('Toda cota precisa ter um percentual maior que zero.');
+            }
+
+            if (share.percentage > 100) {
+                throw new Error('Nenhuma cota pode ultrapassar 100%.');
+            }
+
+            if (seenOwners.has(share.owner_name)) {
+                throw new Error('Não é possível repetir o mesmo cotista nas cotas ativas.');
+            }
+
+            seenOwners.add(share.owner_name);
+        }
+
+        const totalPercentage = normalizedShares.reduce((sum, share) => sum + share.percentage, 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+            throw new Error('A soma das cotas ativas deve totalizar 100%.');
+        }
+
+        const primaryIndex = normalizedShares.findIndex((share) => share.is_primary);
+        const resolvedPrimaryIndex = primaryIndex >= 0 ? primaryIndex : 0;
+        const preparedShares = normalizedShares.map((share, index) => ({
+            ...share,
+            is_primary: index === resolvedPrimaryIndex,
+        }));
+
+        const { data: existingActiveShares, error: existingActiveSharesError } = await supabase
+            .from('animal_ownership_shares')
+            .select('id')
+            .eq('animal_id', animalId)
+            .eq('haras_id', harasId)
+            .or(`end_date.is.null,end_date.gte.${today}`);
+
+        if (existingActiveSharesError) handleSupabaseError(existingActiveSharesError);
+
+        const existingIds = new Set((existingActiveShares || []).map((share) => share.id));
+        const incomingExistingIds = new Set(
+            preparedShares
+                .map((share) => share.id)
+                .filter((shareId): shareId is string => Boolean(shareId && existingIds.has(shareId)))
+        );
+
+        for (const share of preparedShares) {
+            if (share.id && existingIds.has(share.id)) {
+                const { error: updateError } = await supabase
+                    .from('animal_ownership_shares')
+                    .update({
+                        owner_name: share.owner_name,
+                        percentage: share.percentage,
+                        is_primary: share.is_primary,
+                        end_date: null,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', share.id)
+                    .eq('animal_id', animalId)
+                    .eq('haras_id', harasId);
+
+                if (updateError) handleSupabaseError(updateError);
+                continue;
+            }
+
+            const { error: insertError } = await supabase
+                .from('animal_ownership_shares')
+                .insert({
+                    animal_id: animalId,
+                    haras_id: harasId,
+                    owner_name: share.owner_name,
+                    percentage: share.percentage,
+                    is_primary: share.is_primary,
+                    start_date: today,
+                    end_date: null,
+                    source: 'manual',
+                });
+
+            if (insertError) handleSupabaseError(insertError);
+        }
+
+        const sharesToDeactivate = (existingActiveShares || []).filter((share) => !incomingExistingIds.has(share.id));
+        for (const share of sharesToDeactivate) {
+            const { error: deactivateError } = await supabase
+                .from('animal_ownership_shares')
+                .update({
+                    is_primary: false,
+                    end_date: today,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', share.id)
+                .eq('animal_id', animalId)
+                .eq('haras_id', harasId);
+
+            if (deactivateError) handleSupabaseError(deactivateError);
+        }
+
+        const primaryOwner = preparedShares[resolvedPrimaryIndex]?.owner_name || preparedShares[0].owner_name;
+        const { error: animalUpdateError } = await supabase
+            .from('animals')
+            .update({
+                proprietario: primaryOwner,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', animalId)
+            .eq('haras_id', harasId);
+
+        if (animalUpdateError) handleSupabaseError(animalUpdateError);
+
+        const { data: refreshedShares, error: refreshedSharesError } = await supabase
+            .from('animal_ownership_shares')
+            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, created_at, updated_at')
+            .eq('animal_id', animalId)
+            .eq('haras_id', harasId)
+            .or(`end_date.is.null,end_date.gte.${today}`)
+            .order('is_primary', { ascending: false })
+            .order('percentage', { ascending: false })
+            .order('owner_name', { ascending: true });
+
+        if (refreshedSharesError) handleSupabaseError(refreshedSharesError);
+
+        return ((refreshedShares as AnimalOwnershipShare[] | null) || []).map((share) => ({
+            ...share,
+            percentage: typeof share.percentage === 'number'
+                ? share.percentage
+                : Number.parseFloat(String(share.percentage ?? 0)) || 0,
+            is_primary: Boolean(share.is_primary),
+        }));
     },
 
     /**
@@ -1144,6 +1352,26 @@ export const animalsService = {
      * Cria um novo animal
      */
     async create(input: CreateAnimalInput): Promise<Animal> {
+        const guardedInput = input as CreateAnimalInput & {
+            abccmm_rowid?: string | null;
+            environment?: string | null;
+            source?: string | null;
+            import_source?: string | null;
+        };
+
+        const normalizedEnvironment = String(guardedInput.environment || '').toLowerCase().trim();
+        const normalizedSource = String(guardedInput.source || guardedInput.import_source || '').toLowerCase().trim();
+
+        if (
+            guardedInput.abccmm_rowid
+            || normalizedEnvironment === 'oficial'
+            || normalizedEnvironment === 'condominio'
+            || normalizedSource.includes('abccmm')
+            || normalizedSource.includes('condominio')
+        ) {
+            throw new Error('Animais oficiais do plantel e animais em condomínio só podem ser cadastrados via importação ABCCMM.');
+        }
+
         const resolvedStatus = input.status
             ? (REVERSE_STATUS_MAPPING[input.status] ?? input.status)
             : 'Ativo';
@@ -1153,6 +1381,7 @@ export const animalsService = {
 
         const dbInput = {
             haras_id: input.haras_id,
+            ingestion_source: 'manual',
             nome: input.name,
             registro: input.registry_number,
             chip: input.chip_number,
@@ -1579,46 +1808,16 @@ export const animalsService = {
             });
         }
 
-        const toInsert: Array<{
-            haras_id: string;
-            abccmm_rowid: string;
-            nome: string;
-            registro: string;
-            sexo: AnimalSex;
-            categoria: string;
-            status: string;
-            data_nascimento: string | null;
-            chip: string | null;
-            pelagem: string | null;
-            criador: string | null;
-            proprietario: string | null;
-            father_name: string | null;
-            mother_name: string | null;
-            dados_genealogicos: ExtendedGenealogyData | null;
-        }> = [];
+        const toInsert: Array<Database['public']['Tables']['animals']['Insert']> = [];
         const toUpdate: Array<{
-            id: string;
-            payload: {
-                abccmm_rowid: string;
-                nome: string;
-                registro: string;
-                sexo: AnimalSex;
-                categoria: string;
-                status: string;
-                data_nascimento: string | null;
-                chip: string | null;
-                pelagem: string | null;
-                criador: string | null;
-                proprietario: string | null;
-                father_name: string | null;
-                mother_name: string | null;
-                dados_genealogicos: ExtendedGenealogyData | null;
-            };
+                id: string;
+                payload: Database['public']['Tables']['animals']['Update'];
         }> = [];
 
         Array.from(seedMap.values()).forEach((seed) => {
             const details = linkSeedMap.get(seed.rowid);
-            const payload = {
+            const payload: Database['public']['Tables']['animals']['Update'] = {
+                ingestion_source: 'abccmm_plantel' as const,
                 abccmm_rowid: seed.rowid,
                 nome: seed.nome || seed.registro,
                 registro: seed.registro,
@@ -1632,7 +1831,7 @@ export const animalsService = {
                 proprietario: details?.proprietario ?? null,
                 father_name: details?.paiNome ?? null,
                 mother_name: details?.maeNome ?? null,
-                dados_genealogicos: details?.dadosGenealogicos ?? null,
+                dados_genealogicos: (details?.dadosGenealogicos ?? null) as Json | null,
             };
 
             let existingId = existingByRowId.get(seed.rowid);
@@ -1667,7 +1866,7 @@ export const animalsService = {
             toInsert.push({
                 haras_id: harasId,
                 ...payload,
-            });
+            } as Database['public']['Tables']['animals']['Insert']);
         });
 
         const idsByRowId = new Map<string, string>(existingByRowId);
@@ -1705,14 +1904,14 @@ export const animalsService = {
                 const item = chunk[itemIndex];
                 const { error } = await supabase
                     .from('animals')
-                    .update(item.payload)
+                    .update(item.payload as Database['public']['Tables']['animals']['Update'])
                     .eq('id', item.id)
                     .eq('haras_id', harasId);
 
                 if (error) handleSupabaseError(error);
                 updatedCount += 1;
-                idsByRowId.set(item.payload.abccmm_rowid, item.id);
-                idsByRegistro.set(item.payload.registro, item.id);
+                if (item.payload.abccmm_rowid) idsByRowId.set(item.payload.abccmm_rowid, item.id);
+                if (item.payload.registro) idsByRegistro.set(item.payload.registro, item.id);
             }
             reportProgress(70 + ((chunkIndex + 1) / updateChunks.length) * 19, 'Atualizando dados existentes...');
         }
@@ -1763,7 +1962,7 @@ export const animalsService = {
                 const item = chunk[itemIndex];
                 const { error } = await supabase
                     .from('animals')
-                    .update(item.payload)
+                    .update(item.payload as Database['public']['Tables']['animals']['Update'])
                     .eq('id', item.id)
                     .eq('haras_id', harasId);
 

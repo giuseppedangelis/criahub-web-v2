@@ -6,11 +6,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { harasSettingsService, type HarasSettings } from '@/services/harasSettings'
+import { teamKeys } from '@/hooks/useTeam'
 
 export const harasSettingsKeys = {
   all: ['haras-settings'] as const,
   settings: (harasId: string) => [...harasSettingsKeys.all, harasId] as const,
-  team: (harasId: string) => [...harasSettingsKeys.all, harasId, 'team'] as const,
+  team: (harasId: string) => [...teamKeys.members(harasId), 'settings'] as const,
 }
 
 export function useHarasSettings(harasId: string) {
@@ -46,9 +47,9 @@ export function useUpdateTeamMemberStatus() {
 
   return useMutation({
     mutationFn: ({ memberId, status, harasId }: { memberId: string; status: 'Ativo' | 'Inativo'; harasId: string }) =>
-      harasSettingsService.updateTeamMemberStatus(memberId, status),
+      harasSettingsService.updateTeamMemberStatus(memberId, harasId, status),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: harasSettingsKeys.team(variables.harasId) })
+      queryClient.invalidateQueries({ queryKey: teamKeys.members(variables.harasId) })
     },
   })
 }
@@ -57,10 +58,10 @@ export function useRemoveTeamMember() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ memberId }: { memberId: string; harasId: string }) =>
-      harasSettingsService.removeTeamMember(memberId),
+    mutationFn: ({ memberId, harasId }: { memberId: string; harasId: string }) =>
+      harasSettingsService.removeTeamMember(memberId, harasId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: harasSettingsKeys.team(variables.harasId) })
+      queryClient.invalidateQueries({ queryKey: teamKeys.members(variables.harasId) })
     },
   })
 }

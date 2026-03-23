@@ -1,7 +1,8 @@
 'use client'
 
-import { User, UserCog, UserCircle, HelpCircle, LogOut, Loader2 } from 'lucide-react'
+import { UserCog, UserCircle, HelpCircle, LogOut, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getRoleLabel, normalizeRole } from '@/lib/roles'
 
 interface UserDropdownProps {
   userName?: string | null
@@ -32,31 +33,20 @@ export function UserDropdown({
   showProfile = true,
   showHelp = true
 }: UserDropdownProps) {
-  const getRoleLabel = (role: string | null) => {
-    switch (role) {
-      case 'admin':
-        return 'Administrador'
-      case 'breeder':
-      case 'criador':
-        return 'Criador'
-      case 'advisor':
-      case 'assessor':
-        return 'Assessor'
-      default:
-        return 'Usuário'
-    }
-  }
-
   const getRoleColor = (role: string | null) => {
-    switch (role) {
+    switch (normalizeRole(role)) {
       case 'admin':
         return 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
-      case 'breeder':
       case 'criador':
         return 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-      case 'advisor':
       case 'assessor':
         return 'bg-green-500/10 text-green-600 dark:text-green-400'
+      case 'veterinario':
+        return 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
+      case 'peao':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+      case 'funcionario':
+        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
       default:
         return 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
     }

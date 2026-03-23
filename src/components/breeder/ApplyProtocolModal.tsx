@@ -22,7 +22,7 @@ interface ApplyProtocolModalProps {
 }
 
 interface ProtocolStep {
-  id?: number;
+  id?: string | number;
   name: string;
   dayOffset: number;
   type: 'Exame' | 'Aplicação' | 'Procedimento' | 'Coleta';

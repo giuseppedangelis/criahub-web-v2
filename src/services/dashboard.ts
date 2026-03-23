@@ -218,7 +218,7 @@ export const dashboardService = {
         harasId: string,
         options: DashboardSnapshotOptions = {}
     ): Promise<DashboardSnapshot> {
-        const { data, error } = await (supabase as DashboardRpcClient).rpc('get_dashboard_snapshot', {
+        const { data, error } = await (supabase as unknown as DashboardRpcClient).rpc('get_dashboard_snapshot', {
             p_haras_id: harasId,
             p_months: Math.max(1, options.months ?? 6),
             p_events_limit: Math.max(1, options.eventsLimit ?? 5),

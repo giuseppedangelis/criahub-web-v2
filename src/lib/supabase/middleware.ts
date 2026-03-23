@@ -4,6 +4,27 @@ import type { Database } from '@/types/database.types'
 
 type UserRole = Database['public']['Tables']['profiles']['Row']['role']
 
+function normalizeProfileRole(role?: UserRole | null): 'admin' | 'criador' | 'assessor' | 'funcionario' | null {
+    switch (role) {
+        case 'admin':
+            return 'admin'
+        case 'criador':
+        case 'breeder':
+            return 'criador'
+        case 'assessor':
+        case 'advisor':
+        case 'acessor':
+            return 'assessor'
+        case 'veterinario':
+        case 'peao':
+        case 'funcionario':
+        case 'employee':
+            return 'funcionario'
+        default:
+            return null
+    }
+}
+
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
@@ -59,21 +80,21 @@ export async function updateSession(request: NextRequest) {
             .eq('id', user.id)
             .single()
 
-        const role = (profileData as { role?: UserRole } | null)?.role
+        const role = normalizeProfileRole((profileData as { role?: UserRole } | null)?.role)
         const url = request.nextUrl.clone()
 
-        // Redirect based on role (admin, criador, assessor)
         switch (role) {
             case 'admin':
                 url.pathname = '/admin'
                 break
             case 'assessor':
-            case 'advisor':
                 url.pathname = '/assessor'
                 break
             case 'criador':
-            default:
                 url.pathname = '/criador'
+                break
+            default:
+                url.pathname = '/'
         }
 
         return NextResponse.redirect(url)
@@ -87,24 +108,24 @@ export async function updateSession(request: NextRequest) {
             .eq('id', user.id)
             .single()
 
-        const role = (profileData as { role?: UserRole } | null)?.role
+        const role = normalizeProfileRole((profileData as { role?: UserRole } | null)?.role)
 
         // Check if user has access to the current path
         if (request.nextUrl.pathname.startsWith('/admin') && role !== 'admin') {
             const url = request.nextUrl.clone()
-            url.pathname = role === 'assessor' || role === 'advisor' ? '/assessor' : '/criador'
+            url.pathname = role === 'assessor' ? '/assessor' : role === 'criador' ? '/criador' : '/'
             return NextResponse.redirect(url)
         }
 
-        if (request.nextUrl.pathname.startsWith('/assessor') && role !== 'assessor' && role !== 'advisor' && role !== 'admin') {
+        if (request.nextUrl.pathname.startsWith('/assessor') && role !== 'assessor' && role !== 'admin') {
             const url = request.nextUrl.clone()
-            url.pathname = '/criador'
+            url.pathname = role === 'criador' ? '/criador' : '/'
             return NextResponse.redirect(url)
         }
 
         if (request.nextUrl.pathname.startsWith('/criador') && role !== 'criador' && role !== 'admin') {
             const url = request.nextUrl.clone()
-            url.pathname = role === 'assessor' || role === 'advisor' ? '/assessor' : '/criador'
+            url.pathname = role === 'assessor' ? '/assessor' : '/'
             return NextResponse.redirect(url)
         }
     }

@@ -1,5 +1,5 @@
 import { LayoutDashboard, CreditCard, BarChart3, AlertTriangle, Settings } from 'lucide-react';
-import { PageType } from '@/types';
+import type { PageType } from './AppContent';
 import { BrandLogo } from '../branding/BrandLogo';
 
 interface SidebarProps {

@@ -8,6 +8,7 @@ import { useUser } from '@/contexts/UserContext';
 import { useCurrentHaras } from '@/hooks/useHaras';
 import { useProfileSettings, useUpdateProfileSettings } from '@/hooks/useProfileSettings';
 import { useUserSessions, useRevokeSession } from '@/hooks/useSessions';
+import { getRoleLabel } from '@/lib/roles';
 import { isValidPhone, validatePasswordStrength } from '@/lib/validators';
 
 type SettingsTab = 'profile' | 'security' | 'general';
@@ -69,23 +70,6 @@ export function AdvisorSettingsContent() {
   const { data: sessionsData, isLoading: isLoadingSessions, isError: isSessionsError } = useUserSessions();
   const revokeSession = useRevokeSession();
 
-  const ROLE_LABELS: Record<string, string> = {
-    assessor: 'Assessor Administrativo',
-    advisor: 'Assessor Administrativo',
-    criador: 'Criador/Dono de Haras',
-    breeder: 'Criador/Dono de Haras',
-    veterinario: 'Veterinário',
-    peao: 'Funcionário de Campo',
-    admin: 'Administrador',
-  };
-
-  const normalizeRole = (role?: string | null) =>
-    (role || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
-
   const formatPhone = (value: string): string => {
     const numbers = value.replace(/\D/g, '').slice(0, 11);
     if (numbers.length <= 2) return numbers.length ? `(${numbers}` : '';
@@ -145,7 +129,7 @@ export function AdvisorSettingsContent() {
 
   useEffect(() => {
     if (!profile || profileHydrated) return;
-    const roleLabel = ROLE_LABELS[normalizeRole(profile.role)] || profile.role || '';
+    const roleLabel = getRoleLabel(profile.role);
     setProfileData((prev) => ({
       ...prev,
       name: profile.full_name || '',
