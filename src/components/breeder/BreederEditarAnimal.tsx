@@ -728,14 +728,15 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     }
   };
 
-  // Helper function to map category from form values to database values
-  // Database values: 'Potro', 'Potranca', 'Garanhão', 'Égua', 'Castrado'
+  // Helper function to map category from form values to database values.
+  // Database canonical values: 'Potro', 'Potra', 'Garanhão', 'Égua', 'Castrado'.
   const mapCategoryToDb = (category: string): string => {
     const mapping: Record<string, string> = {
       'Égua': 'Égua',
       'Garanhão': 'Garanhão',
       'Potro': 'Potro',
-      'Potra': 'Potranca',
+      'Potra': 'Potra',
+      'Potranca': 'Potra', // legado
       'Castrado': 'Castrado',
     };
     return mapping[category] || category;

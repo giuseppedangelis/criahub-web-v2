@@ -28,7 +28,7 @@ export type AnimalCategory =
 // Database category values (as stored in Supabase - with accents)
 export type AnimalCategoryDb =
     | 'Potro'
-    | 'Potranca'
+    | 'Potra'
     | 'Garanhão'
     | 'Égua'
     | 'Castrado';

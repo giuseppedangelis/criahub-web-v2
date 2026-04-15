@@ -29,7 +29,7 @@ import type {
 
 const CATEGORY_MAPPING: Record<string, string> = {
     'potro': 'Potro',
-    'potra': 'Potranca',
+    'potra': 'Potra',
     'garanhao': 'Garanhão',
     'egua': 'Égua',
     'castrado': 'Castrado'
@@ -38,7 +38,8 @@ const CATEGORY_MAPPING: Record<string, string> = {
 // Reverse mapping: database values -> frontend values
 const DB_TO_FRONTEND_CATEGORY: Record<string, string> = {
     'Potro': 'potro',
-    'Potranca': 'potra',
+    'Potra': 'potra',
+    'Potranca': 'potra', // legado — tolerância caso volte algum valor antigo
     'Garanhão': 'garanhao',
     'Égua': 'egua',
     'Castrado': 'castrado'

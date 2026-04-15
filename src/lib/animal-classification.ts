@@ -68,7 +68,8 @@ export function resolveManagedCategory(
 export function getDisplayCategoryLabel(category?: string | null): string {
   const key = normalizeKey(category)
   if (!key) return '-'
-  if (key.includes('potranca') || key === 'potra') return 'Potra'
+  // 'potranca' mantido como alias legado até cache/usuários antigos ficarem limpos.
+  if (key === 'potra' || key === 'potranca') return 'Potra'
   if (key === 'potro') return 'Potro'
   if (key.includes('garanhao')) return 'Garanhão'
   if (key.includes('egua')) return 'Égua'
