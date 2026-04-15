@@ -1,8 +1,8 @@
-import { ArrowLeft, Upload, X, Camera, FileText, Plus, Video, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Upload, X, Camera, FileText, Plus, Video, Loader2, Lock, Home, PlaneTakeoff, Users } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { NativeSelect } from '../ui/native-select';
-import { useUpdateAnimal } from '@/hooks/useAnimals';
+import { useSaveAnimalOwnershipShares, useUpdateAnimal } from '@/hooks/useAnimals';
 import { useHarasSettings } from '@/hooks/useHarasSettings';
 import { useUser } from '@/contexts/UserContext';
 import { createClient } from '@/lib/supabase/client';
@@ -12,6 +12,7 @@ import {
   getLocationOptionsForType,
   getServiceTypeLabel,
   isHospedagemLocation,
+  isLocationAtHaras,
   normalizeHarasLocationSettings,
   normalizeServiceType,
   parseAnimalLocation,
@@ -19,6 +20,8 @@ import {
   withCurrentLocationOption,
 } from '@/lib/animal-location';
 import { eventsService } from '@/services/events';
+import { OwnershipSharesModal } from './OwnershipSharesModal';
+import type { AnimalOwnershipShare, OwnershipShareDraft } from '@/types';
 
 interface Animal {
   id: string;
@@ -63,6 +66,10 @@ interface Animal {
   imageCaptions?: string[];
   weight?: number;
   height?: number;
+  is_at_haras?: boolean;
+  presence_manual_override?: boolean;
+  ownership_shares?: AnimalOwnershipShare[];
+  proprietario?: string | null;
 }
 
 interface BreederEditarAnimalProps {
@@ -106,6 +113,19 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
     [harasSettings?.location_settings]
   );
   const [returnReminderDate, setReturnReminderDate] = useState('');
+  const [isAtHaras, setIsAtHaras] = useState<boolean>((animal as Animal).is_at_haras ?? true);
+  const [presenceManualOverride, setPresenceManualOverride] = useState<boolean>(false);
+  const [showOwnershipModal, setShowOwnershipModal] = useState(false);
+  const { mutateAsync: saveOwnershipShares, isPending: isSavingOwnership } = useSaveAnimalOwnershipShares();
+  const currentShares: AnimalOwnershipShare[] = useMemo(() => {
+    const src = hydratedAnimal?.ownership_shares ?? animal.ownership_shares ?? [];
+    return src.filter((s) => !s.end_date);
+  }, [hydratedAnimal?.ownership_shares, animal.ownership_shares]);
+  const animalBirthDateIso = useMemo(() => {
+    const src = hydratedAnimal?.birthDate || hydratedAnimal?.birth_date || animal.birthDate || animal.birth_date || '';
+    if (!src) return null;
+    return src.split('T')[0] || src;
+  }, [hydratedAnimal?.birthDate, hydratedAnimal?.birth_date, animal.birthDate, animal.birth_date]);
   const normalizeCategoryValue = (value?: string | null) => {
     switch (value) {
       case 'Égua':
@@ -207,6 +227,25 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
   useEffect(() => {
     setFormData(buildFormData(hydratedAnimal || animal));
   }, [animal, hydratedAnimal]);
+
+  // Sincroniza presença com o animal hidratado (fonte de verdade do banco).
+  useEffect(() => {
+    const src = hydratedAnimal || animal;
+    if (src?.is_at_haras !== undefined) {
+      setIsAtHaras(Boolean(src.is_at_haras));
+    }
+    if (src?.presence_manual_override !== undefined) {
+      setPresenceManualOverride(Boolean(src.presence_manual_override));
+    }
+  }, [hydratedAnimal, animal]);
+
+  // Auto-atualiza presença conforme localização muda (só se ainda não houve override manual na edição).
+  useEffect(() => {
+    if (presenceManualOverride) return;
+    const normalized = normalizeServiceType(formData.servicoTipo);
+    const next = isLocationAtHaras(formData.localizacaoTipo, normalized);
+    setIsAtHaras(next);
+  }, [formData.localizacaoTipo, formData.servicoTipo, presenceManualOverride]);
 
   useEffect(() => {
     if (locationOptions.length === 0) return;
@@ -632,6 +671,8 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
         mother_name: formData.mae || undefined,
         location: resolvedLocation,
         service_type: resolvedServiceType,
+        is_at_haras: isAtHaras,
+        presence_manual_override: presenceManualOverride,
         origin_haras: formData.origemHaras,
         weight: formData.peso ? Number(formData.peso) : undefined,
         height: formData.altura ? Number(formData.altura) : undefined,
@@ -1095,6 +1136,37 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
           {normalizeAnimalStatus(formData.status) !== 'vendido' && normalizeAnimalStatus(formData.status) !== 'morto' && (
             <div>
               <h3 className="text-lg text-foreground dark:text-white mb-4">Localização Atual</h3>
+
+              <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-4 rounded-xl border border-border dark:border-[rgba(255,255,255,0.1)] bg-muted/40 dark:bg-[#0d0d0d]">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      isAtHaras
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                    }`}
+                  >
+                    {isAtHaras ? <Home className="w-4 h-4" /> : <PlaneTakeoff className="w-4 h-4" />}
+                    {isAtHaras ? 'No Haras' : 'Fora do Haras'}
+                  </span>
+                  <span className="text-xs text-muted-foreground dark:text-[#99a1af]">
+                    Atualiza automaticamente ao trocar a localização. Você pode ajustar manualmente.
+                  </span>
+                </div>
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAtHaras}
+                    onChange={(e) => {
+                      setIsAtHaras(e.target.checked);
+                      setPresenceManualOverride(true);
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-[rgba(255,255,255,0.2)]"
+                  />
+                  <span className="text-sm text-foreground dark:text-white">Presente no Haras</span>
+                </label>
+              </div>
+
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -1191,6 +1263,80 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
               </div>
             </div>
           )}
+
+          {/* Propriedade / Condomínio — seção independente da localização */}
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg text-foreground dark:text-white mb-1">Propriedade / Condomínio</h3>
+                <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
+                  Cotistas, percentuais e — em sociedade — prazos e localização física.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOwnershipModal(true)}
+                className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white dark:bg-white dark:text-black hover:opacity-90 transition-opacity"
+              >
+                <Users className="w-4 h-4" />
+                Gerenciar propriedade
+              </button>
+            </div>
+
+            {currentShares.length > 0 ? (
+              <div className="space-y-2">
+                {currentShares.map((share) => (
+                  <div
+                    key={share.id}
+                    className="flex items-center justify-between p-3 bg-muted dark:bg-[#0d0d0d] rounded-lg border border-border dark:border-[rgba(255,255,255,0.1)]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-foreground dark:text-white">{share.owner_name}</span>
+                      {share.is_primary && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                          Principal
+                        </span>
+                      )}
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary dark:bg-white/10 dark:text-white">
+                      {share.percentage}%
+                    </span>
+                  </div>
+                ))}
+
+                {currentShares.length >= 2 && (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    {(() => {
+                      const ref = currentShares.find((s) => s.termination_type) || currentShares[0];
+                      if (!ref) return null;
+                      return (
+                        <>
+                          <div className="p-3 rounded-lg bg-muted dark:bg-[#0d0d0d]">
+                            <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Localização física</p>
+                            <p className="text-foreground dark:text-white">{ref.physical_location || 'Não informada'}</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-muted dark:bg-[#0d0d0d]">
+                            <p className="text-xs text-muted-foreground dark:text-[#99a1af] mb-1">Critério de término</p>
+                            <p className="text-foreground dark:text-white">
+                              {ref.termination_type === 'date'
+                                ? `Até ${(ref.termination_date || '').split('-').reverse().join('/') || '-'}`
+                                : ref.termination_type === 'age'
+                                  ? `Até os ${ref.termination_age_years} anos`
+                                  : 'Sem prazo definido'}
+                            </p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 rounded-lg bg-muted dark:bg-[#0d0d0d] text-sm text-muted-foreground dark:text-[#99a1af]">
+                Nenhum cotista cadastrado. Clique em &quot;Gerenciar propriedade&quot; para definir.
+              </div>
+            )}
+          </div>
 
           {/* Observações */}
           <div>
@@ -1460,6 +1606,36 @@ export function BreederEditarAnimal({ animal, onBack, onSave }: BreederEditarAni
           </div>
         </div>
       </div>
+
+      {showOwnershipModal && (
+        <OwnershipSharesModal
+          initialShares={currentShares}
+          defaultOwnerName={animal.proprietario || undefined}
+          animalBirthDate={animalBirthDateIso}
+          partnerLocationOptions={locationSettings.partner_locations}
+          onClose={() => setShowOwnershipModal(false)}
+          onSave={async (shares: OwnershipShareDraft[]) => {
+            const harasId = animal.haras_id || stableHarasId;
+            if (!harasId) {
+              toast.error('Haras não identificado para atualizar a propriedade.');
+              throw new Error('Haras não identificado');
+            }
+            try {
+              await saveOwnershipShares({ animalId: String(animal.id), harasId, shares });
+              toast.success('Propriedade atualizada com sucesso!');
+              // Recarrega animal para refletir cotas atualizadas
+              const { animalsService } = await import('@/services/animals');
+              const fullAnimal = await animalsService.getById(String(animal.id));
+              if (fullAnimal) setHydratedAnimal(fullAnimal as unknown as Animal);
+            } catch (error) {
+              console.error('Erro ao atualizar cotas:', error);
+              toast.error(error instanceof Error ? error.message : 'Erro ao atualizar propriedade.');
+              throw error;
+            }
+          }}
+          isSaving={isSavingOwnership}
+        />
+      )}
     </div>
   );
 }

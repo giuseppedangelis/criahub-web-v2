@@ -683,7 +683,7 @@ export const animalsService = {
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
                 foto_url, images, documents, observacoes, father_name, mother_name,
-                criador, proprietario,
+                criador, proprietario, is_at_haras, presence_manual_override,
                 created_at, updated_at
             `, { count: 'exact' });
 
@@ -820,7 +820,7 @@ export const animalsService = {
                 status, status_manejo, pai_id, mae_id, localizacao, piquete,
                 height, weight, haras_origem, tipo_servico, para_venda, valor_venda,
                 foto_url, images, documents, observacoes, father_name, mother_name,
-                criador, proprietario,
+                criador, proprietario, is_at_haras, presence_manual_override,
                 created_at, updated_at
             `)
             .eq('id', id)
@@ -908,7 +908,7 @@ export const animalsService = {
 
         const { data: ownershipSharesData, error: ownershipSharesError } = await supabase
             .from('animal_ownership_shares')
-            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, created_at, updated_at')
+            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, termination_type, termination_date, termination_age_years, physical_location, is_external, created_at, updated_at')
             .eq('animal_id', id)
             .order('end_date', { ascending: false, nullsFirst: true })
             .order('is_primary', { ascending: false })
@@ -976,6 +976,8 @@ export const animalsService = {
             harasOrigem: data.haras_origem,
             localizacao: data.localizacao,
             servicoTipo: data.tipo_servico,
+            is_at_haras: data.is_at_haras ?? true,
+            presence_manual_override: data.presence_manual_override ?? false,
             haras: harasData?.name || '-',
             image: data.foto_url || '',
 
@@ -1021,12 +1023,38 @@ export const animalsService = {
 
         const today = new Date().toISOString().slice(0, 10);
         const normalizedShares = shares
-            .map((share) => ({
-                id: share.id,
-                owner_name: normalizeSpaces(String(share.owner_name || '')).toUpperCase(),
-                percentage: Number.parseFloat(String(share.percentage).replace(',', '.')),
-                is_primary: Boolean(share.is_primary),
-            }))
+            .map((share) => {
+                const terminationType = share.termination_type === 'date' || share.termination_type === 'age'
+                    ? share.termination_type
+                    : null;
+                const terminationDate = terminationType === 'date' && share.termination_date
+                    ? share.termination_date
+                    : null;
+                const terminationAgeRaw = terminationType === 'age' && share.termination_age_years != null
+                    ? Number.parseInt(String(share.termination_age_years), 10)
+                    : null;
+                const terminationAgeYears = terminationAgeRaw != null && Number.isFinite(terminationAgeRaw) && terminationAgeRaw > 0
+                    ? terminationAgeRaw
+                    : null;
+                const physicalLocation = share.physical_location
+                    ? normalizeSpaces(String(share.physical_location))
+                    : null;
+                const startDate = share.start_date && String(share.start_date).trim()
+                    ? String(share.start_date)
+                    : null;
+                return {
+                    id: share.id,
+                    owner_name: normalizeSpaces(String(share.owner_name || '')).toUpperCase(),
+                    percentage: Number.parseFloat(String(share.percentage).replace(',', '.')),
+                    is_primary: Boolean(share.is_primary),
+                    start_date: startDate,
+                    termination_type: terminationType,
+                    termination_date: terminationDate,
+                    termination_age_years: terminationAgeYears,
+                    physical_location: physicalLocation || null,
+                    is_external: Boolean(share.is_external),
+                };
+            })
             .filter((share) => share.owner_name);
 
         if (normalizedShares.length === 0) {
@@ -1080,15 +1108,22 @@ export const animalsService = {
 
         for (const share of preparedShares) {
             if (share.id && existingIds.has(share.id)) {
+                const updatePayload: Record<string, unknown> = {
+                    owner_name: share.owner_name,
+                    percentage: share.percentage,
+                    is_primary: share.is_primary,
+                    end_date: null,
+                    termination_type: share.termination_type,
+                    termination_date: share.termination_date,
+                    termination_age_years: share.termination_age_years,
+                    physical_location: share.physical_location,
+                    is_external: share.is_external,
+                    updated_at: new Date().toISOString(),
+                };
+                if (share.start_date) updatePayload.start_date = share.start_date;
                 const { error: updateError } = await supabase
                     .from('animal_ownership_shares')
-                    .update({
-                        owner_name: share.owner_name,
-                        percentage: share.percentage,
-                        is_primary: share.is_primary,
-                        end_date: null,
-                        updated_at: new Date().toISOString(),
-                    })
+                    .update(updatePayload)
                     .eq('id', share.id)
                     .eq('animal_id', animalId)
                     .eq('haras_id', harasId);
@@ -1105,9 +1140,14 @@ export const animalsService = {
                     owner_name: share.owner_name,
                     percentage: share.percentage,
                     is_primary: share.is_primary,
-                    start_date: today,
+                    start_date: share.start_date || today,
                     end_date: null,
                     source: 'manual',
+                    termination_type: share.termination_type,
+                    termination_date: share.termination_date,
+                    termination_age_years: share.termination_age_years,
+                    physical_location: share.physical_location,
+                    is_external: share.is_external,
                 });
 
             if (insertError) handleSupabaseError(insertError);
@@ -1130,12 +1170,19 @@ export const animalsService = {
         }
 
         const primaryOwner = preparedShares[resolvedPrimaryIndex]?.owner_name || preparedShares[0].owner_name;
+        const hasExternalShare = preparedShares.some((share) => share.is_external);
+        const animalUpdatePayload: Record<string, unknown> = {
+            proprietario: primaryOwner,
+            updated_at: new Date().toISOString(),
+        };
+        if (hasExternalShare) {
+            // Quando animal entra em condomínio fora, marca como fora do haras automaticamente.
+            animalUpdatePayload.is_at_haras = false;
+            animalUpdatePayload.presence_manual_override = false;
+        }
         const { error: animalUpdateError } = await supabase
             .from('animals')
-            .update({
-                proprietario: primaryOwner,
-                updated_at: new Date().toISOString(),
-            })
+            .update(animalUpdatePayload)
             .eq('id', animalId)
             .eq('haras_id', harasId);
 
@@ -1143,7 +1190,7 @@ export const animalsService = {
 
         const { data: refreshedShares, error: refreshedSharesError } = await supabase
             .from('animal_ownership_shares')
-            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, created_at, updated_at')
+            .select('id, animal_id, haras_id, owner_name, percentage, is_primary, start_date, end_date, notes, source, termination_type, termination_date, termination_age_years, physical_location, is_external, created_at, updated_at')
             .eq('animal_id', animalId)
             .eq('haras_id', harasId)
             .or(`end_date.is.null,end_date.gte.${today}`)
@@ -1458,6 +1505,8 @@ export const animalsService = {
         if (updateData.origin_haras !== undefined) dbInput.haras_origem = updateData.origin_haras;
         if (updateData.service_type !== undefined) dbInput.tipo_servico = updateData.service_type;
         if (updateData.management_status !== undefined) dbInput.status_manejo = updateData.management_status;
+        if (updateData.is_at_haras !== undefined) dbInput.is_at_haras = updateData.is_at_haras;
+        if (updateData.presence_manual_override !== undefined) dbInput.presence_manual_override = updateData.presence_manual_override;
         // Handle images - always include the array even if empty to clear existing images
         if (updateData.images !== undefined) {
             dbInput.images = updateData.images;
@@ -2649,5 +2698,89 @@ export const animalsService = {
         if (femalesError) handleSupabaseError(femalesError);
 
         return { males: males || 0, females: females || 0 };
-    }
+    },
+
+    async setAnimalPresence(animalId: string, harasId: string, isAtHaras: boolean): Promise<void> {
+        if (!animalId || !harasId) {
+            throw new Error('Animal ou haras inválido para atualizar presença.');
+        }
+        const { error } = await supabase
+            .from('animals')
+            .update({
+                is_at_haras: isAtHaras,
+                presence_manual_override: true,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', animalId)
+            .eq('haras_id', harasId);
+        if (error) handleSupabaseError(error);
+    },
+
+    async getPlantelPresenceCounts(harasId: string): Promise<{ atHaras: number; away: number }> {
+        const [{ count: atCount, error: atErr }, { count: awayCount, error: awayErr }] = await Promise.all([
+            supabase
+                .from('animals')
+                .select('id', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('status', 'Ativo')
+                .eq('is_at_haras', true),
+            supabase
+                .from('animals')
+                .select('id', { count: 'exact', head: true })
+                .eq('haras_id', harasId)
+                .eq('status', 'Ativo')
+                .eq('is_at_haras', false),
+        ]);
+        if (atErr) handleSupabaseError(atErr);
+        if (awayErr) handleSupabaseError(awayErr);
+        return { atHaras: atCount || 0, away: awayCount || 0 };
+    },
+
+    async getCondominiosVencendo(harasId: string, daysAhead: number = 30): Promise<number> {
+        // Conta cotas ativas (end_date null/futuro) com prazo vencendo em até daysAhead dias
+        // ou já vencidas que ainda não foram encerradas.
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const futureStr = new Date(today.getTime() + daysAhead * 86400000).toISOString().slice(0, 10);
+
+        const { data, error } = await supabase
+            .from('animal_ownership_shares')
+            .select('animal_id, termination_type, termination_date, termination_age_years, animals!inner(data_nascimento)')
+            .eq('haras_id', harasId)
+            .eq('is_primary', true)
+            .or(`end_date.is.null,end_date.gte.${todayStr}`)
+            .not('termination_type', 'is', null);
+
+        if (error) handleSupabaseError(error);
+
+        type Row = {
+            animal_id: string;
+            termination_type: 'date' | 'age' | null;
+            termination_date: string | null;
+            termination_age_years: number | null;
+            animals: { data_nascimento: string | null } | { data_nascimento: string | null }[] | null;
+        };
+
+        const rows = (data as unknown as Row[] | null) || [];
+        const seen = new Set<string>();
+        for (const row of rows) {
+            let dueDate: Date | null = null;
+            if (row.termination_type === 'date' && row.termination_date) {
+                dueDate = new Date(row.termination_date);
+            } else if (row.termination_type === 'age' && row.termination_age_years) {
+                const animalRec = Array.isArray(row.animals) ? row.animals[0] : row.animals;
+                const birth = animalRec?.data_nascimento;
+                if (birth) {
+                    const b = new Date(birth);
+                    dueDate = new Date(b.setFullYear(b.getFullYear() + row.termination_age_years));
+                }
+            }
+            if (!dueDate) continue;
+            const dueStr = dueDate.toISOString().slice(0, 10);
+            if (dueStr <= futureStr) {
+                seen.add(row.animal_id);
+            }
+        }
+        return seen.size;
+    },
 };

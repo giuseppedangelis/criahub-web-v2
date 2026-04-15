@@ -2032,8 +2032,7 @@ export function BreederAnimalDetails({ animal, onBack, onEdit, onViewAnimal, ini
               currentLocation={fullAnimal.localizacao}
               locationType={resolvedLocationType}
               serviceType={resolvedServiceType}
-              ownershipShares={fullAnimal.ownership_shares}
-              defaultOwnerName={fullAnimal.proprietario || undefined}
+              isAtHaras={(fullAnimal as { is_at_haras?: boolean }).is_at_haras ?? true}
             />
           )}
 

@@ -184,6 +184,7 @@ export interface HarasLocationSettings {
     baias: string[];
     pastos: string[];
     servicos: string[];
+    partner_locations: string[];
 }
 
 export interface HarasMember {
@@ -227,6 +228,8 @@ export interface Animal {
     mother_name: string | null;
     criador?: string | null;
     proprietario?: string | null;
+    is_at_haras?: boolean;
+    presence_manual_override?: boolean;
     created_at: string;
     updated_at: string;
     // Relacionamentos (quando carregados)
@@ -235,6 +238,8 @@ export interface Animal {
     haras?: Haras | null;
     ownership_shares?: AnimalOwnershipShare[];
 }
+
+export type OwnershipTerminationType = 'date' | 'age';
 
 export interface AnimalOwnershipShare {
     id: string;
@@ -247,19 +252,32 @@ export interface AnimalOwnershipShare {
     end_date?: string | null;
     notes?: string | null;
     source?: string | null;
+    termination_type?: OwnershipTerminationType | null;
+    termination_date?: string | null;
+    termination_age_years?: number | null;
+    physical_location?: string | null;
+    is_external?: boolean;
     created_at?: string;
     updated_at?: string;
+}
+
+export interface OwnershipShareDraft {
+    id?: string;
+    owner_name: string;
+    percentage: number;
+    is_primary: boolean;
+    start_date?: string | null;
+    termination_type?: OwnershipTerminationType | null;
+    termination_date?: string | null;
+    termination_age_years?: number | null;
+    physical_location?: string | null;
+    is_external?: boolean;
 }
 
 export interface SaveAnimalOwnershipSharesInput {
     animalId: string;
     harasId: string;
-    shares: Array<{
-        id?: string;
-        owner_name: string;
-        percentage: number;
-        is_primary: boolean;
-    }>;
+    shares: OwnershipShareDraft[];
 }
 
 export interface AnimalVideo {
@@ -633,6 +651,8 @@ export interface CreateAnimalInput {
     gait?: string;
     criador?: string;
     proprietario?: string;
+    is_at_haras?: boolean;
+    presence_manual_override?: boolean;
 }
 
 export interface CreateAnimalVideoInput {

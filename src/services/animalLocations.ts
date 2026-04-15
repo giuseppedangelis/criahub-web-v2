@@ -9,6 +9,7 @@ import {
     buildAnimalLocationLabel,
     getServiceTypeLabel,
     isHospedagemLocation,
+    isLocationAtHaras,
     normalizeServiceType,
 } from '@/lib/animal-location';
 import { normalizeAnimalStatus } from '@/lib/animal-classification';
@@ -195,9 +196,14 @@ export const animalLocationsService = {
             throw new Error('Informe a data prevista de retorno para hospedagem.');
         }
 
+        const normalizedServiceType = normalizeServiceType(input.service_type);
+        const isAtHarasNow = isLocationAtHaras(input.location_type, normalizedServiceType);
+
         const updatePayload: Record<string, unknown> = {
             localizacao: newLocation,
             tipo_servico: input.location_type === 'Servico' ? serviceTypeLabel : null,
+            is_at_haras: isAtHarasNow,
+            presence_manual_override: false,
             updated_at: new Date().toISOString()
         };
 

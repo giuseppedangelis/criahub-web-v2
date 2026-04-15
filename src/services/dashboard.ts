@@ -16,6 +16,9 @@ export interface DashboardStats {
     monthlyRevenue: number;
     monthlyExpenses: number;
     unreadNotifications: number;
+    animalsAtHaras?: number;
+    animalsAway?: number;
+    condominiosVencendo30d?: number;
 }
 
 export interface CategoryDistribution {

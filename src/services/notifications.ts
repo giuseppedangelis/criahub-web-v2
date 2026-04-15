@@ -186,5 +186,21 @@ export const notificationsService = {
         if (error) return 0;
 
         return count || 0;
+    },
+
+    /**
+     * Dispara geração de notificações de prazo de condomínio. Idempotente por dia.
+     * Retorna a quantidade de notificações criadas nesta execução.
+     */
+    async generateCondominioNotifications(harasId: string): Promise<number> {
+        if (!harasId) return 0;
+        const { data, error } = await supabase.rpc('generate_condominio_notifications', {
+            p_haras_id: harasId,
+        });
+        if (error) {
+            console.error('Falha ao gerar notificações de condomínio:', error);
+            return 0;
+        }
+        return typeof data === 'number' ? data : 0;
     }
 };

@@ -16,6 +16,8 @@ import {
     type RecentActivity,
     type AgeDistribution,
 } from '@/services/dashboard';
+import { animalsService } from '@/services/animals';
+import { notificationsService } from '@/services/notifications';
 import { useUser } from '@/contexts/UserContext';
 
 interface UseDashboardReturn {
@@ -59,8 +61,33 @@ export function useDashboard(harasId?: string, options: DashboardOptions = {}): 
         refetchOnWindowFocus: false,
     });
 
+    const presenceQuery = useQuery({
+        queryKey: ['dashboard', 'presence', currentHarasId],
+        queryFn: async () => {
+            // dispara geração de notificações de prazo e retorna contagens de presença e condomínios vencendo
+            await notificationsService.generateCondominioNotifications(currentHarasId!).catch(() => 0);
+            const [presence, condominios] = await Promise.all([
+                animalsService.getPlantelPresenceCounts(currentHarasId!),
+                animalsService.getCondominiosVencendo(currentHarasId!, 30),
+            ]);
+            return { ...presence, condominiosVencendo30d: condominios };
+        },
+        enabled: !!currentHarasId && isSessionReady,
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+    });
+
+    const enrichedStats = query.data?.stats
+        ? {
+            ...query.data.stats,
+            animalsAtHaras: presenceQuery.data?.atHaras,
+            animalsAway: presenceQuery.data?.away,
+            condominiosVencendo30d: presenceQuery.data?.condominiosVencendo30d,
+        }
+        : null;
+
     return {
-        stats: query.data?.stats || null,
+        stats: enrichedStats,
         categoryDistribution: query.data?.categoryDistribution || [],
         pelagemDistribution: query.data?.pelagemDistribution || [],
         growthData: query.data?.growthData || [],

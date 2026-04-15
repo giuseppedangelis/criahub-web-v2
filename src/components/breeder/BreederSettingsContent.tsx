@@ -145,6 +145,12 @@ export function BreederSettingsContent() {
       description: 'Destinos externos usados em serviço e hospedagem.',
       placeholder: 'Ex: Centro Hípico Serra',
     },
+    {
+      key: 'partner_locations',
+      title: 'Sócios / Haras externos',
+      description: 'Haras e sócios recorrentes usados no cadastro de condomínio.',
+      placeholder: 'Ex: Haras São João',
+    },
   ];
 
   const formatPhone = (value: string): string => {

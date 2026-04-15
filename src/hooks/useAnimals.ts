@@ -189,6 +189,21 @@ export function useSaveAnimalOwnershipShares() {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: animalKeys.detail(variables.animalId) })
             queryClient.invalidateQueries({ queryKey: animalKeys.lists() })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        },
+    })
+}
+
+export function useSetAnimalPresence() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (input: { animalId: string; harasId: string; isAtHaras: boolean }) =>
+            animalsService.setAnimalPresence(input.animalId, input.harasId, input.isAtHaras),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: animalKeys.detail(variables.animalId) })
+            queryClient.invalidateQueries({ queryKey: animalKeys.lists() })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         },
     })
 }

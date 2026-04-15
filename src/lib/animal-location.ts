@@ -14,6 +14,7 @@ export const DEFAULT_HARAS_LOCATION_SETTINGS: HarasLocationSettings = {
   baias: ['Baia 01', 'Baia 02', 'Baia 03'],
   pastos: ['Pasto Maternidade', 'Pasto Norte', 'Pasto Sul'],
   servicos: ['Centro de Treinamento', 'Hospedagem Externa'],
+  partner_locations: [],
 }
 
 function normalizeText(value: string | null | undefined): string {
@@ -52,6 +53,7 @@ export function normalizeHarasLocationSettings(
     baias: dedupeAndSort(input?.baias ?? DEFAULT_HARAS_LOCATION_SETTINGS.baias),
     pastos: dedupeAndSort(input?.pastos ?? DEFAULT_HARAS_LOCATION_SETTINGS.pastos),
     servicos: dedupeAndSort(input?.servicos ?? DEFAULT_HARAS_LOCATION_SETTINGS.servicos),
+    partner_locations: dedupeAndSort(input?.partner_locations ?? []),
   }
 }
 
@@ -166,4 +168,14 @@ export function isHospedagemLocation(location?: string | null, serviceType?: str
   const normalizedServiceType = normalizeServiceType(serviceType)
   if (normalizedServiceType === 'Hospedagem') return true
   return normalizeText(location).includes('hospedagem')
+}
+
+// Considera o animal "no haras" para qualquer localização exceto Hospedagem.
+// Baia, Pasto e Serviços internos (Reprodução, Trabalho, Repouso, Nascimento, Compra, Outro) = presente.
+export function isLocationAtHaras(
+  locationType: AnimalLocationType,
+  serviceType?: AnimalServiceType | null
+): boolean {
+  if (locationType === 'Servico' && serviceType === 'Hospedagem') return false
+  return true
 }

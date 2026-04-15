@@ -170,13 +170,14 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
               onClick={() => onNavigate?.('financial')}
             />
             <KPICard
-              label="Machos / Fêmeas"
-              value={`${stats?.totalMales || 0} / ${stats?.totalFemales || 0}`}
-              change={stats?.totalAnimals && stats.totalAnimals > 0 ? 'Balanceado' : '-'}
+              label="Plantel"
+              value={stats?.totalAnimals?.toString() || '0'}
+              change={`${stats?.animalsAtHaras ?? '-'} no haras · ${stats?.animalsAway ?? '-'} fora`}
               trend="up"
               icon={Activity}
               color="text-blue-600 dark:text-blue-400"
               bgColor="bg-blue-500/10"
+              onClick={() => onNavigate?.('plantel')}
             />
             <KPICard
               label="Gestações Ativas"
@@ -195,8 +196,14 @@ export function BreederDashboardContent({ onNavigate }: { onNavigate?: (tab: str
             <AlertCard
               type="warning"
               title="Atenção"
-              value={stats?.animalsNeedingCare?.toString() || '0'}
-              description="animais que precisam de cuidados"
+              value={(
+                (stats?.animalsNeedingCare || 0) + (stats?.condominiosVencendo30d || 0)
+              ).toString()}
+              description={
+                stats?.condominiosVencendo30d
+                  ? `${stats.animalsNeedingCare || 0} cuidado · ${stats.condominiosVencendo30d} condomínio(s) vencendo`
+                  : 'animais que precisam de cuidados'
+              }
               icon={AlertTriangle}
             />
             <AlertCard

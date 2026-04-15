@@ -1,13 +1,12 @@
-import { MapPin, Users, Clock, Plus, Calendar, User, AlertCircle } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { MapPin, Clock, Plus, Calendar, User, AlertCircle, Home, PlaneTakeoff } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { LocationChangeModal, LocationChangeData } from './LocationChangeModal';
-import { OwnershipSharesModal } from './OwnershipSharesModal';
-import { useSaveAnimalOwnershipShares } from '@/hooks/useAnimals';
+import { useSetAnimalPresence } from '@/hooks/useAnimals';
 import { useAnimalLocationHistory, useCreateAnimalLocationChange } from '@/hooks/useAnimalLocations';
 import { useHarasSettings } from '@/hooks/useHarasSettings';
 import { getServiceTypeLabel, normalizeHarasLocationSettings, parseAnimalLocation } from '@/lib/animal-location';
-import type { AnimalLocationType, AnimalOwnershipShare, AnimalServiceType } from '@/types';
+import type { AnimalLocationType, AnimalServiceType } from '@/types';
 
 interface LocationHistory {
   id: string;
@@ -26,9 +25,8 @@ interface AnimalLocationSectionProps {
   currentLocation?: string;
   locationType?: AnimalLocationType;
   serviceType?: AnimalServiceType;
-  ownershipShares?: AnimalOwnershipShare[];
-  defaultOwnerName?: string;
   locationHistory?: LocationHistory[];
+  isAtHaras?: boolean;
 }
 
 function formatDateLabel(value?: string | null): string {
@@ -44,15 +42,15 @@ export function AnimalLocationSection({
   currentLocation = '-',
   locationType = 'Baia',
   serviceType,
-  ownershipShares = [],
-  defaultOwnerName,
-  locationHistory = []
+  locationHistory = [],
+  isAtHaras: isAtHarasProp = true,
 }: AnimalLocationSectionProps) {
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [showOwnershipModal, setShowOwnershipModal] = useState(false);
+  const [presenceLocal, setPresenceLocal] = useState<boolean>(isAtHarasProp);
+  useEffect(() => setPresenceLocal(isAtHarasProp), [isAtHarasProp]);
   const { data: remoteHistory, isLoading } = useAnimalLocationHistory(animalId);
   const { mutateAsync: createLocationChange, isPending: isSaving } = useCreateAnimalLocationChange();
-  const { mutateAsync: saveOwnershipShares, isPending: isSavingOwnership } = useSaveAnimalOwnershipShares();
+  const { mutateAsync: setPresence, isPending: isSavingPresence } = useSetAnimalPresence();
   const { data: harasSettings } = useHarasSettings(harasId || '');
 
   const locationSettings = useMemo(
@@ -62,26 +60,6 @@ export function AnimalLocationSection({
   const parsedCurrentLocation = useMemo(
     () => parseAnimalLocation(currentLocation, serviceType),
     [currentLocation, serviceType]
-  );
-  const activeOwnershipShares = useMemo(
-    () => ownershipShares.filter((share) => !share.end_date),
-    [ownershipShares]
-  );
-  const historicalOwnershipShares = useMemo(
-    () =>
-      ownershipShares
-        .filter((share) => !!share.end_date)
-        .sort((left, right) => (right.end_date || '').localeCompare(left.end_date || '')),
-    [ownershipShares]
-  );
-  const partners = useMemo(
-    () =>
-      activeOwnershipShares.map((share) => ({
-        id: share.id,
-        name: share.is_primary ? `${share.owner_name} (principal)` : share.owner_name,
-        percentage: share.percentage,
-      })),
-    [activeOwnershipShares]
   );
 
   const historyEntries: LocationHistory[] = useMemo(() => {
@@ -126,30 +104,19 @@ export function AnimalLocationSection({
     }
   };
 
-  const handleSaveOwnershipShares = async (
-    shares: Array<{
-      id?: string;
-      owner_name: string;
-      percentage: number;
-      is_primary: boolean;
-    }>
-  ) => {
+  const handleTogglePresence = async (next: boolean) => {
     if (!harasId) {
-      toast.error('Haras não identificado para atualizar a propriedade.');
-      throw new Error('Haras não identificado.');
+      toast.error('Haras não identificado.');
+      return;
     }
-
+    setPresenceLocal(next);
     try {
-      await saveOwnershipShares({
-        animalId,
-        harasId,
-        shares,
-      });
-      toast.success('Propriedade atualizada com sucesso!');
+      await setPresence({ animalId, harasId, isAtHaras: next });
+      toast.success(next ? 'Animal marcado como presente no haras.' : 'Animal marcado como fora do haras.');
     } catch (error) {
-      console.error('Erro ao atualizar cotas do animal:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar propriedade. Tente novamente.');
-      throw error;
+      console.error('Erro ao atualizar presença:', error);
+      toast.error('Erro ao atualizar presença.');
+      setPresenceLocal(!next);
     }
   };
 
@@ -170,6 +137,33 @@ export function AnimalLocationSection({
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-[rgba(255,255,255,0.1)] p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-4 border-b border-gray-200 dark:border-[rgba(255,255,255,0.08)]">
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+                presenceLocal
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                  : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+              }`}
+            >
+              {presenceLocal ? <Home className="w-4 h-4" /> : <PlaneTakeoff className="w-4 h-4" />}
+              {presenceLocal ? 'No Haras' : 'Fora do Haras'}
+            </span>
+          </div>
+          <label
+            className="inline-flex items-center gap-2 cursor-pointer select-none"
+            title="Atualizado automaticamente ao mudar a localização. Você pode ajustar manualmente."
+          >
+            <input
+              type="checkbox"
+              checked={presenceLocal}
+              disabled={isSavingPresence}
+              onChange={(e) => handleTogglePresence(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 dark:border-[rgba(255,255,255,0.2)]"
+            />
+            <span className="text-sm text-foreground dark:text-white">Presente no Haras</span>
+          </label>
+        </div>
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
           <div>
             <h4 className="text-lg text-foreground dark:text-white mb-1">Localizacao Atual</h4>
@@ -178,13 +172,6 @@ export function AnimalLocationSection({
             </p>
           </div>
           <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => setShowOwnershipModal(true)}
-              className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-[rgba(255,255,255,0.1)] text-foreground dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-[#0d0d0d] transition-colors flex items-center justify-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              Gerenciar Propriedade
-            </button>
             <button
               onClick={() => setShowLocationModal(true)}
               className="w-full sm:w-auto px-4 py-2 bg-primary dark:bg-white text-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
@@ -219,92 +206,6 @@ export function AnimalLocationSection({
               )}
             </div>
           </div>
-
-          <div className="flex items-start gap-3 pt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.1)]">
-            <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-              <Users className="w-5 h-5 text-purple-700 dark:text-purple-400" />
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-                <p className="text-sm text-muted-foreground dark:text-[#99a1af]">
-                  Socios / Propriedade
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowOwnershipModal(true)}
-                  className="text-sm text-primary dark:text-white hover:opacity-80 transition-opacity text-left sm:text-right"
-                >
-                  Editar cotas
-                </button>
-              </div>
-
-              {partners.length > 0 ? (
-                <div className="space-y-2">
-                  {partners.map((partner) => (
-                    <div
-                      key={partner.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#0d0d0d] rounded-lg"
-                    >
-                      <span className="text-foreground dark:text-white">{partner.name}</span>
-                      <span className="px-3 py-1 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-full text-sm font-medium">
-                        {partner.percentage}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#0d0d0d] text-sm text-muted-foreground dark:text-[#99a1af]">
-                  Nenhuma cota ativa cadastrada para este animal.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {historicalOwnershipShares.length > 0 && (
-            <div className="flex items-start gap-3 pt-4 border-t border-gray-200 dark:border-[rgba(255,255,255,0.1)]">
-              <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900/30">
-                <Clock className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-              </div>
-              <div className="flex-1">
-                <div className="mb-3">
-                  <p className="text-sm text-muted-foreground dark:text-[#99a1af] mb-1">
-                    Histórico de Propriedade
-                  </p>
-                  <p className="text-xs text-muted-foreground dark:text-[#99a1af]">
-                    Participações encerradas permanecem aqui para consulta.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {historicalOwnershipShares.map((share) => (
-                    <div
-                      key={share.id}
-                      className="p-3 bg-gray-50 dark:bg-[#0d0d0d] rounded-lg border border-gray-200/70 dark:border-[rgba(255,255,255,0.06)]"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div className="text-foreground dark:text-white">
-                          {share.owner_name}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-3 py-1 bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white rounded-full text-sm font-medium">
-                            {share.percentage}%
-                          </span>
-                          {share.is_primary && (
-                            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium">
-                              Principal
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-muted-foreground dark:text-[#99a1af]">
-                        Vigência: {formatDateLabel(share.start_date)} até {formatDateLabel(share.end_date)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -420,16 +321,6 @@ export function AnimalLocationSection({
           onClose={() => setShowLocationModal(false)}
           onSave={handleSaveLocationChange}
           isSaving={isSaving}
-        />
-      )}
-
-      {showOwnershipModal && (
-        <OwnershipSharesModal
-          initialShares={activeOwnershipShares}
-          defaultOwnerName={defaultOwnerName}
-          onClose={() => setShowOwnershipModal(false)}
-          onSave={handleSaveOwnershipShares}
-          isSaving={isSavingOwnership}
         />
       )}
     </div>

@@ -69,11 +69,11 @@ export const collaboratorsService = {
         p_full_name: input.full_name,
         p_role: normalizedRole,
         p_haras_id: input.haras_id,
-        p_role_id: input.role_id ?? null,
-        p_permissions: input.permissions ? normalizeTeamPermissions(input.permissions) : null,
+        p_role_id: input.role_id ?? undefined,
+        p_permissions: input.permissions ? normalizeTeamPermissions(input.permissions) : undefined,
         p_status: input.status ?? 'Ativo',
-        p_created_by: input.created_by ?? null,
-        p_phone: input.phone ?? null,
+        p_created_by: input.created_by ?? undefined,
+        p_phone: input.phone ?? undefined,
       })
 
       if (error) {
